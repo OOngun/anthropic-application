@@ -21,15 +21,22 @@ engagement = pd.read_csv(f'{OUTPUT_DIR}/engagement_depth.csv')
 startup_ga = pd.read_csv(f'{OUTPUT_DIR}/startup_growth_accounting.csv')
 startup_ga['month'] = pd.to_datetime(startup_ga['month'])
 
-COLORS = {'S001': '#2563eb', 'S002': '#059669', 'S003': '#dc2626'}
+COLORS = {'S001': '#472D7B', 'S002': '#3B528B', 'S003': '#21918C'}
 NAMES = {'S001': 'MedScribe AI', 'S002': 'Eigen Technologies', 'S003': 'BuilderKit'}
-MODEL_COLORS = {'sonnet': '#3b82f6', 'opus': '#8b5cf6', 'haiku': '#06b6d4'}
-BG = '#0f172a'
-CARD = '#1e293b'
-TEXT = '#e2e8f0'
-GRID = '#334155'
-MUTED = '#94a3b8'
-DIM = '#64748b'
+MODEL_COLORS = {'sonnet': '#3B528B', 'opus': '#472D7B', 'haiku': '#21918C'}
+BG = '#FFFCFC'
+CARD = '#F8FAFB'
+TEXT = '#14141C'
+GRID = '#E9E5E8'
+MUTED = '#8E8494'
+DIM = '#43394C'
+ACCENT = '#472D7B'
+ACCENT_LIGHT = 'rgba(71, 57, 130, 0.07)'
+ACCENT_SURFACE = 'rgba(71, 57, 130, 0.04)'
+BORDER_SUBTLE = '#ECEDF2'
+SUCCESS = '#22C55E'
+WARNING = '#EAB308'
+DANGER = '#EF4444'
 
 # ============================================================
 # COMPUTE PER-COMPANY METRICS FOR TOP PERFORMERS TABLE
@@ -117,14 +124,15 @@ company_metrics.sort(key=lambda x: x['token_cagr'], reverse=True)
 
 def layout(title, h=380):
     return dict(
-        title=dict(text=title, font=dict(size=13, color=TEXT, family='Inter'), x=0.01),
-        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(family='Inter', color=TEXT, size=11),
-        height=h, margin=dict(l=50, r=20, t=36, b=36),
-        xaxis=dict(gridcolor=GRID, showgrid=True, zeroline=False),
-        yaxis=dict(gridcolor=GRID, showgrid=True, zeroline=False),
-        legend=dict(bgcolor='rgba(0,0,0,0)', font=dict(size=10)),
+        title=dict(text=title, font=dict(size=13, color=TEXT, family='IBM Plex Sans'), x=0.01),
+        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor=BG,
+        font=dict(family='IBM Plex Sans', color=DIM, size=12),
+        height=h, margin=dict(l=50, r=20, t=40, b=40),
+        xaxis=dict(gridcolor=BORDER_SUBTLE, linecolor=GRID, showgrid=True, zeroline=False),
+        yaxis=dict(gridcolor=BORDER_SUBTLE, linecolor=GRID, showgrid=True, zeroline=False),
+        legend=dict(bgcolor='rgba(0,0,0,0)', orientation='h', yanchor='bottom', y=1.02, xanchor='left', x=0, font=dict(size=11)),
         hovermode='x unified',
+        hoverlabel=dict(bgcolor=TEXT, font_color=BG, font_size=12, font_family='IBM Plex Sans'),
     )
 
 _chart_counter = [0]
@@ -145,17 +153,17 @@ def kpi(label, value, sub='', color=TEXT):
 fig_rev_model = go.Figure()
 names_ordered = [m['name'] for m in company_metrics]
 fig_rev_model.add_trace(go.Bar(name='Sonnet', x=names_ordered,
-    y=[m['sonnet_total'] for m in company_metrics], marker_color='#3b82f6'))
+    y=[m['sonnet_total'] for m in company_metrics], marker_color=MODEL_COLORS['sonnet']))
 fig_rev_model.add_trace(go.Bar(name='Opus', x=names_ordered,
-    y=[m['opus_total'] for m in company_metrics], marker_color='#8b5cf6'))
+    y=[m['opus_total'] for m in company_metrics], marker_color=MODEL_COLORS['opus']))
 fig_rev_model.add_trace(go.Bar(name='Haiku', x=names_ordered,
-    y=[m['haiku_total'] for m in company_metrics], marker_color='#06b6d4'))
+    y=[m['haiku_total'] for m in company_metrics], marker_color=MODEL_COLORS['haiku']))
 fig_rev_model.update_layout(**layout('Total Revenue by Model', h=340), barmode='stack')
 fig_rev_model.update_yaxes(tickprefix='$', tickformat=',')
 
 # Revenue by model over time (all companies stacked)
 fig_rev_model_time = go.Figure()
-model_fills = {'Sonnet': 'rgba(59,130,246,0.7)', 'Opus': 'rgba(139,92,246,0.7)', 'Haiku': 'rgba(6,182,212,0.7)'}
+model_fills = {'Sonnet': 'rgba(59,82,139,0.6)', 'Opus': 'rgba(71,45,123,0.6)', 'Haiku': 'rgba(33,145,140,0.6)'}
 for model, col, color in [('Sonnet', 'sonnet_pct', '#3b82f6'), ('Opus', 'opus_pct', '#8b5cf6'), ('Haiku', 'haiku_pct', '#06b6d4')]:
     agg = monthly_usage.groupby('month').apply(lambda g: (g['revenue_usd'] * g[col]).sum()).reset_index()
     agg.columns = ['month', 'rev']
@@ -255,13 +263,13 @@ for sid in ['S001', 'S002', 'S003']:
     # Revenue by model over time
     f = go.Figure()
     f.add_trace(go.Scatter(x=d_usage['month'], y=d_usage['revenue_usd'] * d_usage['sonnet_pct'], name='Sonnet',
-        stackgroup='one', line=dict(color='#3b82f6', width=0), fillcolor='rgba(59,130,246,0.7)',
+        stackgroup='one', line=dict(color=MODEL_COLORS['sonnet'], width=0), fillcolor=model_fills['Sonnet'],
         hovertemplate='$%{y:,.0f}<extra></extra>'))
     f.add_trace(go.Scatter(x=d_usage['month'], y=d_usage['revenue_usd'] * d_usage['opus_pct'], name='Opus',
-        stackgroup='one', line=dict(color='#8b5cf6', width=0), fillcolor='rgba(139,92,246,0.7)',
+        stackgroup='one', line=dict(color=MODEL_COLORS['opus'], width=0), fillcolor=model_fills['Opus'],
         hovertemplate='$%{y:,.0f}<extra></extra>'))
     f.add_trace(go.Scatter(x=d_usage['month'], y=d_usage['revenue_usd'] * d_usage['haiku_pct'], name='Haiku',
-        stackgroup='one', line=dict(color='#06b6d4', width=0), fillcolor='rgba(6,182,212,0.7)',
+        stackgroup='one', line=dict(color=MODEL_COLORS['haiku'], width=0), fillcolor=model_fills['Haiku'],
         hovertemplate='$%{y:,.0f}<extra></extra>'))
     f.update_layout(**layout('Revenue by Model'))
     f.update_yaxes(tickprefix='$', tickformat=',')
@@ -270,22 +278,22 @@ for sid in ['S001', 'S002', 'S003']:
     # Model mix %
     f = go.Figure()
     f.add_trace(go.Scatter(x=d_usage['month'], y=d_usage['sonnet_pct'] * 100, name='Sonnet',
-        stackgroup='one', line=dict(color='#3b82f6', width=0), fillcolor='rgba(59,130,246,0.7)'))
+        stackgroup='one', line=dict(color=MODEL_COLORS['sonnet'], width=0), fillcolor=model_fills['Sonnet']))
     f.add_trace(go.Scatter(x=d_usage['month'], y=d_usage['opus_pct'] * 100, name='Opus',
-        stackgroup='one', line=dict(color='#8b5cf6', width=0), fillcolor='rgba(139,92,246,0.7)'))
+        stackgroup='one', line=dict(color=MODEL_COLORS['opus'], width=0), fillcolor=model_fills['Opus']))
     f.add_trace(go.Scatter(x=d_usage['month'], y=d_usage['haiku_pct'] * 100, name='Haiku',
-        stackgroup='one', line=dict(color='#06b6d4', width=0), fillcolor='rgba(6,182,212,0.7)'))
+        stackgroup='one', line=dict(color=MODEL_COLORS['haiku'], width=0), fillcolor=model_fills['Haiku']))
     f.update_layout(**layout('Model Mix %', h=300))
     f.update_yaxes(ticksuffix='%', range=[0, 100])
     charts['model_mix'] = to_div(f)
 
     # Growth Accounting
     f = go.Figure()
-    f.add_trace(go.Bar(x=d_ga['month'], y=d_ga['new_revenue'], name='New', marker_color='#22c55e'))
-    f.add_trace(go.Bar(x=d_ga['month'], y=d_ga['expansion_revenue'], name='Expansion', marker_color='#3b82f6'))
-    f.add_trace(go.Bar(x=d_ga['month'], y=d_ga['resurrected_revenue'], name='Resurrected', marker_color='#a78bfa'))
-    f.add_trace(go.Bar(x=d_ga['month'], y=-d_ga['churned_revenue'], name='Churned', marker_color='#ef4444'))
-    f.add_trace(go.Bar(x=d_ga['month'], y=-d_ga['contraction_revenue'], name='Contraction', marker_color='#f97316'))
+    f.add_trace(go.Bar(x=d_ga['month'], y=d_ga['new_revenue'], name='New', marker_color=SUCCESS))
+    f.add_trace(go.Bar(x=d_ga['month'], y=d_ga['expansion_revenue'], name='Expansion', marker_color=MODEL_COLORS['sonnet']))
+    f.add_trace(go.Bar(x=d_ga['month'], y=d_ga['resurrected_revenue'], name='Resurrected', marker_color='#5EC962'))
+    f.add_trace(go.Bar(x=d_ga['month'], y=-d_ga['churned_revenue'], name='Churned', marker_color=DANGER))
+    f.add_trace(go.Bar(x=d_ga['month'], y=-d_ga['contraction_revenue'], name='Contraction', marker_color=WARNING))
     f.update_layout(**layout('Spend Growth Accounting'), barmode='relative')
     f.update_yaxes(tickprefix='$', tickformat=',')
     charts['growth_acct'] = to_div(f)
@@ -295,11 +303,11 @@ for sid in ['S001', 'S002', 'S003']:
     f.add_trace(go.Bar(x=d_usage['month'], y=d_usage['api_calls'], name='API Calls',
         marker_color=COLORS[sid], opacity=0.4))
     f.add_trace(go.Scatter(x=d_usage['month'], y=d_usage['active_developers'], name='Active Devs',
-        mode='lines+markers', line=dict(color='#f59e0b', width=2.5), marker=dict(size=5), yaxis='y2'))
+        mode='lines+markers', line=dict(color='#5EC962', width=2.5), marker=dict(size=5), yaxis='y2'))
     dl = layout('API Calls & Active Developers')
     dl['yaxis2'] = dict(overlaying='y', side='right',
         showgrid=False, zeroline=False, title='Developers',
-        titlefont=dict(color='#f59e0b'), tickfont=dict(color='#f59e0b'))
+        titlefont=dict(color='#5EC962'), tickfont=dict(color='#5EC962'))
     dl['yaxis']['title'] = 'API Calls'
     f.update_layout(**dl)
     charts['devs_calls'] = to_div(f)
@@ -319,14 +327,14 @@ for sid in ['S001', 'S002', 'S003']:
     # Latency + Error rate
     f = go.Figure()
     f.add_trace(go.Scatter(x=d_usage['month'], y=d_usage['avg_latency_ms'], name='Avg Latency (ms)',
-        mode='lines+markers', line=dict(color='#06b6d4', width=2), marker=dict(size=4)))
+        mode='lines+markers', line=dict(color=MODEL_COLORS['haiku'], width=2), marker=dict(size=4)))
     f.add_trace(go.Scatter(x=d_usage['month'], y=d_usage['error_rate'] * 100, name='Error Rate (%)',
-        mode='lines+markers', line=dict(color='#ef4444', width=2), marker=dict(size=4), yaxis='y2'))
+        mode='lines+markers', line=dict(color=DANGER, width=2), marker=dict(size=4), yaxis='y2'))
     ll = layout('Latency & Error Rate')
     ll['yaxis']['title'] = 'ms'
     ll['yaxis2'] = dict(overlaying='y', side='right',
         showgrid=False, zeroline=False, title='Error %',
-        ticksuffix='%', titlefont=dict(color='#ef4444'), tickfont=dict(color='#ef4444'))
+        ticksuffix='%', titlefont=dict(color=DANGER), tickfont=dict(color=DANGER))
     f.update_layout(**ll)
     charts['latency'] = to_div(f)
 
@@ -348,10 +356,10 @@ def fmt_pct(v):
 
 table_rows = ''
 for i, m in enumerate(company_metrics):
-    cagr_color = '#22c55e' if m['token_cagr'] > 2 else '#f59e0b' if m['token_cagr'] > 0.5 else '#ef4444'
-    rev_cagr_color = '#22c55e' if m['rev_cagr'] > 2 else '#f59e0b' if m['rev_cagr'] > 0.5 else '#ef4444'
-    roi_color = '#22c55e' if m['roi'] > 2 else '#f59e0b' if m['roi'] > 1 else '#ef4444'
-    momentum_color = '#22c55e' if m['momentum'] > 20 else '#f59e0b' if m['momentum'] > 0 else '#ef4444'
+    cagr_color = SUCCESS if m['token_cagr'] > 2 else WARNING if m['token_cagr'] > 0.5 else DANGER
+    rev_cagr_color = SUCCESS if m['rev_cagr'] > 2 else WARNING if m['rev_cagr'] > 0.5 else DANGER
+    roi_color = SUCCESS if m['roi'] > 2 else WARNING if m['roi'] > 1 else DANGER
+    momentum_color = SUCCESS if m['momentum'] > 20 else WARNING if m['momentum'] > 0 else DANGER
 
     table_rows += f'''<tr class="perf-row" data-sid="{m['sid']}" style="cursor:pointer">
         <td><span class="dot-sm" style="background:{COLORS[m['sid']]}"></span>{m['name']}</td>
@@ -359,7 +367,7 @@ for i, m in enumerate(company_metrics):
         <td style="color:{cagr_color}">{fmt_pct(m['token_cagr'])}</td>
         <td style="color:{rev_cagr_color}">{fmt_pct(m['rev_cagr'])}</td>
         <td>${m['latest_mrr']:,.0f}</td>
-        <td><span style="color:#3b82f6">${m['sonnet_rev']:,.0f}</span> / <span style="color:#8b5cf6">${m['opus_rev']:,.0f}</span> / <span style="color:#06b6d4">${m['haiku_rev']:,.0f}</span></td>
+        <td><span style="color:{MODEL_COLORS['sonnet']}">${m['sonnet_rev']:,.0f}</span> / <span style="color:{MODEL_COLORS['opus']}">${m['opus_rev']:,.0f}</span> / <span style="color:{MODEL_COLORS['haiku']}">${m['haiku_rev']:,.0f}</span></td>
         <td>${m['total_rev']:,.0f}</td>
         <td style="color:{roi_color}">{m['roi']:.1f}x</td>
         <td style="color:{momentum_color}">{m['momentum']:+.0f}%</td>
@@ -407,7 +415,7 @@ total_haiku = sum(m['haiku_total'] for m in company_metrics)
 portfolio_kpis = '<div class="kpi-row">'
 portfolio_kpis += kpi('Total Revenue', f'${total_revenue:,.0f}', 'all partners')
 portfolio_kpis += kpi('Credits Deployed', f'${total_credits:,.0f}', '3 partners')
-portfolio_kpis += kpi('Portfolio ROI', f'{roi:.1f}x', 'rev / credits', '#22c55e' if roi > 2 else '#f97316')
+portfolio_kpis += kpi('Portfolio ROI', f'{roi:.1f}x', 'rev / credits', SUCCESS if roi > 2 else WARNING)
 portfolio_kpis += kpi('Sonnet Revenue', f'${total_sonnet:,.0f}', f'{total_sonnet/total_revenue*100:.0f}% of total', '#3b82f6')
 portfolio_kpis += kpi('Opus Revenue', f'${total_opus:,.0f}', f'{total_opus/total_revenue*100:.0f}% of total', '#8b5cf6')
 portfolio_kpis += kpi('Haiku Revenue', f'${total_haiku:,.0f}', f'{total_haiku/total_revenue*100:.0f}% of total', '#06b6d4')
@@ -418,10 +426,10 @@ def startup_kpis(sid):
     u = monthly_usage[monthly_usage['startup_id'] == sid].sort_values('month')
     latest = u.iloc[-1]
 
-    roi_color = '#22c55e' if m['roi'] > 2 else '#f97316' if m['roi'] > 1 else '#ef4444'
+    roi_color = SUCCESS if m['roi'] > 2 else WARNING if m['roi'] > 1 else DANGER
     payback_val = f"{m['payback']} mo" if m['payback'] else 'Not yet'
-    payback_color = '#22c55e' if m['payback'] and m['payback'] < 18 else '#f97316' if m['payback'] else '#ef4444'
-    cagr_color = '#22c55e' if m['token_cagr'] > 2 else '#f59e0b' if m['token_cagr'] > 0.5 else '#ef4444'
+    payback_color = SUCCESS if m['payback'] and m['payback'] < 18 else WARNING if m['payback'] else DANGER
+    cagr_color = SUCCESS if m['token_cagr'] > 2 else WARNING if m['token_cagr'] > 0.5 else DANGER
 
     html = '<div class="kpi-row">'
     html += kpi('Latest MRR', f'${m["latest_mrr"]:,.0f}', 'API revenue')
@@ -437,7 +445,7 @@ def startup_kpis(sid):
     html += kpi('Sonnet Rev', f'${m["sonnet_total"]:,.0f}', f'{m["sonnet_total"]/m["total_rev"]*100:.0f}% of total', '#3b82f6')
     html += kpi('Opus Rev', f'${m["opus_total"]:,.0f}', f'{m["opus_total"]/m["total_rev"]*100:.0f}% of total', '#8b5cf6')
     html += kpi('Haiku Rev', f'${m["haiku_total"]:,.0f}', f'{m["haiku_total"]/m["total_rev"]*100:.0f}% of total', '#06b6d4')
-    html += kpi('Avg Latency', f'{m["latest_latency"]:.0f}ms', '', '#22c55e' if m['latest_latency'] < 400 else TEXT)
+    html += kpi('Avg Latency', f'{m["latest_latency"]:.0f}ms', '', SUCCESS if m['latest_latency'] < 400 else TEXT)
     html += '</div>'
     return html
 
@@ -539,86 +547,70 @@ full_html = f'''<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Anthropic EMEA Startup Partnerships</title>
 <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 * {{ margin:0; padding:0; box-sizing:border-box; }}
-body {{ font-family:Inter,-apple-system,sans-serif; background:{BG}; color:{TEXT}; line-height:1.5; }}
+body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; color:{TEXT}; line-height:1.5; }}
 
 .topbar {{ padding:20px 32px 16px; border-bottom:1px solid {GRID}; }}
 .topbar-row {{ display:flex; justify-content:space-between; align-items:baseline; }}
-.topbar h1 {{ font-size:20px; font-weight:700; letter-spacing:-0.02em; }}
+.topbar h1 {{ font-size:20px; font-weight:700; letter-spacing:-0.02em; color:{TEXT}; }}
 .topbar .subtitle {{ font-size:12px; color:{MUTED}; margin-top:2px; }}
-.topbar .meta {{ font-size:11px; color:{DIM}; }}
+.topbar .meta {{ font-size:11px; color:{MUTED}; }}
 
-.assumptions {{ padding:10px 32px; background:rgba(30,41,59,0.6); border-bottom:1px solid {GRID}; display:flex; gap:32px; flex-wrap:wrap; }}
+.assumptions {{ padding:10px 32px; background:{ACCENT_SURFACE}; border-bottom:1px solid {GRID}; display:flex; gap:32px; flex-wrap:wrap; }}
 .assumptions .a-item {{ font-size:11px; color:{MUTED}; }}
 .assumptions .a-item strong {{ color:{TEXT}; font-weight:600; }}
 
-.tabs {{ display:flex; padding:0 32px; border-bottom:1px solid {GRID}; background:{CARD}; position:sticky; top:0; z-index:100; }}
-.tab {{ padding:12px 20px; font-size:13px; font-weight:500; color:{MUTED}; cursor:pointer; border-bottom:2px solid transparent; transition:all .15s; user-select:none; position:relative; }}
-.tab:hover {{ color:{TEXT}; }}
-.tab.active {{ color:{TEXT}; border-bottom-color:transparent; }}
+.tabs {{ display:flex; padding:0 32px; border-bottom:1px solid {GRID}; background:{BG}; position:sticky; top:0; z-index:100; }}
+.tab {{ padding:12px 20px; font-size:13px; font-weight:500; color:{MUTED}; cursor:pointer; border-bottom:2px solid transparent; transition:all .15s; user-select:none; }}
+.tab:hover {{ color:{DIM}; }}
+.tab.active {{ color:{TEXT}; border-bottom-color:{ACCENT}; }}
 .tab .dot {{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; vertical-align:middle; }}
-.tab::after {{ content:''; position:absolute; bottom:-1px; left:50%; width:0; height:2px; background:#3b82f6; transition:all 0.25s cubic-bezier(0.22,1,0.36,1); transform:translateX(-50%); }}
-.tab.active::after {{ width:100%; left:0; transform:translateX(0); }}
 
 .content {{ padding:24px 32px; }}
 .tab-panel {{ display:none; }}
-.tab-panel.active {{ display:block; animation:fadeIn 0.3s ease-out; }}
+.tab-panel.active {{ display:block; }}
+@keyframes fadeIn {{ from {{ opacity:0; }} to {{ opacity:1; }} }}
 
-.section-header {{ font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:{MUTED}; margin:24px 0 12px; padding-bottom:6px; border-bottom:1px solid {GRID}; opacity:0; animation:slideInLeft 0.4s 0.1s cubic-bezier(0.22,1,0.36,1) forwards; }}
+.section-header {{ font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:{MUTED}; margin:24px 0 12px; padding-bottom:6px; border-bottom:1px solid {GRID}; }}
 .section-header:first-child {{ margin-top:0; }}
 
 .kpi-row {{ display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap; }}
-.kpi {{ background:{CARD}; border-radius:10px; padding:14px 18px; flex:1; min-width:120px; opacity:0; animation:fadeSlideUp 0.4s cubic-bezier(0.22,1,0.36,1) forwards; }}
-.kpi:nth-child(1) {{ animation-delay:0.05s; }}
-.kpi:nth-child(2) {{ animation-delay:0.10s; }}
-.kpi:nth-child(3) {{ animation-delay:0.15s; }}
-.kpi:nth-child(4) {{ animation-delay:0.20s; }}
-.kpi:nth-child(5) {{ animation-delay:0.25s; }}
-.kpi:nth-child(6) {{ animation-delay:0.30s; }}
+.kpi {{ background:{CARD}; border:1px solid {GRID}; border-radius:8px; padding:14px 18px; flex:1; min-width:140px; }}
 .kpi-l {{ font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:{MUTED}; margin-bottom:2px; }}
-.kpi-v {{ font-size:20px; font-weight:700; }}
-.kpi-s {{ font-size:10px; color:{DIM}; }}
+.kpi-v {{ font-size:24px; font-weight:700; }}
+.kpi-s {{ font-size:11px; color:{MUTED}; }}
 
-.card {{ background:{CARD}; border-radius:10px; padding:14px; overflow:hidden; transition:transform 0.25s cubic-bezier(0.22,1,0.36,1), box-shadow 0.25s ease; }}
-.card:hover {{ transform:translateY(-3px); box-shadow:0 8px 24px rgba(0,0,0,0.3); }}
+.card {{ background:{CARD}; border:1px solid {GRID}; border-radius:8px; padding:16px; overflow:hidden; }}
 .row-1 {{ display:grid; grid-template-columns:1fr; gap:16px; margin-bottom:16px; }}
 .row-2 {{ display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }}
 
-.startup-hero {{ background:{CARD}; border-radius:10px; padding:18px 20px; margin-bottom:16px; animation:slideInLeft 0.5s cubic-bezier(0.22,1,0.36,1) forwards; }}
+.startup-hero {{ background:{CARD}; border:1px solid {GRID}; border-radius:8px; padding:18px 20px; margin-bottom:16px; }}
 .hero-top {{ display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }}
-.hero-name {{ font-size:18px; font-weight:700; margin-right:10px; }}
+.hero-name {{ font-size:18px; font-weight:700; margin-right:10px; color:{TEXT}; }}
 .badge {{ font-size:9px; font-weight:700; padding:2px 8px; border-radius:10px; color:#fff; letter-spacing:.04em; vertical-align:middle; }}
 .hero-meta {{ font-size:12px; color:{MUTED}; }}
-.hero-desc {{ font-size:12px; color:#cbd5e1; margin-top:4px; }}
+.hero-desc {{ font-size:12px; color:{DIM}; margin-top:4px; }}
 
 .filter-bar {{ display:flex; align-items:center; gap:8px; margin-bottom:16px; }}
-.filter-label {{ font-size:11px; color:{DIM}; text-transform:uppercase; letter-spacing:.05em; margin-right:4px; }}
-.pill {{ display:inline-flex; align-items:center; gap:6px; padding:6px 14px; border-radius:20px; border:1px solid {GRID}; background:transparent; color:{MUTED}; font-size:12px; font-family:Inter,sans-serif; cursor:pointer; transition:all 0.2s cubic-bezier(0.22,1,0.36,1); user-select:none; }}
+.filter-label {{ font-size:11px; color:{MUTED}; text-transform:uppercase; letter-spacing:.05em; margin-right:4px; }}
+.pill {{ display:inline-flex; align-items:center; gap:6px; padding:6px 14px; border-radius:20px; border:1px solid {GRID}; background:transparent; color:{MUTED}; font-size:12px; font-family:'IBM Plex Sans',sans-serif; cursor:pointer; transition:all 0.15s; user-select:none; }}
 .pill:hover {{ border-color:{MUTED}; }}
-.pill.active {{ background:rgba(255,255,255,0.06); border-color:var(--pill-color); color:{TEXT}; }}
-.pill:active {{ transform:scale(0.94); }}
+.pill.active {{ background:{ACCENT_LIGHT}; border-color:var(--pill-color); color:{TEXT}; }}
 .pill .dot {{ display:inline-block; width:8px; height:8px; border-radius:50%; }}
 .pill:not(.active) .dot {{ opacity:0.3; }}
 
-/* Top performers table */
 .perf-table-wrap {{ padding:0; overflow-x:auto; }}
-.perf-table {{ width:100%; border-collapse:collapse; font-size:12px; }}
-.perf-table th {{ text-align:left; padding:10px 12px; border-bottom:1px solid {GRID}; color:{MUTED}; font-size:10px; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; white-space:nowrap; }}
-.perf-table td {{ padding:10px 12px; border-bottom:1px solid rgba(51,65,85,0.4); white-space:nowrap; }}
+.perf-table {{ width:100%; border-collapse:collapse; font-size:13px; }}
+.perf-table th {{ text-align:left; padding:10px 14px; border-bottom:1px solid {GRID}; color:{MUTED}; font-size:11px; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; white-space:nowrap; }}
+.perf-table td {{ padding:10px 14px; border-bottom:1px solid {BORDER_SUBTLE}; white-space:nowrap; color:{DIM}; }}
 .perf-table tr:last-child td {{ border-bottom:none; }}
-.perf-table .perf-row:hover {{ background:rgba(255,255,255,0.04); }}
+.perf-table .perf-row:hover {{ background:{ACCENT_SURFACE}; }}
 .perf-table .perf-row td:first-child {{ font-weight:600; color:{TEXT}; }}
 .dot-sm {{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:8px; vertical-align:middle; }}
-.model-legend {{ font-size:8px; color:{DIM}; font-weight:400; text-transform:none; letter-spacing:0; }}
+.model-legend {{ font-size:8px; color:{MUTED}; font-weight:400; text-transform:none; letter-spacing:0; }}
 
-/* Motion */
-@keyframes fadeSlideUp {{ from {{ opacity:0; transform:translateY(18px); }} to {{ opacity:1; transform:translateY(0); }} }}
-@keyframes fadeIn {{ from {{ opacity:0; }} to {{ opacity:1; }} }}
-@keyframes slideInLeft {{ from {{ opacity:0; transform:translateX(-20px); }} to {{ opacity:1; transform:translateX(0); }} }}
-.anim-hidden {{ opacity:0; transform:translateY(18px); }}
-.anim-visible {{ animation:fadeSlideUp 0.45s cubic-bezier(0.22,1,0.36,1) forwards; }}
 html {{ scroll-behavior:smooth; }}
 
 @media (max-width:900px) {{
@@ -670,48 +662,13 @@ html {{ scroll-behavior:smooth; }}
 </div>
 
 <script>
-// Scroll-reveal cards
-const observer = new IntersectionObserver((entries) => {{
-    entries.forEach((entry) => {{
-        if (entry.isIntersecting) {{
-            const el = entry.target;
-            el.style.animationDelay = (el.dataset.animDelay || '0') + 's';
-            el.classList.remove('anim-hidden');
-            el.classList.add('anim-visible');
-            observer.unobserve(el);
-        }}
-    }});
-}}, {{ threshold: 0.08, rootMargin: '0px 0px -30px 0px' }});
-
-function observeCards(panel) {{
-    panel.querySelectorAll('.card, .row-1, .row-2, .perf-table-wrap').forEach((el, i) => {{
-        el.classList.add('anim-hidden');
-        el.dataset.animDelay = (i * 0.08).toFixed(2);
-        observer.observe(el);
-    }});
-}}
-document.querySelectorAll('.tab-panel.active').forEach(observeCards);
-
 // Tab switching
 document.querySelectorAll('.tab').forEach(tab => {{
     tab.addEventListener('click', () => {{
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
         tab.classList.add('active');
-        const panel = document.getElementById('panel-' + tab.dataset.tab);
-        panel.classList.add('active');
-        observeCards(panel);
-        panel.querySelectorAll('.kpi').forEach((kpi, i) => {{
-            kpi.style.animation = 'none';
-            kpi.offsetHeight;
-            kpi.style.animation = '';
-            kpi.style.animationDelay = (i * 0.05) + 's';
-        }});
-        panel.querySelectorAll('.startup-hero, .section-header').forEach(el => {{
-            el.style.animation = 'none';
-            el.offsetHeight;
-            el.style.animation = '';
-        }});
+        document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
         setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
         window.scrollTo({{ top: 0, behavior: 'smooth' }});
     }});
