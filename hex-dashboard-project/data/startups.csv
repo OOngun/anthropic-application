@@ -1,0 +1,4 @@
+startup_id,startup_name,hq_city,country,region,vertical,stage,founding_year,onboard_date,source,tier,archetype,description
+S001,MedScribe AI,Paris,France,France,HealthTech,Series A,2022,2024-01-01,accelerator,growth,rocket,AI clinical note-taking. Uses Claude to transcribe and summarise patient consultations. Expanding from France into DACH.
+S002,Eigen Technologies,London,UK,UK & Ireland,Document AI,Series B,2014,2024-04-01,vc_referral,growth,steady,Intelligent document processing for financial services. Migrating from in-house models to Claude for complex extraction. Established but conservative growth.
+S003,BuilderKit,London,UK,UK & Ireland,No-Code/AI,Series B,2018,2024-06-01,vc_referral,growth,declining,AI-powered no-code app builder. Initially enthusiastic Claude adopter but struggled with cost management and shifted some workloads to open-source models.

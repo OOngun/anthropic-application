@@ -1,0 +1,8 @@
+startup_id,grant_date,grant_type,amount_usd
+S001,2024-01-01,initial,24059
+S001,2024-06-01,topup,14115
+S001,2024-12-01,renewal,18025
+S002,2024-04-01,initial,24593
+S002,2024-11-01,topup,10051
+S002,2025-03-01,renewal,18451
+S003,2024-06-01,initial,26560
