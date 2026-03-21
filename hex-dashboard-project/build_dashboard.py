@@ -229,7 +229,7 @@ for sid in ['S001', 'S002', 'S003']:
         hovertemplate='%{y} devs<extra></extra>'))
 fig_devs.update_layout(**layout('Active Developers'))
 
-PORTFOLIO_CHART_IDS = ['p-rev', 'p-tokens', 'p-payback', 'p-qr', 'p-devs']
+PORTFOLIO_CHART_IDS = ['p-rev', 'p-devs']
 
 # ============================================================
 # PER-STARTUP CHARTS
@@ -413,12 +413,18 @@ total_opus = sum(m['opus_total'] for m in company_metrics)
 total_haiku = sum(m['haiku_total'] for m in company_metrics)
 
 portfolio_kpis = '<div class="kpi-row">'
-portfolio_kpis += kpi('Total Revenue', f'${total_revenue:,.0f}', 'all partners')
+portfolio_kpis += f'''<div class="kpi kpi-expandable" onclick="this.classList.toggle('expanded')">
+    <div class="kpi-l">Total Revenue</div>
+    <div class="kpi-v">${total_revenue:,.0f}</div>
+    <div class="kpi-s">all partners &middot; <span class="expand-hint">click to expand</span></div>
+    <div class="kpi-breakdown">
+        <div class="kpi-breakdown-row"><span class="dot-sm" style="background:{MODEL_COLORS['sonnet']}"></span>Sonnet <span style="color:{MODEL_COLORS['sonnet']}">${total_sonnet:,.0f}</span> <span class="kpi-s">{total_sonnet/total_revenue*100:.0f}%</span></div>
+        <div class="kpi-breakdown-row"><span class="dot-sm" style="background:{MODEL_COLORS['opus']}"></span>Opus <span style="color:{MODEL_COLORS['opus']}">${total_opus:,.0f}</span> <span class="kpi-s">{total_opus/total_revenue*100:.0f}%</span></div>
+        <div class="kpi-breakdown-row"><span class="dot-sm" style="background:{MODEL_COLORS['haiku']}"></span>Haiku <span style="color:{MODEL_COLORS['haiku']}">${total_haiku:,.0f}</span> <span class="kpi-s">{total_haiku/total_revenue*100:.0f}%</span></div>
+    </div>
+</div>'''
 portfolio_kpis += kpi('Credits Deployed', f'${total_credits:,.0f}', '3 partners')
-portfolio_kpis += kpi('Portfolio ROI', f'{roi:.1f}x', 'rev / credits', SUCCESS if roi > 2 else WARNING)
-portfolio_kpis += kpi('Sonnet Revenue', f'${total_sonnet:,.0f}', f'{total_sonnet/total_revenue*100:.0f}% of total', '#3b82f6')
-portfolio_kpis += kpi('Opus Revenue', f'${total_opus:,.0f}', f'{total_opus/total_revenue*100:.0f}% of total', '#8b5cf6')
-portfolio_kpis += kpi('Haiku Revenue', f'${total_haiku:,.0f}', f'{total_haiku/total_revenue*100:.0f}% of total', '#06b6d4')
+portfolio_kpis += kpi('Active Developers', f'{sum(m["active_devs"] for m in company_metrics)}', 'across portfolio')
 portfolio_kpis += '</div>'
 
 def startup_kpis(sid):
@@ -502,13 +508,6 @@ def startup_tab_html(sid):
 # ============================================================
 
 portfolio_content = f'''
-<div class="filter-bar">
-    <span class="filter-label">Filter</span>
-    <button class="pill active" data-sid="S001" style="--pill-color:#2563eb"><span class="dot" style="background:#2563eb"></span>MedScribe AI</button>
-    <button class="pill active" data-sid="S002" style="--pill-color:#059669"><span class="dot" style="background:#059669"></span>Eigen Technologies</button>
-    <button class="pill active" data-sid="S003" style="--pill-color:#dc2626"><span class="dot" style="background:#dc2626"></span>BuilderKit</button>
-</div>
-
 {portfolio_kpis}
 
 <div class="section-header">Top Performers</div>
@@ -520,20 +519,31 @@ portfolio_content = f'''
     <div class="card">{to_div(fig_rev_model_time, 'p-rev-model-time')}</div>
 </div>
 
-<div class="section-header">Revenue & Credit Economics</div>
-<div class="row-2">
+<div class="section-header">Revenue & Token Consumption</div>
+<div class="chart-filter-wrap">
+    <div class="chart-filters" id="rev-chart-filters">
+        <button class="chip active" data-sid="S001" style="--chip-color:{COLORS['S001']}"><span class="dot-sm" style="background:{COLORS['S001']}"></span>MedScribe AI</button>
+        <button class="chip active" data-sid="S002" style="--chip-color:{COLORS['S002']}"><span class="dot-sm" style="background:{COLORS['S002']}"></span>Eigen Technologies</button>
+        <button class="chip active" data-sid="S003" style="--chip-color:{COLORS['S003']}"><span class="dot-sm" style="background:{COLORS['S003']}"></span>BuilderKit</button>
+        <span class="chip-divider"></span>
+        <button class="chip toggle-chip active" data-metric="revenue">Revenue ($)</button>
+        <button class="chip toggle-chip" data-metric="tokens">Tokens</button>
+    </div>
     <div class="card">{to_div(fig_rev, 'p-rev')}</div>
-    <div class="card">{to_div(fig_tokens, 'p-tokens')}</div>
 </div>
-<div class="row-2">
-    <div class="card">{to_div(fig_payback, 'p-payback')}</div>
+
+<div class="section-header">Active Developers</div>
+<div class="row-1">
     <div class="card">{to_div(fig_devs, 'p-devs')}</div>
 </div>
 
-<div class="section-header">Spend Health</div>
-<div class="row-1">
-    <div class="card">{to_div(fig_qr, 'p-qr')}</div>
-</div>
+<!-- TODO: Credit Payback chart — needs refinement on what "payback" means in credit context -->
+<!-- <div class="section-header">Credit Payback</div>
+<div class="row-1"><div class="card">{to_div(fig_payback, 'p-payback')}</div></div> -->
+
+<!-- TODO: Spend Quick Ratio — need better understanding of growth accounting decomposition before showing -->
+<!-- <div class="section-header">Spend Health</div>
+<div class="row-1"><div class="card">{to_div(fig_qr, 'p-qr')}</div></div> -->
 '''
 
 # ============================================================
@@ -611,6 +621,26 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .dot-sm {{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:8px; vertical-align:middle; }}
 .model-legend {{ font-size:8px; color:{MUTED}; font-weight:400; text-transform:none; letter-spacing:0; }}
 
+/* Expandable KPI */
+.kpi-expandable {{ cursor:pointer; position:relative; }}
+.kpi-expandable .expand-hint {{ color:{ACCENT}; font-size:9px; }}
+.kpi-expandable .kpi-breakdown {{ max-height:0; overflow:hidden; transition:max-height 0.3s ease, opacity 0.3s ease, margin 0.2s ease; opacity:0; margin-top:0; }}
+.kpi-expandable.expanded .kpi-breakdown {{ max-height:120px; opacity:1; margin-top:10px; }}
+.kpi-expandable.expanded .expand-hint {{ display:none; }}
+.kpi-breakdown-row {{ display:flex; align-items:center; gap:8px; font-size:12px; color:{DIM}; padding:3px 0; }}
+.kpi-breakdown-row span.kpi-s {{ margin-left:auto; }}
+
+/* Chart filter chips */
+.chart-filter-wrap {{ margin-bottom:16px; }}
+.chart-filters {{ display:flex; align-items:center; gap:6px; margin-bottom:10px; flex-wrap:wrap; }}
+.chip {{ display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:16px; border:1px solid {GRID}; background:transparent; color:{MUTED}; font-size:12px; font-family:IBM Plex Sans,Inter,sans-serif; cursor:pointer; transition:all 0.15s; user-select:none; }}
+.chip:hover {{ border-color:{MUTED}; }}
+.chip.active {{ background:{ACCENT_LIGHT}; border-color:var(--chip-color, {ACCENT}); color:{TEXT}; }}
+.chip:active {{ transform:scale(0.95); }}
+.chip-divider {{ width:1px; height:20px; background:{GRID}; margin:0 4px; }}
+.toggle-chip {{ --chip-color:{ACCENT}; }}
+.toggle-chip.active {{ background:{ACCENT_LIGHT}; border-color:{ACCENT}; }}
+
 html {{ scroll-behavior:smooth; }}
 
 @media (max-width:900px) {{
@@ -683,26 +713,68 @@ document.querySelectorAll('.perf-row').forEach(row => {{
     }});
 }});
 
-// Portfolio filter
-const chartIds = {json.dumps(PORTFOLIO_CHART_IDS)};
+// Chart company filter chips
+const revChartId = 'p-rev';
+const tokChartId = 'p-tokens';
+const devChartId = 'p-devs';
 const sidOrder = ['S001', 'S002', 'S003'];
-const activeFilters = {{ S001: true, S002: true, S003: true }};
-document.querySelectorAll('.pill').forEach(pill => {{
-    pill.addEventListener('click', () => {{
-        const sid = pill.dataset.sid;
-        activeFilters[sid] = !activeFilters[sid];
-        pill.classList.toggle('active');
+const activeCompanies = {{ S001: true, S002: true, S003: true }};
+let showingMetric = 'revenue'; // or 'tokens'
+
+// Company chips — toggle traces on revenue and dev charts
+document.querySelectorAll('#rev-chart-filters .chip[data-sid]').forEach(chip => {{
+    chip.addEventListener('click', () => {{
+        const sid = chip.dataset.sid;
+        activeCompanies[sid] = !activeCompanies[sid];
+        chip.classList.toggle('active');
         const traceIdx = sidOrder.indexOf(sid);
-        const vis = activeFilters[sid] ? true : 'legendonly';
-        chartIds.forEach(id => {{
-            const el = document.getElementById(id);
-            if (el && el.data && traceIdx < el.data.length) {{
-                Plotly.restyle(id, {{ visible: vis }}, [traceIdx]);
-            }}
-        }});
+        const vis = activeCompanies[sid] ? true : 'legendonly';
+
+        // Toggle on revenue chart
+        const revEl = document.getElementById(revChartId);
+        if (revEl && revEl.data && traceIdx < revEl.data.length) {{
+            Plotly.restyle(revChartId, {{ visible: vis }}, [traceIdx]);
+        }}
+
+        // Toggle on devs chart
+        const devEl = document.getElementById(devChartId);
+        if (devEl && devEl.data && traceIdx < devEl.data.length) {{
+            Plotly.restyle(devChartId, {{ visible: vis }}, [traceIdx]);
+        }}
+
         // Toggle table rows
         document.querySelectorAll('.perf-row[data-sid="' + sid + '"]').forEach(r => {{
-            r.style.display = activeFilters[sid] ? '' : 'none';
+            r.style.display = activeCompanies[sid] ? '' : 'none';
+        }});
+    }});
+}});
+
+// Revenue/Tokens metric toggle
+const tokenData = {json.dumps({sid: monthly_usage[monthly_usage['startup_id']==sid].sort_values('month')[['total_tokens']].values.flatten().tolist() for sid in ['S001','S002','S003']})};
+const revenueData = {json.dumps({sid: monthly_usage[monthly_usage['startup_id']==sid].sort_values('month')[['revenue_usd']].values.flatten().tolist() for sid in ['S001','S002','S003']})};
+
+document.querySelectorAll('.toggle-chip').forEach(chip => {{
+    chip.addEventListener('click', () => {{
+        document.querySelectorAll('.toggle-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        showingMetric = chip.dataset.metric;
+
+        const data = showingMetric === 'tokens' ? tokenData : revenueData;
+        const prefix = showingMetric === 'tokens' ? '' : '$';
+        const fmt = showingMetric === 'tokens' ? '%{{y:,.0f}}<extra></extra>' : '$%{{y:,.0f}}<extra></extra>';
+
+        sidOrder.forEach((sid, i) => {{
+            Plotly.restyle(revChartId, {{
+                y: [data[sid]],
+                hovertemplate: fmt
+            }}, [i]);
+        }});
+
+        const titleText = showingMetric === 'tokens' ? 'Monthly Token Consumption' : 'Monthly API Revenue';
+        const tickpre = showingMetric === 'tokens' ? '' : '$';
+        Plotly.relayout(revChartId, {{
+            'title.text': titleText,
+            'yaxis.tickprefix': tickpre
         }});
     }});
 }});
