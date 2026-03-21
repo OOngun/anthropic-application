@@ -828,6 +828,17 @@ def startup_tab_html(sid):
     s = startups[startups['startup_id'] == sid].iloc[0]
     ch = startup_charts[sid]
 
+    # Compute per-company summary values for section headers
+    m = next(x for x in company_metrics if x['sid'] == sid)
+    d_dga = dev_ga[dev_ga['startup_id'] == sid]
+    latest_dqr = d_dga.dropna(subset=['dev_quick_ratio'])['dev_quick_ratio'].iloc[-1] if len(d_dga.dropna(subset=['dev_quick_ratio'])) > 0 else 0
+    d_ga_s = startup_ga[startup_ga['startup_id'] == sid]
+    latest_gret = d_ga_s['gross_retention_pct'].iloc[-1] if len(d_ga_s) > 0 and 'gross_retention_pct' in d_ga_s.columns else 0
+
+    # Per-company cohort LTV
+    cd_s = cohort_df[cohort_df['startup_id'] == sid]
+    ltv_12 = cd_s[cd_s['months_since'] <= 12]['revenue'].sum() if len(cd_s) > 0 else 0
+
     html = f'''
     <div class="startup-hero" style="border-left: 4px solid {COLORS[sid]}">
         <div class="hero-top">
@@ -842,36 +853,88 @@ def startup_tab_html(sid):
 
     {startup_kpis(sid)}
 
-    <div class="section-header">Revenue Growth Accounting</div>
-    <div class="row-1">
-        <div class="card">{ch['growth_acct']}</div>
+    <!-- SECTION 1: Growth Accounting — Users -->
+    <div class="analysis-section" data-section="{sid}-user-ga">
+        <div class="analysis-header" onclick="toggleSection(this)">
+            <div class="analysis-title"><span class="chevron">▼</span> Growth Accounting — Users</div>
+            <div class="analysis-summary">
+                <span class="sum-item">Devs <span class="sum-val">{m['active_devs']}</span></span>
+                <span class="sum-item">QR <span class="sum-val">{latest_dqr:.1f}x</span></span>
+            </div>
+        </div>
+        <div class="analysis-body">
+            <div class="mode-tabs" data-section="{sid}-user-ga">
+                <div class="mode-tab active" data-mode="qr">Quick Ratio</div>
+                <div class="mode-tab" data-mode="ga">Growth Accounting</div>
+                {'<div class="mode-tab" data-mode="retention">Cohort Retention</div>' if 'dev_retention' in ch else ''}
+            </div>
+            <div class="mode-panel active" data-mode="qr">
+                <div class="row-1"><div class="card">{ch['dev_qr']}</div></div>
+            </div>
+            <div class="mode-panel" data-mode="ga">
+                <div class="row-1"><div class="card">{ch['dev_ga']}</div></div>
+            </div>
+            {'<div class="mode-panel" data-mode="retention"><div class="row-1"><div class="card">' + ch['dev_retention'] + '</div></div></div>' if 'dev_retention' in ch else ''}
+        </div>
     </div>
 
-    <div class="section-header">Developer Growth Accounting</div>
-    <div class="row-2">
-        <div class="card">{ch['dev_ga']}</div>
-        <div class="card">{ch['dev_qr']}</div>
+    <!-- SECTION 2: Growth Accounting — Revenue -->
+    <div class="analysis-section" data-section="{sid}-rev-ga">
+        <div class="analysis-header" onclick="toggleSection(this)">
+            <div class="analysis-title"><span class="chevron">▼</span> Growth Accounting — Revenue</div>
+            <div class="analysis-summary">
+                <span class="sum-item">MRR <span class="sum-val">${m['latest_mrr']:,.0f}</span></span>
+                <span class="sum-item">CAGR <span class="sum-val">{m['token_cagr']*100:.0f}%</span></span>
+            </div>
+        </div>
+        <div class="analysis-body">
+            <div class="mode-tabs" data-section="{sid}-rev-ga">
+                <div class="mode-tab active" data-mode="ga">Growth Accounting</div>
+                <div class="mode-tab" data-mode="rev-tok">Revenue & Tokens</div>
+                <div class="mode-tab" data-mode="model">By Model</div>
+                <div class="mode-tab" data-mode="mix">Model Mix</div>
+            </div>
+            <div class="mode-panel active" data-mode="ga">
+                <div class="row-1"><div class="card">{ch['growth_acct']}</div></div>
+            </div>
+            <div class="mode-panel" data-mode="rev-tok">
+                <div class="row-2">
+                    <div class="card">{ch['revenue']}</div>
+                    <div class="card">{ch['tokens']}</div>
+                </div>
+            </div>
+            <div class="mode-panel" data-mode="model">
+                <div class="row-1"><div class="card">{ch['rev_by_model']}</div></div>
+            </div>
+            <div class="mode-panel" data-mode="mix">
+                <div class="row-1"><div class="card">{ch['model_mix']}</div></div>
+            </div>
+        </div>
     </div>
-    {'<div class="row-1"><div class="card">' + ch["dev_retention"] + '</div></div>' if 'dev_retention' in ch else ''}
 
-    <div class="section-header">Revenue & Tokens</div>
-    <div class="row-2">
-        <div class="card">{ch['revenue']}</div>
-        <div class="card">{ch['tokens']}</div>
+    <!-- SECTION 3: Adoption & Reliability -->
+    <div class="analysis-section" data-section="{sid}-adoption">
+        <div class="analysis-header" onclick="toggleSection(this)">
+            <div class="analysis-title"><span class="chevron">▼</span> Adoption & Reliability</div>
+            <div class="analysis-summary">
+                <span class="sum-item">Latency <span class="sum-val">{m['latest_latency']:.0f}ms</span></span>
+            </div>
+        </div>
+        <div class="analysis-body">
+            <div class="mode-tabs" data-section="{sid}-adoption">
+                <div class="mode-tab active" data-mode="devs">API Calls & Devs</div>
+                <div class="mode-tab" data-mode="latency">Latency & Errors</div>
+                {'<div class="mode-tab" data-mode="engagement">Engagement (L28)</div>' if 'engagement' in ch else ''}
+            </div>
+            <div class="mode-panel active" data-mode="devs">
+                <div class="row-1"><div class="card">{ch['devs_calls']}</div></div>
+            </div>
+            <div class="mode-panel" data-mode="latency">
+                <div class="row-1"><div class="card">{ch['latency']}</div></div>
+            </div>
+            {'<div class="mode-panel" data-mode="engagement"><div class="row-1"><div class="card">' + ch['engagement'] + '</div></div></div>' if 'engagement' in ch else ''}
+        </div>
     </div>
-
-    <div class="section-header">Revenue by Model</div>
-    <div class="row-2">
-        <div class="card">{ch['rev_by_model']}</div>
-        <div class="card">{ch['model_mix']}</div>
-    </div>
-
-    <div class="section-header">Adoption & Reliability</div>
-    <div class="row-2">
-        <div class="card">{ch['devs_calls']}</div>
-        <div class="card">{ch['latency']}</div>
-    </div>
-    {'<div class="row-1"><div class="card">' + ch['engagement'] + '</div></div>' if 'engagement' in ch else ''}
     '''
     return html
 
