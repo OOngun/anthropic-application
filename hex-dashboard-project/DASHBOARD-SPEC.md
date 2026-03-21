@@ -1,5 +1,24 @@
 # Dashboard Specification — Anthropic EMEA Startup Partnerships
 
+## Strategic Context
+
+The startup credit program is fundamentally a **customer acquisition cost (CAC) play**. Credits are an investment to create switching costs and long-term revenue:
+
+1. **Land** — Deploy credits ($25K base) to remove the cost barrier for startups to build on Claude
+2. **Integrate** — Startup builds prompts, chains, and product features on Claude's API. Every line of integration code increases switching cost.
+3. **Lock-in** — Once Claude is wired into their product loop, migrating to OpenAI/Gemini means rewriting prompts, re-testing behaviour, retraining the team. This is the moat.
+4. **Convert** — Credits exhaust → startup starts paying. The bet has paid off.
+5. **Expand** — Usage scales with their growth. Revenue compounds.
+
+The dashboard exists to answer: **is this investment strategy working, and which startups should we double down on vs. cut loose?**
+
+What we're really measuring isn't just volume — it's **depth of integration**:
+- A startup burning tokens on experiments = low value
+- A startup with Claude in their core product loop = high value, even at lower absolute token count
+- Consistency (daily API calls = production; sporadic bursts = experimenting)
+- Breadth of model usage (multiple models = real system architecture, not one prompt)
+- Growth trajectory (small but accelerating = they've found PMF with Claude in the loop)
+
 ## Scope
 
 This dashboard monitors **direct API partners only** — startups that call Anthropic's API with their own API keys and receive credit grants through the partnerships program.
