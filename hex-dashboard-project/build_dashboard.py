@@ -383,15 +383,15 @@ for sid in ['S001', 'S002', 'S003']:
 fig_rev.update_layout(**layout('Monthly API Revenue'))
 fig_rev.update_yaxes(tickprefix='$', tickformat=',')
 
-# Token consumption
+# Token consumption (in millions for readability)
 fig_tokens = go.Figure()
 for sid in ['S001', 'S002', 'S003']:
     d = monthly_usage[monthly_usage['startup_id'] == sid].sort_values('month')
-    fig_tokens.add_trace(go.Scatter(x=d['month'], y=d['total_tokens'], name=NAMES[sid],
+    fig_tokens.add_trace(go.Scatter(x=d['month'], y=d['total_tokens'] / 1e6, name=NAMES[sid],
         mode='lines+markers', line=dict(color=COLORS[sid], width=2.5), marker=dict(size=4),
-        hovertemplate='%{y:,.0f}<extra></extra>'))
+        hovertemplate='%{y:,.0f}M tokens<extra></extra>'))
 fig_tokens.update_layout(**layout('Monthly Token Consumption'))
-fig_tokens.update_yaxes(tickformat=',')
+fig_tokens.update_yaxes(ticksuffix='M', tickformat=',')
 
 # Credit Payback
 fig_payback = go.Figure()
@@ -452,11 +452,12 @@ for sid in ['S001', 'S002', 'S003']:
 
     # Token consumption
     f = go.Figure()
-    f.add_trace(go.Scatter(x=d_usage['month'], y=d_usage['total_tokens'], mode='lines+markers',
+    tok_millions = d_usage['total_tokens'] / 1e6
+    f.add_trace(go.Scatter(x=d_usage['month'], y=tok_millions, mode='lines+markers',
         line=dict(color=COLORS[sid], width=2.5), marker=dict(size=5), showlegend=False,
-        hovertemplate='%{y:,.0f}<extra></extra>'))
-    f.update_layout(**layout('Monthly Tokens'))
-    f.update_yaxes(tickformat=',')
+        hovertemplate='%{y:,.0f}M tokens<extra></extra>'))
+    f.update_layout(**layout('Monthly Tokens (millions)'))
+    f.update_yaxes(ticksuffix='M', tickformat=',')
     charts['tokens'] = to_div(f)
 
     # Revenue by model over time
@@ -666,29 +667,30 @@ portfolio_kpis += '</div>'
 
 def startup_kpis(sid):
     m = next(x for x in company_metrics if x['sid'] == sid)
-    u = monthly_usage[monthly_usage['startup_id'] == sid].sort_values('month')
-    latest = u.iloc[-1]
+    d_dga = dev_ga[dev_ga['startup_id'] == sid].sort_values('month')
+    latest_dqr = d_dga.iloc[-1]['dev_quick_ratio'] if len(d_dga) > 0 else 0
 
     roi_color = SUCCESS if m['roi'] > 2 else WARNING if m['roi'] > 1 else DANGER
-    payback_val = f"{m['payback']} mo" if m['payback'] else 'Not yet'
-    payback_color = SUCCESS if m['payback'] and m['payback'] < 18 else WARNING if m['payback'] else DANGER
     cagr_color = SUCCESS if m['token_cagr'] > 2 else WARNING if m['token_cagr'] > 0.5 else DANGER
+    dqr_color = SUCCESS if latest_dqr > 2 else WARNING if latest_dqr > 1 else DANGER
 
     html = '<div class="kpi-row">'
+    # Total Rev with expandable model breakdown
+    html += f'''<div class="kpi kpi-expandable" onclick="this.classList.toggle('expanded')">
+        <div class="kpi-l">Total Revenue</div>
+        <div class="kpi-v">${m["total_rev"]:,.0f}</div>
+        <div class="kpi-s">all time &middot; <span class="expand-hint">click to expand</span></div>
+        <div class="kpi-breakdown">
+            <div class="kpi-breakdown-row"><span class="dot-sm" style="background:{MODEL_COLORS['sonnet']}"></span>Sonnet <span style="color:{MODEL_COLORS['sonnet']}">${m["sonnet_total"]:,.0f}</span> <span class="kpi-s">{m["sonnet_total"]/m["total_rev"]*100:.0f}%</span></div>
+            <div class="kpi-breakdown-row"><span class="dot-sm" style="background:{MODEL_COLORS['opus']}"></span>Opus <span style="color:{MODEL_COLORS['opus']}">${m["opus_total"]:,.0f}</span> <span class="kpi-s">{m["opus_total"]/m["total_rev"]*100:.0f}%</span></div>
+            <div class="kpi-breakdown-row"><span class="dot-sm" style="background:{MODEL_COLORS['haiku']}"></span>Haiku <span style="color:{MODEL_COLORS['haiku']}">${m["haiku_total"]:,.0f}</span> <span class="kpi-s">{m["haiku_total"]/m["total_rev"]*100:.0f}%</span></div>
+        </div>
+    </div>'''
     html += kpi('Latest MRR', f'${m["latest_mrr"]:,.0f}', 'API revenue')
     html += kpi('Token CAGR', fmt_pct(m['token_cagr']), 'annualized', cagr_color)
-    html += kpi('Active Devs', f'{m["active_devs"]}', 'current month')
-    html += kpi('Rev/Dev', f'${m["rev_per_dev"]:,.0f}', 'per developer')
     html += kpi('Credit ROI', f'{m["roi"]:.1f}x', f'${m["credits"]:,.0f} invested', roi_color)
-    html += kpi('Payback', payback_val, '', payback_color)
-    html += '</div>'
-
-    # Model revenue breakdown
-    html += '<div class="kpi-row">'
-    html += kpi('Sonnet Rev', f'${m["sonnet_total"]:,.0f}', f'{m["sonnet_total"]/m["total_rev"]*100:.0f}% of total', '#3b82f6')
-    html += kpi('Opus Rev', f'${m["opus_total"]:,.0f}', f'{m["opus_total"]/m["total_rev"]*100:.0f}% of total', '#8b5cf6')
-    html += kpi('Haiku Rev', f'${m["haiku_total"]:,.0f}', f'{m["haiku_total"]/m["total_rev"]*100:.0f}% of total', '#06b6d4')
-    html += kpi('Avg Latency', f'{m["latest_latency"]:.0f}ms', '', SUCCESS if m['latest_latency'] < 400 else TEXT)
+    html += kpi('Active Devs', f'{m["active_devs"]}', 'current month')
+    html += kpi('Dev Quick Ratio', f'{latest_dqr:.1f}x', 'new+resurrected / churned', dqr_color)
     html += '</div>'
     return html
 
@@ -1043,7 +1045,7 @@ document.querySelectorAll('#rev-chart-filters .chip[data-sid]').forEach(chip => 
 }});
 
 // Revenue/Tokens metric toggle
-const tokenData = {json.dumps({sid: monthly_usage[monthly_usage['startup_id']==sid].sort_values('month')[['total_tokens']].values.flatten().tolist() for sid in ['S001','S002','S003']})};
+const tokenData = {json.dumps({sid: (monthly_usage[monthly_usage['startup_id']==sid].sort_values('month')['total_tokens'] / 1e6).tolist() for sid in ['S001','S002','S003']})};
 const revenueData = {json.dumps({sid: monthly_usage[monthly_usage['startup_id']==sid].sort_values('month')[['revenue_usd']].values.flatten().tolist() for sid in ['S001','S002','S003']})};
 
 document.querySelectorAll('.toggle-chip').forEach(chip => {{
@@ -1063,11 +1065,13 @@ document.querySelectorAll('.toggle-chip').forEach(chip => {{
             }}, [i]);
         }});
 
-        const titleText = showingMetric === 'tokens' ? 'Monthly Token Consumption' : 'Monthly API Revenue';
+        const titleText = showingMetric === 'tokens' ? 'Monthly Token Consumption (millions)' : 'Monthly API Revenue';
         const tickpre = showingMetric === 'tokens' ? '' : '$';
+        const ticksuf = showingMetric === 'tokens' ? 'M' : '';
         Plotly.relayout(revChartId, {{
             'title.text': titleText,
-            'yaxis.tickprefix': tickpre
+            'yaxis.tickprefix': tickpre,
+            'yaxis.ticksuffix': ticksuf
         }});
     }});
 }});
