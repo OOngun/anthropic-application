@@ -66,6 +66,15 @@ body { font-family:'IBM Plex Sans',-apple-system,sans-serif; background:#FFFCFC;
 .perf-table tr:last-child td { border-bottom:none; }
 .perf-table .perf-row:hover { background:rgba(71, 57, 130, 0.04); }
 .perf-table .perf-row td:first-child { font-weight:600; color:#14141C; }
+/* Credit payback progress bar */
+.payback-cell { min-width:140px; }
+.payback-bar { position:relative; height:18px; background:#ECEDF2; border-radius:9px; overflow:visible; }
+.payback-fill { height:100%; border-radius:9px; transition:width 0.6s cubic-bezier(0.22,1,0.36,1); min-width:2px; }
+.payback-overflow .payback-fill { border-radius:9px; box-shadow:0 0 6px rgba(34,197,94,0.4); }
+.payback-label { position:absolute; right:6px; top:50%; transform:translateY(-50%); font-size:10px; font-weight:700; color:#14141C; }
+.payback-overflow .payback-label { color:#fff; }
+.payback-amounts { font-size:9px; color:#8E8494; margin-top:2px; text-align:center; }
+
 .dot-sm { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:8px; vertical-align:middle; }
 .model-legend { font-size:8px; color:#8E8494; font-weight:400; text-transform:none; letter-spacing:0; }
 
@@ -146,12 +155,11 @@ html { scroll-behavior:smooth; }
             <tr>
                 <th>Company</th>
                 <th>Vertical</th>
+                <th>Credit Payback</th>
                 <th>Token CAGR</th>
                 <th>Rev CAGR</th>
                 <th>Latest MRR</th>
                 <th>MRR by Model <span class="model-legend">S / O / H</span></th>
-                <th>Total Rev</th>
-                <th>Credit ROI</th>
                 <th>3mo Momentum</th>
                 <th>Devs</th>
                 <th>Rev/Dev</th>
@@ -160,36 +168,51 @@ html { scroll-behavior:smooth; }
         <tbody><tr class="perf-row" data-sid="S001" style="cursor:pointer">
         <td><span class="dot-sm" style="background:#472D7B"></span>MedScribe AI</td>
         <td>HealthTech</td>
+        <td class="payback-cell">
+            <div class="payback-bar payback-overflow">
+                <div class="payback-fill" style="width:100%;background:#22C55E"></div>
+                <span class="payback-label">4.1x</span>
+            </div>
+            <div class="payback-amounts">$232,752 / $56,199</div>
+        </td>
         <td style="color:#22C55E">1,586%</td>
         <td style="color:#22C55E">1,586%</td>
         <td>$27,444</td>
         <td><span style="color:#3B528B">$17,016</span> / <span style="color:#472D7B">$3,293</span> / <span style="color:#21918C">$7,136</span></td>
-        <td>$232,752</td>
-        <td style="color:#22C55E">4.1x</td>
         <td style="color:#22C55E">+59%</td>
         <td>35</td>
         <td>$784</td>
     </tr><tr class="perf-row" data-sid="S002" style="cursor:pointer">
         <td><span class="dot-sm" style="background:#3B528B"></span>Eigen Technologies</td>
         <td>Document AI</td>
+        <td class="payback-cell">
+            <div class="payback-bar payback-overflow">
+                <div class="payback-fill" style="width:100%;background:#22C55E"></div>
+                <span class="payback-label">1.6x</span>
+            </div>
+            <div class="payback-amounts">$83,687 / $53,095</div>
+        </td>
         <td style="color:#22C55E">557%</td>
         <td style="color:#22C55E">557%</td>
         <td>$5,528</td>
         <td><span style="color:#3B528B">$3,140</span> / <span style="color:#472D7B">$1,083</span> / <span style="color:#21918C">$1,305</span></td>
-        <td>$83,687</td>
-        <td style="color:#EAB308">1.6x</td>
         <td style="color:#EAB308">+11%</td>
         <td>22</td>
         <td>$251</td>
     </tr><tr class="perf-row" data-sid="S003" style="cursor:pointer">
         <td><span class="dot-sm" style="background:#21918C"></span>BuilderKit</td>
         <td>No-Code/AI</td>
+        <td class="payback-cell">
+            <div class="payback-bar payback-overflow">
+                <div class="payback-fill" style="width:100%;background:#22C55E"></div>
+                <span class="payback-label">1.0x</span>
+            </div>
+            <div class="payback-amounts">$27,727 / $26,560</div>
+        </td>
         <td style="color:#22C55E">204%</td>
         <td style="color:#22C55E">204%</td>
         <td>$1,030</td>
         <td><span style="color:#3B528B">$331</span> / <span style="color:#472D7B">$94</span> / <span style="color:#21918C">$606</span></td>
-        <td>$27,727</td>
-        <td style="color:#EAB308">1.0x</td>
         <td style="color:#EAB308">+1%</td>
         <td>12</td>
         <td>$86</td>

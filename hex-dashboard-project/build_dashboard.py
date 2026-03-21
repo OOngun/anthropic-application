@@ -361,15 +361,34 @@ for i, m in enumerate(company_metrics):
     roi_color = SUCCESS if m['roi'] > 2 else WARNING if m['roi'] > 1 else DANGER
     momentum_color = SUCCESS if m['momentum'] > 20 else WARNING if m['momentum'] > 0 else DANGER
 
+    # Credit payback progress bar
+    payback_pct = min(m['roi'] * 100, 100)  # cap at 100% for the bar
+    if m['roi'] >= 1:
+        bar_color = SUCCESS
+        bar_label = f'{m["roi"]:.1f}x'
+    elif m['roi'] >= 0.5:
+        bar_color = WARNING
+        bar_label = f'{payback_pct:.0f}%'
+    else:
+        bar_color = DANGER
+        bar_label = f'{payback_pct:.0f}%'
+    overflow = m['roi'] > 1
+    bar_extra_class = ' payback-overflow' if overflow else ''
+
     table_rows += f'''<tr class="perf-row" data-sid="{m['sid']}" style="cursor:pointer">
         <td><span class="dot-sm" style="background:{COLORS[m['sid']]}"></span>{m['name']}</td>
         <td>{m['vertical']}</td>
+        <td class="payback-cell">
+            <div class="payback-bar{bar_extra_class}">
+                <div class="payback-fill" style="width:{payback_pct}%;background:{bar_color}"></div>
+                <span class="payback-label">{bar_label}</span>
+            </div>
+            <div class="payback-amounts">${m['total_rev']:,.0f} / ${m['credits']:,.0f}</div>
+        </td>
         <td style="color:{cagr_color}">{fmt_pct(m['token_cagr'])}</td>
         <td style="color:{rev_cagr_color}">{fmt_pct(m['rev_cagr'])}</td>
         <td>${m['latest_mrr']:,.0f}</td>
         <td><span style="color:{MODEL_COLORS['sonnet']}">${m['sonnet_rev']:,.0f}</span> / <span style="color:{MODEL_COLORS['opus']}">${m['opus_rev']:,.0f}</span> / <span style="color:{MODEL_COLORS['haiku']}">${m['haiku_rev']:,.0f}</span></td>
-        <td>${m['total_rev']:,.0f}</td>
-        <td style="color:{roi_color}">{m['roi']:.1f}x</td>
         <td style="color:{momentum_color}">{m['momentum']:+.0f}%</td>
         <td>{m['active_devs']}</td>
         <td>${m['rev_per_dev']:,.0f}</td>
@@ -382,12 +401,11 @@ top_performers_html = f'''
             <tr>
                 <th>Company</th>
                 <th>Vertical</th>
+                <th>Credit Payback</th>
                 <th>Token CAGR</th>
                 <th>Rev CAGR</th>
                 <th>Latest MRR</th>
                 <th>MRR by Model <span class="model-legend">S / O / H</span></th>
-                <th>Total Rev</th>
-                <th>Credit ROI</th>
                 <th>3mo Momentum</th>
                 <th>Devs</th>
                 <th>Rev/Dev</th>
@@ -618,6 +636,15 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .perf-table tr:last-child td {{ border-bottom:none; }}
 .perf-table .perf-row:hover {{ background:{ACCENT_SURFACE}; }}
 .perf-table .perf-row td:first-child {{ font-weight:600; color:{TEXT}; }}
+/* Credit payback progress bar */
+.payback-cell {{ min-width:140px; }}
+.payback-bar {{ position:relative; height:18px; background:{BORDER_SUBTLE}; border-radius:9px; overflow:visible; }}
+.payback-fill {{ height:100%; border-radius:9px; transition:width 0.6s cubic-bezier(0.22,1,0.36,1); min-width:2px; }}
+.payback-overflow .payback-fill {{ border-radius:9px; box-shadow:0 0 6px rgba(34,197,94,0.4); }}
+.payback-label {{ position:absolute; right:6px; top:50%; transform:translateY(-50%); font-size:10px; font-weight:700; color:{TEXT}; }}
+.payback-overflow .payback-label {{ color:#fff; }}
+.payback-amounts {{ font-size:9px; color:{MUTED}; margin-top:2px; text-align:center; }}
+
 .dot-sm {{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:8px; vertical-align:middle; }}
 .model-legend {{ font-size:8px; color:{MUTED}; font-weight:400; text-transform:none; letter-spacing:0; }}
 
