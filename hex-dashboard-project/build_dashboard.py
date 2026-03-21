@@ -262,6 +262,14 @@ def to_div(fig, chart_id=None):
 def kpi(label, value, sub='', color=TEXT):
     return f'<div class="kpi"><div class="kpi-l">{label}</div><div class="kpi-v" style="color:{color}">{value}</div><div class="kpi-s">{sub}</div></div>'
 
+def company_chips(section_id):
+    """Generate company filter chip HTML for a section."""
+    chips = f'<div class="section-filters" data-filter-section="{section_id}">'
+    for sid in ['S001', 'S002', 'S003']:
+        chips += f'<button class="chip active" data-sid="{sid}" style="--chip-color:{COLORS[sid]}"><span class="dot-sm" style="background:{COLORS[sid]}"></span>{NAMES[sid]}</button>'
+    chips += '</div>'
+    return chips
+
 # ============================================================
 # PORTFOLIO CHARTS — TRIBE CAPITAL FRAMEWORK
 # ============================================================
@@ -282,19 +290,29 @@ fig_dev_ga.add_trace(go.Bar(x=agg_dev_ga['month'], y=agg_dev_ga['resurrected_dev
 fig_dev_ga.add_trace(go.Bar(x=agg_dev_ga['month'], y=-agg_dev_ga['churned_devs'], name='Churned', marker_color=DANGER))
 fig_dev_ga.update_layout(**layout('Developer Growth Accounting', h=340), barmode='relative')
 
-# --- DEVELOPER QUICK RATIO (portfolio-level) — skip first month (no churn) ---
-agg_dev_qr = agg_dev_ga[agg_dev_ga['churned_devs'] > 0].copy()
-agg_dev_qr['portfolio_qr'] = np.minimum(
-    (agg_dev_qr['new_devs'] + agg_dev_qr['resurrected_devs']) / agg_dev_qr['churned_devs'], 10.0)
+# --- DEVELOPER QUICK RATIO — per-company lines + mean ---
 fig_dev_qr = go.Figure()
-fig_dev_qr.add_trace(go.Scatter(x=agg_dev_qr['month'], y=agg_dev_qr['portfolio_qr'],
-    mode='lines+markers', line=dict(color=ACCENT, width=2.5), marker=dict(size=5), showlegend=False))
+all_qr_max = 5
+for sid in ['S001', 'S002', 'S003']:
+    dq = dev_ga[(dev_ga['startup_id'] == sid) & (dev_ga['dev_quick_ratio'].notna())].sort_values('month')
+    if len(dq) > 0:
+        fig_dev_qr.add_trace(go.Scatter(x=dq['month'], y=dq['dev_quick_ratio'], name=NAMES[sid],
+            mode='lines+markers', line=dict(color=COLORS[sid], width=2.5), marker=dict(size=4),
+            hovertemplate='%{y:.1f}x<extra>' + NAMES[sid] + '</extra>'))
+        all_qr_max = max(all_qr_max, dq['dev_quick_ratio'].max())
+
+# Mean line
+agg_dev_qr = dev_ga[dev_ga['dev_quick_ratio'].notna()].groupby('month')['dev_quick_ratio'].mean().reset_index()
+fig_dev_qr.add_trace(go.Scatter(x=agg_dev_qr['month'], y=agg_dev_qr['dev_quick_ratio'], name='Mean',
+    mode='lines', line=dict(color=TEXT, width=2, dash='dot'),
+    hovertemplate='Mean: %{y:.1f}x<extra></extra>'))
+
 fig_dev_qr.add_hline(y=2, line_dash="dash", line_color=SUCCESS,
     annotation_text="2.0x Strong", annotation_position="top right", annotation_font_color=SUCCESS)
 fig_dev_qr.add_hline(y=1, line_dash="dash", line_color=DANGER,
     annotation_text="1.0x Flat", annotation_position="bottom right", annotation_font_color=DANGER)
-fig_dev_qr.update_layout(**layout('Developer Quick Ratio', h=300))
-fig_dev_qr.update_yaxes(range=[0, min(agg_dev_qr['portfolio_qr'].max() * 1.2, 8)])
+fig_dev_qr.update_layout(**layout('Developer Quick Ratio', h=340))
+fig_dev_qr.update_yaxes(range=[0, min(all_qr_max * 1.2, 8)])
 
 # --- PER-COMPANY DEVELOPER GA (for filterable chart) ---
 fig_dev_ga_company = go.Figure()
@@ -944,7 +962,7 @@ def startup_tab_html(sid):
 
 # Compute summary values for section headers
 total_mau_latest = int(monthly_usage.groupby('month')['active_developers'].sum().iloc[-1])
-latest_dev_qr = agg_dev_qr['portfolio_qr'].iloc[-1] if len(agg_dev_qr) > 0 else 0
+latest_dev_qr = agg_dev_qr['dev_quick_ratio'].iloc[-1] if len(agg_dev_qr) > 0 else 0
 latest_mrr = monthly_usage.groupby('month')['revenue_usd'].sum().iloc[-1]
 latest_gross_ret = agg_rev_ga['gross_ret'].dropna().iloc[-1] if agg_rev_ga['gross_ret'].dropna().any() else 0
 top_partner_pct = max(m['total_rev'] for m in company_metrics) / total_revenue * 100
@@ -967,18 +985,22 @@ portfolio_content = f'''
     </div>
     <div class="analysis-body">
         <div class="mode-tabs" data-section="user-ga">
-            <div class="mode-tab active" data-mode="qr">Quick Ratio</div>
+            <div class="mode-tab active" data-mode="mau">MAU Trend</div>
+            <div class="mode-tab" data-mode="qr">Quick Ratio</div>
             <div class="mode-tab" data-mode="ga">Growth Accounting</div>
-            <div class="mode-tab" data-mode="mau">MAU Trend</div>
         </div>
-        <div class="mode-panel active" data-mode="qr">
+        <div class="mode-panel active" data-mode="mau">
+            <div class="row-1"><div class="card">{to_div(fig_mau, 'p-mau')}</div></div>
+            <p class="chart-desc"><strong>Monthly Active Developers (MAU)</strong> tracks the number of unique developers or API keys making at least one API call per month. This is the headline adoption metric &mdash; a snapshot of how many people are actively building on Claude across your portfolio.</p>
+        </div>
+        <div class="mode-panel" data-mode="qr">
+            {company_chips('p-dev-qr')}
             <div class="row-1"><div class="card">{to_div(fig_dev_qr, 'p-dev-qr')}</div></div>
+            <p class="chart-desc"><strong>Quick Ratio</strong> measures growth quality: <strong>(New + Resurrected) / Churned</strong> developers. A QR of 2.0x means for every developer lost, two are gained. Above 2.0x indicates strong net growth; below 1.0x means the developer base is shrinking. The dotted line shows the portfolio mean.</p>
         </div>
         <div class="mode-panel" data-mode="ga">
             <div class="row-1"><div class="card">{to_div(fig_dev_ga, 'p-dev-ga')}</div></div>
-        </div>
-        <div class="mode-panel" data-mode="mau">
-            <div class="row-1"><div class="card">{to_div(fig_mau, 'p-mau')}</div></div>
+            <p class="chart-desc"><strong>Growth Accounting</strong> decomposes MAU into its components: <strong>Retained</strong> (active both this and last month), <strong>New</strong> (first API call this month), <strong>Resurrected</strong> (returned after inactivity), and <strong>Churned</strong> (active last month, gone this month). This reveals the quality of growth &mdash; healthy growth is driven by retention and new adds, not by resurrecting churned developers.</p>
         </div>
     </div>
 </div>
@@ -1000,6 +1022,7 @@ portfolio_content = f'''
         </div>
         <div class="mode-panel active" data-mode="ga">
             <div class="row-1"><div class="card">{to_div(fig_rev_ga, 'p-rev-ga')}</div></div>
+            <p class="chart-desc"><strong>Revenue Growth Accounting</strong> breaks down monthly API revenue into six categories: <strong>Retained</strong> (carried forward), <strong>New</strong> (first-month partners), <strong>Expansion</strong> (partners spending more), <strong>Resurrected</strong> (returned from churn), <strong>Churned</strong> (lost entirely), and <strong>Contraction</strong> (partners spending less). The balance between gains above zero and losses below reveals whether portfolio revenue growth is sustainable or fragile.</p>
         </div>
         <div class="mode-panel" data-mode="company">
             <div class="chart-filter-wrap">
@@ -1013,12 +1036,14 @@ portfolio_content = f'''
                 </div>
                 <div class="card">{to_div(fig_rev, 'p-rev')}</div>
             </div>
+            <p class="chart-desc"><strong>Revenue by Company</strong> shows per-partner API billing over time. Toggle between dollar revenue and raw token consumption &mdash; these measure the same activity in different units. Divergence between the two indicates model mix shifts (e.g. migrating from Opus to Haiku changes revenue per token).</p>
         </div>
         <div class="mode-panel" data-mode="model">
             <div class="row-2">
                 <div class="card">{to_div(fig_rev_model, 'p-rev-model')}</div>
                 <div class="card">{to_div(fig_rev_model_time, 'p-rev-model-time')}</div>
             </div>
+            <p class="chart-desc"><strong>Revenue by Model</strong> shows how much each Claude model (Sonnet, Opus, Haiku) contributes to total portfolio revenue. Partners moving towards Opus over time indicates they are building more complex features &mdash; a positive integration depth signal.</p>
         </div>
     </div>
 </div>
@@ -1043,46 +1068,32 @@ portfolio_content = f'''
         </div>
         <div class="mode-panel active" data-mode="ltv-lines">
             <div class="row-1"><div class="card clickable-chart">{to_div(fig_cohort_ltv, 'p-cohort-ltv')}</div></div>
+            <p class="chart-desc"><strong>Cumulative LTV</strong> shows the total revenue Anthropic has earned from each partner since onboarding. A <strong>super-linear curve</strong> (accelerating upward) means the partner is spending more over time &mdash; the ideal signal. A flattening curve indicates declining engagement. Click a line to drill down to that company.</p>
         </div>
         <div class="mode-panel" data-mode="ltv-heat">
             <div class="row-1"><div class="card">{to_div(fig_ltv_heatmap, 'p-ltv-heatmap')}</div></div>
+            <p class="chart-desc"><strong>LTV Heatmap</strong> shows the same data as a matrix &mdash; rows are partners, columns are months since onboarding. Darker colour = higher cumulative revenue. Useful for spotting which partners accelerated early vs. late.</p>
         </div>
         <div class="mode-panel" data-mode="dev-ret">
             <div class="row-1"><div class="card clickable-chart">{to_div(fig_dev_retention, 'p-dev-retention')}</div></div>
+            <p class="chart-desc"><strong>Developer Retention</strong> tracks what percentage of a cohort's developers remain active at each month after onboarding. The curve should flatten and stabilise &mdash; that floor is your steady-state retention rate. Below 50% after 6 months is a warning sign.</p>
         </div>
         <div class="mode-panel" data-mode="dev-ret-heat">
             <div class="row-1"><div class="card">{to_div(fig_ret_heatmap, 'p-ret-heatmap')}</div></div>
+            <p class="chart-desc"><strong>Retention Heatmap</strong> reveals patterns across the portfolio. <strong>Vertical patterns</strong> = all partners lose devs at the same age (e.g. month 3 drop-off). <strong>Horizontal patterns</strong> = one partner is uniquely sticky or leaky. Green = healthy retention, red = churn.</p>
         </div>
         <div class="mode-panel" data-mode="rev-ret">
             <div class="row-1"><div class="card">{to_div(fig_rev_retention, 'p-rev-retention')}</div></div>
+            <p class="chart-desc"><strong>Revenue Retention</strong> compares each partner's current monthly spend to their first month. Values above 1x mean the partner is spending more than when they started (net expansion). This is the revenue analogue of logo retention.</p>
         </div>
         <div class="mode-panel" data-mode="gross-ret">
             <div class="row-1"><div class="card">{to_div(fig_gross_ret, 'p-gross-ret')}</div></div>
+            <p class="chart-desc"><strong>Gross Revenue Retention</strong> measures the portfolio's revenue floor &mdash; what percentage of last month's revenue carried forward without any new business. The B2B SaaS benchmark is &gt;70%. This metric excludes new and expansion revenue to isolate the base.</p>
         </div>
     </div>
 </div>
 
-<!-- SECTION 4: Distribution of PMF -->
-<div class="analysis-section" data-section="distribution">
-    <div class="analysis-header" onclick="toggleSection(this)">
-        <div class="analysis-title"><span class="chevron">▼</span> Distribution of PMF</div>
-        <div class="analysis-summary">
-            <span class="sum-item">Top partner <span class="sum-val">{top_partner_pct:.0f}%</span> of rev</span>
-        </div>
-    </div>
-    <div class="analysis-body">
-        <div class="mode-tabs" data-section="distribution">
-            <div class="mode-tab active" data-mode="concentration">Revenue Concentration</div>
-            <div class="mode-tab" data-mode="engagement">Engagement (L28)</div>
-        </div>
-        <div class="mode-panel active" data-mode="concentration">
-            <div class="row-1"><div class="card">{to_div(fig_concentration, 'p-concentration')}</div></div>
-        </div>
-        <div class="mode-panel" data-mode="engagement">
-            <div class="row-1"><div class="card">{to_div(fig_devs, 'p-devs')}</div></div>
-        </div>
-    </div>
-</div>
+<!-- Revenue Concentration archived — too few partners for meaningful CDF. See DASHBOARD-PROPOSAL-V2.md, project log item 5. -->
 '''
 
 # ============================================================
@@ -1217,6 +1228,14 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .mode-panel {{ display:none; }}
 .mode-panel.active {{ display:block; }}
 
+/* Chart descriptions */
+.chart-desc {{ font-size:11px; color:{MUTED}; line-height:1.6; margin-top:8px; padding:0 4px; }}
+.chart-desc strong {{ color:{DIM}; font-weight:600; }}
+
+/* Section company filter */
+.section-filters {{ display:flex; align-items:center; gap:6px; margin-bottom:12px; flex-wrap:wrap; }}
+.section-filters .chip {{ padding:4px 10px; font-size:11px; }}
+
 html {{ scroll-behavior:smooth; }}
 
 @media (max-width:900px) {{
@@ -1326,6 +1345,27 @@ document.querySelectorAll('.perf-row').forEach(row => {{
         const sid = row.dataset.sid.toLowerCase();
         const tab = document.querySelector('[data-tab="' + sid + '"]');
         if (tab) tab.click();
+    }});
+}});
+
+// Section-level company filter chips
+document.querySelectorAll('.section-filters .chip').forEach(chip => {{
+    chip.addEventListener('click', () => {{
+        chip.classList.toggle('active');
+        const sid = chip.dataset.sid;
+        const filterSection = chip.closest('.section-filters').dataset.filterSection;
+        const chartEl = document.getElementById(filterSection);
+        if (chartEl && chartEl.data) {{
+            const sidIdx = sidOrder.indexOf(sid);
+            // Find traces matching this company — check by name
+            const name = {{ S001: 'MedScribe AI', S002: 'Eigen Technologies', S003: 'BuilderKit' }}[sid];
+            chartEl.data.forEach((trace, i) => {{
+                if (trace.name && trace.name.includes(name)) {{
+                    const vis = chip.classList.contains('active') ? true : 'legendonly';
+                    Plotly.restyle(filterSection, {{ visible: vis }}, [i]);
+                }}
+            }});
+        }}
     }});
 }});
 
