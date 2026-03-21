@@ -1274,7 +1274,7 @@ html {{ scroll-behavior:smooth; }}
 </div>
 
 <div class="tabs">
-    <div class="tab active" data-tab="portfolio">All Companies</div>
+    <div class="tab active" data-tab="portfolio">Pulse</div>
     <div class="tab" data-tab="s001"><span class="dot" style="background:#2563eb"></span>MedScribe AI</div>
     <div class="tab" data-tab="s002"><span class="dot" style="background:#059669"></span>Eigen Technologies</div>
     <div class="tab" data-tab="s003"><span class="dot" style="background:#dc2626"></span>BuilderKit</div>
