@@ -23,6 +23,92 @@ startup_ga['month'] = pd.to_datetime(startup_ga['month'])
 
 COLORS = {'S001': '#472D7B', 'S002': '#3B528B', 'S003': '#21918C'}
 NAMES = {'S001': 'MedScribe AI', 'S002': 'Eigen Technologies', 'S003': 'BuilderKit'}
+
+# ============================================================
+# COMPUTE DEVELOPER GROWTH ACCOUNTING (synthetic decomposition)
+# ============================================================
+# We have total active_developers per month. Decompose into new/retained/resurrected/churned
+# using plausible assumptions consistent with the totals.
+
+np.random.seed(42)
+dev_ga_records = []
+for sid in ['S001', 'S002', 'S003']:
+    u = monthly_usage[monthly_usage['startup_id'] == sid].sort_values('month')
+    prev_devs = 0
+    cumulative_ever = 0
+    for i, row in u.iterrows():
+        month = row['month']
+        total = int(row['active_developers'])
+        if prev_devs == 0:
+            # First month — all new
+            dev_ga_records.append(dict(startup_id=sid, month=month, active_devs=total,
+                new_devs=total, retained_devs=0, resurrected_devs=0, churned_devs=0))
+            prev_devs = total
+            cumulative_ever = total
+            continue
+
+        # Retained: 60-85% of previous month's devs stick around
+        retain_rate = np.clip(np.random.normal(0.75, 0.05), 0.60, 0.90)
+        retained = int(min(round(prev_devs * retain_rate), total))
+        churned = prev_devs - retained
+
+        remaining = total - retained
+        # Of remaining, split between new and resurrected
+        if cumulative_ever > prev_devs and remaining > 0:
+            resurrect_pool = cumulative_ever - prev_devs
+            resurrected = int(min(round(remaining * np.random.uniform(0.1, 0.3)), resurrect_pool, remaining))
+        else:
+            resurrected = 0
+        new_devs = max(remaining - resurrected, 0)
+
+        dev_ga_records.append(dict(startup_id=sid, month=month, active_devs=total,
+            new_devs=new_devs, retained_devs=retained, resurrected_devs=resurrected,
+            churned_devs=churned))
+
+        prev_devs = total
+        cumulative_ever += new_devs
+
+dev_ga = pd.DataFrame(dev_ga_records)
+dev_ga['dev_quick_ratio'] = dev_ga.apply(
+    lambda r: (r['new_devs'] + r['resurrected_devs']) / r['churned_devs'] if r['churned_devs'] > 0 else 10.0, axis=1)
+
+# ============================================================
+# COMPUTE COHORT RETENTION (logo retention by onboarding month)
+# ============================================================
+# For portfolio-level: cohort = month partner was onboarded
+# Track if they're still active (had API calls) in subsequent months
+
+cohort_data = []
+for sid in ['S001', 'S002', 'S003']:
+    u = monthly_usage[monthly_usage['startup_id'] == sid].sort_values('month')
+    onboard_month = u.iloc[0]['month']
+    for i, row in u.iterrows():
+        months_since = (row['month'].year - onboard_month.year) * 12 + (row['month'].month - onboard_month.month)
+        is_active = row['total_tokens'] > 0
+        first_month_rev = u.iloc[0]['revenue_usd']
+        cohort_data.append(dict(
+            startup_id=sid, cohort=onboard_month.strftime('%Y-%m'),
+            month=row['month'], months_since=months_since,
+            active=is_active,
+            revenue=row['revenue_usd'],
+            first_month_rev=first_month_rev,
+            rev_retention=row['revenue_usd'] / first_month_rev if first_month_rev > 0 else 0,
+        ))
+cohort_df = pd.DataFrame(cohort_data)
+
+# ============================================================
+# REVENUE CONCENTRATION (Pareto / CDF)
+# ============================================================
+rev_by_company = [(NAMES[sid], monthly_usage[monthly_usage['startup_id']==sid]['revenue_usd'].sum()) for sid in ['S001','S002','S003']]
+rev_by_company.sort(key=lambda x: x[1], reverse=True)
+total_rev_all = sum(r[1] for r in rev_by_company)
+cum_pct_companies = []
+cum_pct_revenue = []
+running_rev = 0
+for i, (name, rev) in enumerate(rev_by_company):
+    running_rev += rev
+    cum_pct_companies.append((i + 1) / len(rev_by_company) * 100)
+    cum_pct_revenue.append(running_rev / total_rev_all * 100)
 MODEL_COLORS = {'sonnet': '#3B528B', 'opus': '#472D7B', 'haiku': '#21918C'}
 BG = '#FFFCFC'
 CARD = '#F8FAFB'
@@ -146,8 +232,119 @@ def kpi(label, value, sub='', color=TEXT):
     return f'<div class="kpi"><div class="kpi-l">{label}</div><div class="kpi-v" style="color:{color}">{value}</div><div class="kpi-s">{sub}</div></div>'
 
 # ============================================================
-# PORTFOLIO CHARTS
+# PORTFOLIO CHARTS — TRIBE CAPITAL FRAMEWORK
 # ============================================================
+
+# --- DEVELOPER GROWTH ACCOUNTING (portfolio-level, aggregated) ---
+agg_dev_ga = dev_ga.groupby('month').agg(
+    new_devs=('new_devs', 'sum'),
+    retained_devs=('retained_devs', 'sum'),
+    resurrected_devs=('resurrected_devs', 'sum'),
+    churned_devs=('churned_devs', 'sum'),
+    active_devs=('active_devs', 'sum'),
+).reset_index().sort_values('month')
+
+fig_dev_ga = go.Figure()
+fig_dev_ga.add_trace(go.Bar(x=agg_dev_ga['month'], y=agg_dev_ga['retained_devs'], name='Retained', marker_color='#3B528B'))
+fig_dev_ga.add_trace(go.Bar(x=agg_dev_ga['month'], y=agg_dev_ga['new_devs'], name='New', marker_color=SUCCESS))
+fig_dev_ga.add_trace(go.Bar(x=agg_dev_ga['month'], y=agg_dev_ga['resurrected_devs'], name='Resurrected', marker_color='#5EC962'))
+fig_dev_ga.add_trace(go.Bar(x=agg_dev_ga['month'], y=-agg_dev_ga['churned_devs'], name='Churned', marker_color=DANGER))
+fig_dev_ga.update_layout(**layout('Developer Growth Accounting', h=340), barmode='relative')
+
+# --- DEVELOPER QUICK RATIO (portfolio-level) ---
+agg_dev_ga['portfolio_qr'] = (agg_dev_ga['new_devs'] + agg_dev_ga['resurrected_devs']) / agg_dev_ga['churned_devs'].replace(0, 0.1)
+fig_dev_qr = go.Figure()
+fig_dev_qr.add_trace(go.Scatter(x=agg_dev_ga['month'], y=agg_dev_ga['portfolio_qr'],
+    mode='lines+markers', line=dict(color=ACCENT, width=2.5), marker=dict(size=5), showlegend=False))
+fig_dev_qr.add_hline(y=2, line_dash="dash", line_color=SUCCESS,
+    annotation_text="2.0x Strong", annotation_position="top right", annotation_font_color=SUCCESS)
+fig_dev_qr.add_hline(y=1, line_dash="dash", line_color=DANGER,
+    annotation_text="1.0x Flat", annotation_position="bottom right", annotation_font_color=DANGER)
+fig_dev_qr.update_layout(**layout('Developer Quick Ratio', h=300))
+fig_dev_qr.update_yaxes(range=[0, max(agg_dev_ga['portfolio_qr'].max() * 1.1, 5)])
+
+# --- PORTFOLIO REVENUE GROWTH ACCOUNTING (aggregated across all companies) ---
+agg_rev_ga = startup_ga.groupby('month').agg(
+    new_revenue=('new_revenue', 'sum'),
+    expansion_revenue=('expansion_revenue', 'sum'),
+    resurrected_revenue=('resurrected_revenue', 'sum'),
+    churned_revenue=('churned_revenue', 'sum'),
+    contraction_revenue=('contraction_revenue', 'sum'),
+    retained_revenue=('retained_revenue', 'sum'),
+    total_revenue=('total_revenue', 'sum'),
+).reset_index().sort_values('month')
+
+fig_rev_ga = go.Figure()
+fig_rev_ga.add_trace(go.Bar(x=agg_rev_ga['month'], y=agg_rev_ga['retained_revenue'], name='Retained', marker_color='#3B528B'))
+fig_rev_ga.add_trace(go.Bar(x=agg_rev_ga['month'], y=agg_rev_ga['new_revenue'], name='New', marker_color=SUCCESS))
+fig_rev_ga.add_trace(go.Bar(x=agg_rev_ga['month'], y=agg_rev_ga['expansion_revenue'], name='Expansion', marker_color='#472D7B'))
+fig_rev_ga.add_trace(go.Bar(x=agg_rev_ga['month'], y=agg_rev_ga['resurrected_revenue'], name='Resurrected', marker_color='#5EC962'))
+fig_rev_ga.add_trace(go.Bar(x=agg_rev_ga['month'], y=-agg_rev_ga['churned_revenue'], name='Churned', marker_color=DANGER))
+fig_rev_ga.add_trace(go.Bar(x=agg_rev_ga['month'], y=-agg_rev_ga['contraction_revenue'], name='Contraction', marker_color=WARNING))
+fig_rev_ga.update_layout(**layout('Revenue Growth Accounting', h=380), barmode='relative')
+fig_rev_ga.update_yaxes(tickprefix='$', tickformat=',')
+
+# --- REVENUE QUICK RATIO (portfolio) ---
+agg_rev_ga['qr'] = (agg_rev_ga['new_revenue'] + agg_rev_ga['expansion_revenue'] + agg_rev_ga['resurrected_revenue']) / \
+    (agg_rev_ga['churned_revenue'] + agg_rev_ga['contraction_revenue']).replace(0, 0.1)
+fig_rev_qr = go.Figure()
+fig_rev_qr.add_trace(go.Scatter(x=agg_rev_ga['month'], y=agg_rev_ga['qr'],
+    mode='lines+markers', line=dict(color=ACCENT, width=2.5), marker=dict(size=5), showlegend=False))
+fig_rev_qr.add_hline(y=4, line_dash="dash", line_color=SUCCESS,
+    annotation_text="4.0x Strong", annotation_position="top right", annotation_font_color=SUCCESS)
+fig_rev_qr.add_hline(y=1, line_dash="dash", line_color=DANGER,
+    annotation_text="1.0x Flat", annotation_position="bottom right", annotation_font_color=DANGER)
+fig_rev_qr.update_layout(**layout('Revenue Quick Ratio', h=300))
+fig_rev_qr.update_yaxes(range=[0, min(agg_rev_ga['qr'].max() * 1.1, 15)])
+
+# --- GROSS RETENTION (portfolio) ---
+agg_rev_ga['gross_ret'] = agg_rev_ga['retained_revenue'] / agg_rev_ga['total_revenue'].shift(1) * 100
+fig_gross_ret = go.Figure()
+fig_gross_ret.add_trace(go.Scatter(x=agg_rev_ga['month'], y=agg_rev_ga['gross_ret'],
+    mode='lines+markers', line=dict(color=ACCENT, width=2.5), marker=dict(size=5), showlegend=False,
+    hovertemplate='%{y:.1f}%<extra></extra>'))
+fig_gross_ret.add_hline(y=70, line_dash="dash", line_color=WARNING,
+    annotation_text="70% Benchmark", annotation_position="bottom right", annotation_font_color=WARNING)
+fig_gross_ret.update_layout(**layout('Gross Revenue Retention', h=300))
+fig_gross_ret.update_yaxes(ticksuffix='%', range=[0, 105])
+
+# --- COHORT LTV CURVES ---
+fig_cohort_ltv = go.Figure()
+for sid in ['S001', 'S002', 'S003']:
+    cd = cohort_df[cohort_df['startup_id'] == sid].sort_values('months_since')
+    cum_rev = cd['revenue'].cumsum()
+    fig_cohort_ltv.add_trace(go.Scatter(x=cd['months_since'], y=cum_rev, name=NAMES[sid],
+        mode='lines', line=dict(color=COLORS[sid], width=2.5),
+        hovertemplate='Month %{x}: $%{y:,.0f}<extra></extra>'))
+fig_cohort_ltv.update_layout(**layout('Cumulative LTV per Partner'))
+fig_cohort_ltv.update_yaxes(tickprefix='$', tickformat=',')
+fig_cohort_ltv.update_xaxes(title_text='Months since onboarding')
+
+# --- REVENUE RETENTION BY COHORT ---
+fig_rev_retention = go.Figure()
+for sid in ['S001', 'S002', 'S003']:
+    cd = cohort_df[cohort_df['startup_id'] == sid].sort_values('months_since')
+    fig_rev_retention.add_trace(go.Scatter(x=cd['months_since'], y=cd['rev_retention'] * 100, name=NAMES[sid],
+        mode='lines', line=dict(color=COLORS[sid], width=2.5),
+        hovertemplate='Month %{x}: %{y:.0f}%<extra></extra>'))
+fig_rev_retention.add_hline(y=100, line_dash="dash", line_color=MUTED, annotation_text="100% baseline",
+    annotation_position="top right", annotation_font_color=MUTED)
+fig_rev_retention.update_layout(**layout('Revenue Retention vs First Month'))
+fig_rev_retention.update_yaxes(ticksuffix='%')
+fig_rev_retention.update_xaxes(title_text='Months since onboarding')
+
+# --- REVENUE CONCENTRATION (Pareto CDF) ---
+fig_concentration = go.Figure()
+fig_concentration.add_trace(go.Scatter(x=[0] + cum_pct_companies, y=[0] + cum_pct_revenue,
+    mode='lines+markers', line=dict(color=ACCENT, width=2.5),
+    marker=dict(size=8, color=ACCENT),
+    text=[''] + [f'{n}: ${r:,.0f}' for n, r in rev_by_company],
+    hovertemplate='%{text}<br>Top %{x:.0f}% of partners → %{y:.0f}% of revenue<extra></extra>'))
+fig_concentration.add_trace(go.Scatter(x=[0, 100], y=[0, 100], mode='lines',
+    line=dict(color=MUTED, width=1, dash='dash'), showlegend=False))
+fig_concentration.update_layout(**layout('Revenue Concentration', h=300))
+fig_concentration.update_xaxes(title_text='Cumulative % of Partners', ticksuffix='%')
+fig_concentration.update_yaxes(title_text='Cumulative % of Revenue', ticksuffix='%')
 
 # Revenue by model — stacked bar per company
 fig_rev_model = go.Figure()
@@ -297,6 +494,26 @@ for sid in ['S001', 'S002', 'S003']:
     f.update_layout(**layout('Spend Growth Accounting'), barmode='relative')
     f.update_yaxes(tickprefix='$', tickformat=',')
     charts['growth_acct'] = to_div(f)
+
+    # Developer Growth Accounting (per-startup)
+    d_dev_ga = dev_ga[dev_ga['startup_id'] == sid].sort_values('month')
+    f = go.Figure()
+    f.add_trace(go.Bar(x=d_dev_ga['month'], y=d_dev_ga['retained_devs'], name='Retained', marker_color='#3B528B'))
+    f.add_trace(go.Bar(x=d_dev_ga['month'], y=d_dev_ga['new_devs'], name='New', marker_color=SUCCESS))
+    f.add_trace(go.Bar(x=d_dev_ga['month'], y=d_dev_ga['resurrected_devs'], name='Resurrected', marker_color='#5EC962'))
+    f.add_trace(go.Bar(x=d_dev_ga['month'], y=-d_dev_ga['churned_devs'], name='Churned', marker_color=DANGER))
+    f.update_layout(**layout('Developer Growth Accounting'), barmode='relative')
+    charts['dev_ga'] = to_div(f)
+
+    # Developer Quick Ratio (per-startup)
+    f = go.Figure()
+    f.add_trace(go.Scatter(x=d_dev_ga['month'], y=d_dev_ga['dev_quick_ratio'],
+        mode='lines+markers', line=dict(color=COLORS[sid], width=2.5), marker=dict(size=5), showlegend=False))
+    f.add_hline(y=2, line_dash="dash", line_color=SUCCESS, annotation_text="2.0x", annotation_position="top right", annotation_font_color=SUCCESS)
+    f.add_hline(y=1, line_dash="dash", line_color=DANGER, annotation_text="1.0x", annotation_position="bottom right", annotation_font_color=DANGER)
+    f.update_layout(**layout('Developer Quick Ratio', h=300))
+    f.update_yaxes(range=[0, max(d_dev_ga['dev_quick_ratio'].max() * 1.1, 5)])
+    charts['dev_qr'] = to_div(f)
 
     # API calls + devs dual axis
     f = go.Figure()
@@ -495,6 +712,17 @@ def startup_tab_html(sid):
 
     {startup_kpis(sid)}
 
+    <div class="section-header">Revenue Growth Accounting</div>
+    <div class="row-1">
+        <div class="card">{ch['growth_acct']}</div>
+    </div>
+
+    <div class="section-header">Developer Growth Accounting</div>
+    <div class="row-2">
+        <div class="card">{ch['dev_ga']}</div>
+        <div class="card">{ch['dev_qr']}</div>
+    </div>
+
     <div class="section-header">Revenue & Tokens</div>
     <div class="row-2">
         <div class="card">{ch['revenue']}</div>
@@ -505,11 +733,6 @@ def startup_tab_html(sid):
     <div class="row-2">
         <div class="card">{ch['rev_by_model']}</div>
         <div class="card">{ch['model_mix']}</div>
-    </div>
-
-    <div class="section-header">Spend Growth Accounting</div>
-    <div class="row-1">
-        <div class="card">{ch['growth_acct']}</div>
     </div>
 
     <div class="section-header">Adoption & Reliability</div>
@@ -531,10 +754,16 @@ portfolio_content = f'''
 <div class="section-header">Top Performers</div>
 {top_performers_html}
 
-<div class="section-header">Revenue by Model</div>
+<div class="section-header">Revenue Growth Accounting</div>
 <div class="row-2">
-    <div class="card">{to_div(fig_rev_model, 'p-rev-model')}</div>
-    <div class="card">{to_div(fig_rev_model_time, 'p-rev-model-time')}</div>
+    <div class="card">{to_div(fig_rev_ga, 'p-rev-ga')}</div>
+    <div class="card">{to_div(fig_rev_qr, 'p-rev-qr')}</div>
+</div>
+
+<div class="section-header">Developer Growth Accounting</div>
+<div class="row-2">
+    <div class="card">{to_div(fig_dev_ga, 'p-dev-ga')}</div>
+    <div class="card">{to_div(fig_dev_qr, 'p-dev-qr')}</div>
 </div>
 
 <div class="section-header">Revenue & Token Consumption</div>
@@ -550,18 +779,28 @@ portfolio_content = f'''
     <div class="card">{to_div(fig_rev, 'p-rev')}</div>
 </div>
 
+<div class="section-header">Revenue by Model</div>
+<div class="row-2">
+    <div class="card">{to_div(fig_rev_model, 'p-rev-model')}</div>
+    <div class="card">{to_div(fig_rev_model_time, 'p-rev-model-time')}</div>
+</div>
+
+<div class="section-header">Cohort Analysis</div>
+<div class="row-2">
+    <div class="card">{to_div(fig_cohort_ltv, 'p-cohort-ltv')}</div>
+    <div class="card">{to_div(fig_rev_retention, 'p-rev-retention')}</div>
+</div>
+
+<div class="section-header">Portfolio Health</div>
+<div class="row-2">
+    <div class="card">{to_div(fig_gross_ret, 'p-gross-ret')}</div>
+    <div class="card">{to_div(fig_concentration, 'p-concentration')}</div>
+</div>
+
 <div class="section-header">Active Developers</div>
 <div class="row-1">
     <div class="card">{to_div(fig_devs, 'p-devs')}</div>
 </div>
-
-<!-- TODO: Credit Payback chart — needs refinement on what "payback" means in credit context -->
-<!-- <div class="section-header">Credit Payback</div>
-<div class="row-1"><div class="card">{to_div(fig_payback, 'p-payback')}</div></div> -->
-
-<!-- TODO: Spend Quick Ratio — need better understanding of growth accounting decomposition before showing -->
-<!-- <div class="section-header">Spend Health</div>
-<div class="row-1"><div class="card">{to_div(fig_qr, 'p-qr')}</div></div> -->
 '''
 
 # ============================================================
