@@ -879,66 +879,146 @@ def startup_tab_html(sid):
 # PORTFOLIO CONTENT
 # ============================================================
 
+# Compute summary values for section headers
+total_mau_latest = int(monthly_usage.groupby('month')['active_developers'].sum().iloc[-1])
+latest_dev_qr = agg_dev_qr['portfolio_qr'].iloc[-1] if len(agg_dev_qr) > 0 else 0
+latest_mrr = monthly_usage.groupby('month')['revenue_usd'].sum().iloc[-1]
+latest_gross_ret = agg_rev_ga['gross_ret'].dropna().iloc[-1] if agg_rev_ga['gross_ret'].dropna().any() else 0
+top_partner_pct = max(m['total_rev'] for m in company_metrics) / total_revenue * 100
+avg_ltv_m12 = cohort_df.groupby('startup_id').apply(lambda g: g[g['months_since'] <= 12]['revenue'].sum()).mean()
+
 portfolio_content = f'''
 {portfolio_kpis}
 
 <div class="section-header">Top Performers</div>
 {top_performers_html}
 
-<div class="section-header">Monthly Active Developers</div>
-<div class="row-1">
-    <div class="card">{to_div(fig_mau, 'p-mau')}</div>
-</div>
-
-<div class="section-header">Revenue Growth Accounting</div>
-<div class="row-1">
-    <div class="card">{to_div(fig_rev_ga, 'p-rev-ga')}</div>
-</div>
-
-<div class="section-header">Developer Growth Accounting</div>
-<div class="row-2">
-    <div class="card">{to_div(fig_dev_ga, 'p-dev-ga')}</div>
-    <div class="card">{to_div(fig_dev_qr, 'p-dev-qr')}</div>
-</div>
-
-<div class="section-header">Revenue & Token Consumption</div>
-<div class="chart-filter-wrap">
-    <div class="chart-filters" id="rev-chart-filters">
-        <button class="chip active" data-sid="S001" style="--chip-color:{COLORS['S001']}"><span class="dot-sm" style="background:{COLORS['S001']}"></span>MedScribe AI</button>
-        <button class="chip active" data-sid="S002" style="--chip-color:{COLORS['S002']}"><span class="dot-sm" style="background:{COLORS['S002']}"></span>Eigen Technologies</button>
-        <button class="chip active" data-sid="S003" style="--chip-color:{COLORS['S003']}"><span class="dot-sm" style="background:{COLORS['S003']}"></span>BuilderKit</button>
-        <span class="chip-divider"></span>
-        <button class="chip toggle-chip active" data-metric="revenue">Revenue ($)</button>
-        <button class="chip toggle-chip" data-metric="tokens">Tokens</button>
+<!-- SECTION 1: Growth Accounting — Users -->
+<div class="analysis-section" data-section="user-ga">
+    <div class="analysis-header" onclick="toggleSection(this)">
+        <div class="analysis-title"><span class="chevron">▼</span> Growth Accounting — Users</div>
+        <div class="analysis-summary">
+            <span class="sum-item">MAU <span class="sum-val">{total_mau_latest}</span></span>
+            <span class="sum-item">QR <span class="sum-val">{latest_dev_qr:.1f}x</span></span>
+        </div>
     </div>
-    <div class="card">{to_div(fig_rev, 'p-rev')}</div>
+    <div class="analysis-body">
+        <div class="mode-tabs" data-section="user-ga">
+            <div class="mode-tab active" data-mode="qr">Quick Ratio</div>
+            <div class="mode-tab" data-mode="ga">Growth Accounting</div>
+            <div class="mode-tab" data-mode="mau">MAU Trend</div>
+        </div>
+        <div class="mode-panel active" data-mode="qr">
+            <div class="row-1"><div class="card">{to_div(fig_dev_qr, 'p-dev-qr')}</div></div>
+        </div>
+        <div class="mode-panel" data-mode="ga">
+            <div class="row-1"><div class="card">{to_div(fig_dev_ga, 'p-dev-ga')}</div></div>
+        </div>
+        <div class="mode-panel" data-mode="mau">
+            <div class="row-1"><div class="card">{to_div(fig_mau, 'p-mau')}</div></div>
+        </div>
+    </div>
 </div>
 
-<div class="section-header">Revenue by Model</div>
-<div class="row-2">
-    <div class="card">{to_div(fig_rev_model, 'p-rev-model')}</div>
-    <div class="card">{to_div(fig_rev_model_time, 'p-rev-model-time')}</div>
+<!-- SECTION 2: Growth Accounting — Revenue -->
+<div class="analysis-section" data-section="rev-ga">
+    <div class="analysis-header" onclick="toggleSection(this)">
+        <div class="analysis-title"><span class="chevron">▼</span> Growth Accounting — Revenue</div>
+        <div class="analysis-summary">
+            <span class="sum-item">MRR <span class="sum-val">${latest_mrr:,.0f}</span></span>
+            <span class="sum-item">Gross Ret <span class="sum-val">{latest_gross_ret:.0f}%</span></span>
+        </div>
+    </div>
+    <div class="analysis-body">
+        <div class="mode-tabs" data-section="rev-ga">
+            <div class="mode-tab active" data-mode="ga">Growth Accounting</div>
+            <div class="mode-tab" data-mode="company">By Company</div>
+            <div class="mode-tab" data-mode="model">By Model</div>
+        </div>
+        <div class="mode-panel active" data-mode="ga">
+            <div class="row-1"><div class="card">{to_div(fig_rev_ga, 'p-rev-ga')}</div></div>
+        </div>
+        <div class="mode-panel" data-mode="company">
+            <div class="chart-filter-wrap">
+                <div class="chart-filters" id="rev-chart-filters">
+                    <button class="chip active" data-sid="S001" style="--chip-color:{COLORS['S001']}"><span class="dot-sm" style="background:{COLORS['S001']}"></span>MedScribe AI</button>
+                    <button class="chip active" data-sid="S002" style="--chip-color:{COLORS['S002']}"><span class="dot-sm" style="background:{COLORS['S002']}"></span>Eigen Technologies</button>
+                    <button class="chip active" data-sid="S003" style="--chip-color:{COLORS['S003']}"><span class="dot-sm" style="background:{COLORS['S003']}"></span>BuilderKit</button>
+                    <span class="chip-divider"></span>
+                    <button class="chip toggle-chip active" data-metric="revenue">Revenue ($)</button>
+                    <button class="chip toggle-chip" data-metric="tokens">Tokens</button>
+                </div>
+                <div class="card">{to_div(fig_rev, 'p-rev')}</div>
+            </div>
+        </div>
+        <div class="mode-panel" data-mode="model">
+            <div class="row-2">
+                <div class="card">{to_div(fig_rev_model, 'p-rev-model')}</div>
+                <div class="card">{to_div(fig_rev_model_time, 'p-rev-model-time')}</div>
+            </div>
+        </div>
+    </div>
 </div>
 
-<div class="section-header">Cohort Analysis — LTV</div>
-<div class="row-2">
-    <div class="card clickable-chart" data-jump="cohort-ltv">{to_div(fig_cohort_ltv, 'p-cohort-ltv')}</div>
-    <div class="card">{to_div(fig_ltv_heatmap, 'p-ltv-heatmap')}</div>
+<!-- SECTION 3: Cohort Analysis -->
+<div class="analysis-section" data-section="cohorts">
+    <div class="analysis-header" onclick="toggleSection(this)">
+        <div class="analysis-title"><span class="chevron">▼</span> Cohort Analysis</div>
+        <div class="analysis-summary">
+            <span class="sum-item">Avg LTV (12mo) <span class="sum-val">${avg_ltv_m12:,.0f}</span></span>
+            <span class="sum-item">Gross Ret <span class="sum-val">{latest_gross_ret:.0f}%</span></span>
+        </div>
+    </div>
+    <div class="analysis-body">
+        <div class="mode-tabs" data-section="cohorts">
+            <div class="mode-tab active" data-mode="ltv-lines">LTV Lines</div>
+            <div class="mode-tab" data-mode="ltv-heat">LTV Heatmap</div>
+            <div class="mode-tab" data-mode="dev-ret">Dev Retention</div>
+            <div class="mode-tab" data-mode="dev-ret-heat">Retention Heatmap</div>
+            <div class="mode-tab" data-mode="rev-ret">Revenue Retention</div>
+            <div class="mode-tab" data-mode="gross-ret">Gross Retention</div>
+        </div>
+        <div class="mode-panel active" data-mode="ltv-lines">
+            <div class="row-1"><div class="card clickable-chart">{to_div(fig_cohort_ltv, 'p-cohort-ltv')}</div></div>
+        </div>
+        <div class="mode-panel" data-mode="ltv-heat">
+            <div class="row-1"><div class="card">{to_div(fig_ltv_heatmap, 'p-ltv-heatmap')}</div></div>
+        </div>
+        <div class="mode-panel" data-mode="dev-ret">
+            <div class="row-1"><div class="card clickable-chart">{to_div(fig_dev_retention, 'p-dev-retention')}</div></div>
+        </div>
+        <div class="mode-panel" data-mode="dev-ret-heat">
+            <div class="row-1"><div class="card">{to_div(fig_ret_heatmap, 'p-ret-heatmap')}</div></div>
+        </div>
+        <div class="mode-panel" data-mode="rev-ret">
+            <div class="row-1"><div class="card">{to_div(fig_rev_retention, 'p-rev-retention')}</div></div>
+        </div>
+        <div class="mode-panel" data-mode="gross-ret">
+            <div class="row-1"><div class="card">{to_div(fig_gross_ret, 'p-gross-ret')}</div></div>
+        </div>
+    </div>
 </div>
 
-<div class="section-header">Cohort Analysis — Retention</div>
-<div class="row-2">
-    <div class="card">{to_div(fig_dev_retention, 'p-dev-retention')}</div>
-    <div class="card">{to_div(fig_ret_heatmap, 'p-ret-heatmap')}</div>
-</div>
-<div class="row-2">
-    <div class="card">{to_div(fig_rev_retention, 'p-rev-retention')}</div>
-    <div class="card">{to_div(fig_gross_ret, 'p-gross-ret')}</div>
-</div>
-
-<div class="section-header">Portfolio Health</div>
-<div class="row-1">
-    <div class="card">{to_div(fig_concentration, 'p-concentration')}</div>
+<!-- SECTION 4: Distribution of PMF -->
+<div class="analysis-section" data-section="distribution">
+    <div class="analysis-header" onclick="toggleSection(this)">
+        <div class="analysis-title"><span class="chevron">▼</span> Distribution of PMF</div>
+        <div class="analysis-summary">
+            <span class="sum-item">Top partner <span class="sum-val">{top_partner_pct:.0f}%</span> of rev</span>
+        </div>
+    </div>
+    <div class="analysis-body">
+        <div class="mode-tabs" data-section="distribution">
+            <div class="mode-tab active" data-mode="concentration">Revenue Concentration</div>
+            <div class="mode-tab" data-mode="engagement">Engagement (L28)</div>
+        </div>
+        <div class="mode-panel active" data-mode="concentration">
+            <div class="row-1"><div class="card">{to_div(fig_concentration, 'p-concentration')}</div></div>
+        </div>
+        <div class="mode-panel" data-mode="engagement">
+            <div class="row-1"><div class="card">{to_div(fig_devs, 'p-devs')}</div></div>
+        </div>
+    </div>
 </div>
 '''
 
@@ -1053,6 +1133,27 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .toggle-chip {{ --chip-color:{ACCENT}; }}
 .toggle-chip.active {{ background:{ACCENT_LIGHT}; border-color:{ACCENT}; }}
 
+/* Collapsible analysis sections */
+.analysis-section {{ background:{CARD}; border:1px solid {GRID}; border-radius:10px; margin-bottom:16px; overflow:hidden; }}
+.analysis-header {{ display:flex; align-items:center; justify-content:space-between; padding:14px 20px; cursor:pointer; user-select:none; transition:background 0.15s; }}
+.analysis-header:hover {{ background:{ACCENT_SURFACE}; }}
+.analysis-title {{ font-size:13px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:{TEXT}; display:flex; align-items:center; gap:8px; }}
+.analysis-title .chevron {{ font-size:10px; color:{MUTED}; transition:transform 0.25s; }}
+.analysis-section.collapsed .chevron {{ transform:rotate(-90deg); }}
+.analysis-summary {{ font-size:11px; color:{MUTED}; display:flex; gap:16px; }}
+.analysis-summary .sum-item {{ white-space:nowrap; }}
+.analysis-summary .sum-val {{ font-weight:600; color:{DIM}; }}
+.analysis-body {{ padding:0 20px 16px; transition:max-height 0.35s ease, opacity 0.25s ease; overflow:hidden; }}
+.analysis-section.collapsed .analysis-body {{ max-height:0 !important; padding:0 20px; opacity:0; }}
+
+/* Mode tabs within sections */
+.mode-tabs {{ display:flex; gap:2px; margin-bottom:14px; background:{BG}; border-radius:6px; padding:2px; border:1px solid {GRID}; width:fit-content; }}
+.mode-tab {{ padding:6px 14px; font-size:11px; font-weight:500; color:{MUTED}; cursor:pointer; border-radius:4px; transition:all 0.15s; user-select:none; white-space:nowrap; }}
+.mode-tab:hover {{ color:{DIM}; }}
+.mode-tab.active {{ background:{ACCENT_LIGHT}; color:{TEXT}; font-weight:600; }}
+.mode-panel {{ display:none; }}
+.mode-panel.active {{ display:block; }}
+
 html {{ scroll-behavior:smooth; }}
 
 @media (max-width:900px) {{
@@ -1113,6 +1214,37 @@ html {{ scroll-behavior:smooth; }}
 </div>
 
 <script>
+// Section collapse/expand
+function toggleSection(header) {{
+    const section = header.closest('.analysis-section');
+    section.classList.toggle('collapsed');
+    // Trigger resize for any Plotly charts that might need re-rendering
+    if (!section.classList.contains('collapsed')) {{
+        setTimeout(() => window.dispatchEvent(new Event('resize')), 100);
+    }}
+}}
+
+// Mode tab switching within sections
+document.querySelectorAll('.mode-tabs').forEach(tabGroup => {{
+    tabGroup.querySelectorAll('.mode-tab').forEach(tab => {{
+        tab.addEventListener('click', () => {{
+            const section = tab.closest('.analysis-section') || tab.closest('.analysis-body');
+            const body = tab.closest('.analysis-body');
+            // Deactivate all tabs and panels in this section
+            tabGroup.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+            body.querySelectorAll('.mode-panel').forEach(p => p.classList.remove('active'));
+            // Activate clicked tab and matching panel
+            tab.classList.add('active');
+            const mode = tab.dataset.mode;
+            body.querySelectorAll('.mode-panel[data-mode="' + mode + '"]').forEach(p => {{
+                p.classList.add('active');
+            }});
+            // Resize Plotly charts in newly visible panel
+            setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+        }});
+    }});
+}});
+
 // Tab switching
 document.querySelectorAll('.tab').forEach(tab => {{
     tab.addEventListener('click', () => {{
