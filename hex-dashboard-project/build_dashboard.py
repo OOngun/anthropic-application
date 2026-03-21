@@ -324,19 +324,19 @@ fig_cohort_ltv.update_xaxes(title_text='Months since onboarding')
 fig_rev_retention = go.Figure()
 for sid in ['S001', 'S002', 'S003']:
     cd = cohort_df[cohort_df['startup_id'] == sid].sort_values('months_since')
-    fig_rev_retention.add_trace(go.Scatter(x=cd['months_since'], y=cd['rev_retention'] * 100, name=NAMES[sid],
+    fig_rev_retention.add_trace(go.Scatter(x=cd['months_since'], y=cd['rev_retention'], name=NAMES[sid],
         mode='lines', line=dict(color=COLORS[sid], width=2.5),
-        hovertemplate='Month %{x}: %{y:.0f}%<extra></extra>'))
-fig_rev_retention.add_hline(y=100, line_dash="dash", line_color=MUTED, annotation_text="100% baseline",
+        hovertemplate='Month %{x}: %{y:.1f}x first month<extra></extra>'))
+fig_rev_retention.add_hline(y=1, line_dash="dash", line_color=MUTED, annotation_text="1x baseline",
     annotation_position="top right", annotation_font_color=MUTED)
 fig_rev_retention.update_layout(**layout('Revenue Retention vs First Month'))
-fig_rev_retention.update_yaxes(ticksuffix='%')
+fig_rev_retention.update_yaxes(ticksuffix='x')
 fig_rev_retention.update_xaxes(title_text='Months since onboarding')
 
 # --- REVENUE CONCENTRATION (Pareto CDF) ---
 fig_concentration = go.Figure()
 fig_concentration.add_trace(go.Scatter(x=[0] + cum_pct_companies, y=[0] + cum_pct_revenue,
-    mode='lines+markers', line=dict(color=ACCENT, width=2.5),
+    name='Portfolio', mode='lines+markers', line=dict(color=ACCENT, width=2.5),
     marker=dict(size=8, color=ACCENT),
     text=[''] + [f'{n}: ${r:,.0f}' for n, r in rev_by_company],
     hovertemplate='%{text}<br>Top %{x:.0f}% of partners → %{y:.0f}% of revenue<extra></extra>'))
