@@ -213,7 +213,7 @@ def layout(title, h=380):
         title=dict(text=title, font=dict(size=13, color=TEXT, family='IBM Plex Sans'), x=0.01),
         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor=BG,
         font=dict(family='IBM Plex Sans', color=DIM, size=12),
-        height=h, margin=dict(l=50, r=20, t=40, b=40),
+        height=h, margin=dict(l=55, r=20, t=40, b=40),
         xaxis=dict(gridcolor=BORDER_SUBTLE, linecolor=GRID, showgrid=True, zeroline=False),
         yaxis=dict(gridcolor=BORDER_SUBTLE, linecolor=GRID, showgrid=True, zeroline=False),
         legend=dict(bgcolor='rgba(0,0,0,0)', orientation='h', yanchor='bottom', y=1.02, xanchor='left', x=0, font=dict(size=11)),
@@ -221,12 +221,14 @@ def layout(title, h=380):
         hoverlabel=dict(bgcolor=TEXT, font_color=BG, font_size=12, font_family='IBM Plex Sans'),
     )
 
+PLOTLY_CONFIG = dict(displaylogo=False, modeBarButtonsToRemove=['lasso2d','select2d'])
+
 _chart_counter = [0]
 def to_div(fig, chart_id=None):
     if chart_id is None:
         _chart_counter[0] += 1
         chart_id = f'chart-{_chart_counter[0]}'
-    return fig.to_html(full_html=False, include_plotlyjs=False, div_id=chart_id)
+    return fig.to_html(full_html=False, include_plotlyjs=False, div_id=chart_id, config=PLOTLY_CONFIG)
 
 def kpi(label, value, sub='', color=TEXT):
     return f'<div class="kpi"><div class="kpi-l">{label}</div><div class="kpi-v" style="color:{color}">{value}</div><div class="kpi-s">{sub}</div></div>'
@@ -843,8 +845,8 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .section-header {{ font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:{MUTED}; margin:24px 0 12px; padding-bottom:6px; border-bottom:1px solid {GRID}; }}
 .section-header:first-child {{ margin-top:0; }}
 
-.kpi-row {{ display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap; }}
-.kpi {{ background:{CARD}; border:1px solid {GRID}; border-radius:8px; padding:14px 18px; flex:1; min-width:140px; }}
+.kpi-row {{ display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:20px; }}
+.kpi {{ background:{CARD}; border:1px solid {GRID}; border-radius:8px; padding:14px 18px; }}
 .kpi-l {{ font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:{MUTED}; margin-bottom:2px; }}
 .kpi-v {{ font-size:24px; font-weight:700; }}
 .kpi-s {{ font-size:11px; color:{MUTED}; }}
@@ -868,7 +870,9 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .pill .dot {{ display:inline-block; width:8px; height:8px; border-radius:50%; }}
 .pill:not(.active) .dot {{ opacity:0.3; }}
 
-.perf-table-wrap {{ padding:0; overflow-x:auto; }}
+.perf-table-wrap {{ padding:0; overflow-x:auto; position:relative; }}
+.perf-table-wrap::after {{ content:''; position:absolute; right:0; top:0; bottom:0; width:40px; background:linear-gradient(90deg, transparent, {CARD}); pointer-events:none; opacity:0; transition:opacity 0.3s; }}
+.perf-table-wrap.scrollable::after {{ opacity:1; }}
 .perf-table {{ width:100%; border-collapse:collapse; font-size:13px; }}
 .perf-table th {{ text-align:left; padding:10px 14px; border-bottom:1px solid {GRID}; color:{MUTED}; font-size:11px; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; white-space:nowrap; }}
 .perf-table td {{ padding:10px 14px; border-bottom:1px solid {BORDER_SUBTLE}; white-space:nowrap; color:{DIM}; }}
@@ -911,8 +915,17 @@ html {{ scroll-behavior:smooth; }}
 
 @media (max-width:900px) {{
     .row-2 {{ grid-template-columns:1fr; }}
-    .kpi-row {{ flex-direction:column; }}
+    .row-3 {{ grid-template-columns:1fr; }}
+    .kpi-row {{ grid-template-columns:1fr 1fr; }}
     .assumptions {{ flex-direction:column; gap:8px; }}
+    .content {{ padding:16px; }}
+    .topbar {{ padding:16px; }}
+    .chart-filters {{ gap:4px; }}
+    .chip {{ padding:4px 10px; font-size:11px; }}
+}}
+
+@media (max-width:480px) {{
+    .kpi-row {{ grid-template-columns:1fr; }}
 }}
 </style>
 </head>
@@ -977,6 +990,20 @@ document.querySelectorAll('.perf-row').forEach(row => {{
         const tab = document.querySelector('[data-tab="' + sid + '"]');
         if (tab) tab.click();
     }});
+}});
+
+// Table scroll indicator
+document.querySelectorAll('.perf-table-wrap').forEach(wrap => {{
+    function checkScroll() {{
+        if (wrap.scrollWidth > wrap.clientWidth && wrap.scrollLeft < wrap.scrollWidth - wrap.clientWidth - 10) {{
+            wrap.classList.add('scrollable');
+        }} else {{
+            wrap.classList.remove('scrollable');
+        }}
+    }}
+    checkScroll();
+    wrap.addEventListener('scroll', checkScroll);
+    window.addEventListener('resize', checkScroll);
 }});
 
 // Chart company filter chips
