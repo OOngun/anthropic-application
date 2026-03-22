@@ -128,14 +128,17 @@ body { font-family:'IBM Plex Sans',-apple-system,sans-serif; background:#FFFCFC;
 [data-tooltip] { cursor:help; }
 .tooltip-box { position:fixed; background:#14141C; color:#FFFCFC; padding:10px 14px; border-radius:8px; font-size:11px; font-weight:400; font-family:Inter,-apple-system,sans-serif; white-space:normal; width:260px; text-align:left; line-height:1.5; z-index:10000; pointer-events:none; box-shadow:0 4px 16px rgba(0,0,0,0.2); opacity:0; transition:opacity 0.15s ease; }
 .tooltip-box.visible { opacity:1; }
-.tooltip-box .tip-title { font-weight:600; font-size:12px; margin-bottom:4px; color:#fff; }
-.tooltip-box .tip-formula { font-family:'IBM Plex Mono',monospace; font-size:11px; background:rgba(255,255,255,0.1); padding:5px 8px; border-radius:4px; margin:6px 0; display:block; color:#a5b4fc; letter-spacing:0.02em; }
-.tooltip-box .tip-formula .frac { display:inline-flex; flex-direction:column; align-items:center; vertical-align:middle; margin:0 2px; }
-.tooltip-box .tip-formula .frac-num { border-bottom:1px solid #a5b4fc; padding:0 3px 1px; font-size:10px; }
-.tooltip-box .tip-formula .frac-den { padding:1px 3px 0; font-size:10px; }
-.tooltip-box .tip-formula sup { font-size:8px; vertical-align:super; }
-.tooltip-box .tip-body { color:rgba(255,255,255,0.8); }
-.tooltip-box .tip-bench { font-size:10px; color:rgba(255,255,255,0.6); margin-top:4px; font-style:italic; }
+.tooltip-box .tip-title { font-weight:600; font-size:12px; margin-bottom:6px; color:#fff; }
+.tooltip-box .tip-formula { font-family:'IBM Plex Mono',ui-monospace,monospace; font-size:13px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); padding:10px 14px; border-radius:6px; margin:8px 0; color:#c4b5fd; line-height:1.6; }
+.tooltip-box .tip-formula .frac { display:inline-flex; flex-direction:column; align-items:center; vertical-align:middle; margin:0 3px; line-height:1.1; }
+.tooltip-box .tip-formula .frac-num { border-bottom:1.5px solid #c4b5fd; padding:0 5px 2px; font-size:11px; text-align:center; white-space:nowrap; }
+.tooltip-box .tip-formula .frac-den { padding:2px 5px 0; font-size:11px; text-align:center; white-space:nowrap; }
+.tooltip-box .tip-formula .paren { font-size:22px; font-weight:200; color:#a78bfa; vertical-align:middle; }
+.tooltip-box .tip-formula sup { font-size:9px; vertical-align:super; color:#e9d5ff; }
+.tooltip-box .tip-formula sub { font-size:9px; vertical-align:sub; color:#e9d5ff; }
+.tooltip-box .tip-formula .op { margin:0 4px; color:#94a3b8; }
+.tooltip-box .tip-body { color:rgba(255,255,255,0.8); margin-top:2px; }
+.tooltip-box .tip-bench { font-size:10px; color:rgba(255,255,255,0.5); margin-top:6px; padding-top:6px; border-top:1px solid rgba(255,255,255,0.1); }
 .tip-defs { display:none; }
 
 /* CMGR rows */
@@ -1047,40 +1050,40 @@ document.querySelectorAll('.partner-list').forEach(wrap => {
 
 <div id="tip-quick-ratio">
     <div class="tip-title">Quick Ratio</div>
-    <span class="tip-formula"><span class="frac"><span class="frac-num">New + Resurrected + Expansion</span><span class="frac-den">Churned + Contraction</span></span></span>
+    <div class="tip-formula"><span class="paren">(</span><span class="frac"><span class="frac-num">New + Resurrected + Expansion</span><span class="frac-den">Churned + Contraction</span></span><span class="paren">)</span></div>
     <div class="tip-body">Measures growth efficiency. How many units gained for every unit lost.</div>
-    <div class="tip-bench">&gt; 4&times; very healthy &middot; &lt; 1&times; shrinking</div>
+    <div class="tip-bench">&gt; 4&times; very healthy &middot; 1&ndash;4&times; moderate &middot; &lt; 1&times; shrinking</div>
 </div>
 
 <div id="tip-net-churn">
     <div class="tip-title">Net API Churn</div>
-    <span class="tip-formula"><span class="frac"><span class="frac-num">Churned + Contraction &minus; Resurrected &minus; Expansion</span><span class="frac-den">Prior Period Revenue</span></span></span>
-    <div class="tip-body">Negative = the existing base is growing even without new partners. The holy grail of net negative churn.</div>
+    <div class="tip-formula"><span class="frac"><span class="frac-num">Churned + Contraction &minus; Resurrected &minus; Expansion</span><span class="frac-den">Prior Period Revenue</span></span></div>
+    <div class="tip-body">Negative = existing base is growing without new partners. The holy grail of net negative churn.</div>
 </div>
 
 <div id="tip-gross-retention">
     <div class="tip-title">Gross Retention</div>
-    <span class="tip-formula"><span class="frac"><span class="frac-num">Retained Revenue</span><span class="frac-den">Prior Period Revenue</span></span> &times; 100</span>
-    <div class="tip-body">The floor &mdash; how much revenue survives without any new business or expansion.</div>
-    <div class="tip-bench">&gt; 80% healthy &middot; &lt; 60% critical</div>
+    <div class="tip-formula"><span class="frac"><span class="frac-num">Retained Revenue</span><span class="frac-den">Prior Period Revenue</span></span><span class="op">&times;</span>100</div>
+    <div class="tip-body">The floor &mdash; how much revenue survives without new business or expansion.</div>
+    <div class="tip-bench">&gt; 80% healthy &middot; 60&ndash;80% watch &middot; &lt; 60% critical</div>
 </div>
 
 <div id="tip-credit-payback">
     <div class="tip-title">Credit Payback</div>
-    <span class="tip-formula"><span class="frac"><span class="frac-num">Cumulative Revenue</span><span class="frac-den">Credits Granted</span></span></span>
-    <div class="tip-body">Above 1&times; = investment has paid back. Progress bar shows how close to breakeven.</div>
+    <div class="tip-formula"><span class="frac"><span class="frac-num">Cumulative Revenue</span><span class="frac-den">Credits Granted</span></span></div>
+    <div class="tip-body">Above 1&times; = investment has paid back. The progress bar shows proximity to breakeven.</div>
 </div>
 
 <div id="tip-token-cagr">
     <div class="tip-title">Token CAGR</div>
-    <span class="tip-formula">(<span class="frac"><span class="frac-num">Latest Month</span><span class="frac-den">First Month</span></span>)<sup>12/n</sup> &minus; 1</span>
-    <div class="tip-body">Compound Annual Growth Rate of token consumption, annualised from monthly volumes.</div>
+    <div class="tip-formula"><span class="paren">(</span><span class="frac"><span class="frac-num">V<sub>latest</sub></span><span class="frac-den">V<sub>first</sub></span></span><span class="paren">)</span><sup>12/n</sup><span class="op">&minus;</span>1</div>
+    <div class="tip-body">Compound Annual Growth Rate of token consumption. Annualised from monthly volumes.</div>
 </div>
 
 <div id="tip-last-active">
     <div class="tip-title">Last Active</div>
     <div class="tip-body">Days since this partner last made an API call.</div>
-    <div class="tip-bench">&lt; 7d healthy &middot; 7&ndash;14d at risk &middot; &gt; 14d likely dormant</div>
+    <div class="tip-bench">&lt; 7d healthy &middot; 7&ndash;14d at risk &middot; &gt; 14d dormant</div>
 </div>
 
 <div id="tip-monthly-tokens">
@@ -1089,45 +1092,45 @@ document.querySelectorAll('.partner-list').forEach(wrap => {
 </div>
 
 <div id="tip-cmgr3">
-    <div class="tip-title">CMGR-3</div>
-    <span class="tip-formula">(<span class="frac"><span class="frac-num">V<sub>t</sub></span><span class="frac-den">V<sub>t&minus;3</sub></span></span>)<sup>1/3</sup> &minus; 1</span>
-    <div class="tip-body">Compound Monthly Growth Rate over trailing 3 months. Captures recent momentum.</div>
+    <div class="tip-title">CMGR-3 &mdash; Compound Monthly Growth Rate</div>
+    <div class="tip-formula"><span class="paren">(</span><span class="frac"><span class="frac-num">V<sub>t</sub></span><span class="frac-den">V<sub>t&minus;3</sub></span></span><span class="paren">)</span><sup>1/3</sup><span class="op">&minus;</span>1</div>
+    <div class="tip-body">Growth rate over the trailing 3 months. Captures recent momentum.</div>
 </div>
 
 <div id="tip-cmgr6">
     <div class="tip-title">CMGR-6</div>
-    <span class="tip-formula">(<span class="frac"><span class="frac-num">V<sub>t</sub></span><span class="frac-den">V<sub>t&minus;6</sub></span></span>)<sup>1/6</sup> &minus; 1</span>
-    <div class="tip-body">Trailing 6-month CMGR. Smooths short-term volatility. Compare with CMGR-3 to detect acceleration or deceleration.</div>
+    <div class="tip-formula"><span class="paren">(</span><span class="frac"><span class="frac-num">V<sub>t</sub></span><span class="frac-den">V<sub>t&minus;6</sub></span></span><span class="paren">)</span><sup>1/6</sup><span class="op">&minus;</span>1</div>
+    <div class="tip-body">Trailing 6-month CMGR. Smooths short-term volatility. Compare with CMGR-3 to spot acceleration or deceleration.</div>
 </div>
 
 <div id="tip-cmgr12">
     <div class="tip-title">CMGR-12</div>
-    <span class="tip-formula">(<span class="frac"><span class="frac-num">V<sub>t</sub></span><span class="frac-den">V<sub>t&minus;12</sub></span></span>)<sup>1/12</sup> &minus; 1</span>
-    <div class="tip-body">Long-term structural growth rate. If CMGR-3 &lt; CMGR-12, growth is decelerating.</div>
+    <div class="tip-formula"><span class="paren">(</span><span class="frac"><span class="frac-num">V<sub>t</sub></span><span class="frac-den">V<sub>t&minus;12</sub></span></span><span class="paren">)</span><sup>1/12</sup><span class="op">&minus;</span>1</div>
+    <div class="tip-body">Long-term structural growth rate. If CMGR-3 &lt; CMGR-12, growth is decelerating &mdash; investigate.</div>
 </div>
 
 <div id="tip-abs-growth">
     <div class="tip-title">Absolute Monthly Growth</div>
-    <span class="tip-formula">Tokens<sub>current</sub> &times; CMGR-3</span>
-    <div class="tip-body">New tokens added per month. Rewards scale &mdash; a large partner growing slowly adds more absolute usage than a tiny one growing fast.</div>
+    <div class="tip-formula">Tokens<sub>now</sub><span class="op">&times;</span>CMGR-3</div>
+    <div class="tip-body">New tokens added per month. Rewards scale &mdash; a large partner growing slowly adds more than a tiny one growing fast.</div>
 </div>
 
 <div id="tip-gw-score">
     <div class="tip-title">Growth-Weighted Score</div>
-    <span class="tip-formula">log<sub>10</sub>(Tokens) &times; CMGR-3 &times; 100</span>
-    <div class="tip-body">Balances scale and velocity. The log transform prevents volume from completely dominating the score.</div>
+    <div class="tip-formula">log<sub>10</sub><span class="paren">(</span>Tokens<span class="paren">)</span><span class="op">&times;</span>CMGR-3<span class="op">&times;</span>100</div>
+    <div class="tip-body">Balances scale and velocity. Log compresses volume so neither dimension dominates.</div>
 </div>
 
 <div id="tip-proj-12mo">
     <div class="tip-title">Projected 12-Month Run-Rate</div>
-    <span class="tip-formula">Tokens<sub>current</sub> &times; (1 + CMGR-3)<sup>12</sup></span>
-    <div class="tip-body">Where this partner lands in 12 months if trailing 3-month growth continues. The primary power law ranking metric.</div>
+    <div class="tip-formula">Tokens<sub>now</sub><span class="op">&times;</span><span class="paren">(</span>1 + CMGR-3<span class="paren">)</span><sup>12</sup></div>
+    <div class="tip-body">Where this partner lands in a year if trailing 3-month growth continues. The primary power law ranking metric.</div>
 </div>
 
 <div id="tip-rev-impact">
     <div class="tip-title">Revenue Impact (6-month)</div>
-    <span class="tip-formula">Revenue<sub>current</sub> &times; (1 + CMGR-3)<sup>6</sup></span>
-    <div class="tip-body">Projected monthly revenue in 6 months. Factors in model mix since Opus tokens generate more revenue per token than Haiku.</div>
+    <div class="tip-formula">Rev<sub>now</sub><span class="op">&times;</span><span class="paren">(</span>1 + CMGR-3<span class="paren">)</span><sup>6</sup></div>
+    <div class="tip-body">Projected monthly revenue in 6 months. Factors in model mix since Opus generates more revenue per token than Haiku.</div>
 </div>
 
 </div>
