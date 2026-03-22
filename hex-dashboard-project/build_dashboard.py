@@ -1342,9 +1342,32 @@ html {{ scroll-behavior:smooth; }}
     .topbar {{ padding:16px; }}
 }}
 
+@media (max-width:680px) {{
+    .tabs {{ overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; }}
+    .tabs::-webkit-scrollbar {{ display:none; }}
+    .tab {{ padding:10px 14px; font-size:12px; flex-shrink:0; }}
+    .topbar-row {{ flex-direction:column; gap:4px; }}
+    .topbar .meta {{ font-size:10px; }}
+    .topbar h1 {{ font-size:17px; }}
+    .waterfall-row {{ grid-template-columns:72px 1fr 52px 16px; gap:4px; }}
+    .wf-label {{ font-size:11px; }}
+    .wf-value {{ font-size:11px; }}
+    .wf-delta {{ font-size:12px; }}
+    .pulse-panel {{ padding:14px 12px; overflow-x:auto; }}
+    .pulse-panel-chart {{ padding:8px 2px 4px; }}
+    .pl-subtitle {{ font-size:11px; }}
+    .chart-desc {{ font-size:10px; }}
+    .perf-table td {{ padding:8px 10px; font-size:12px; }}
+    .perf-table th {{ padding:8px 10px; font-size:9px; }}
+    .scoreboard-table td {{ padding:7px 8px; font-size:11px; }}
+    .scoreboard-table th {{ padding:7px 8px; font-size:9px; }}
+}}
+
 @media (max-width:480px) {{
     .kpi-row {{ grid-template-columns:1fr; }}
     .pulse-cards {{ grid-template-columns:1fr; }}
+    .analysis-header {{ flex-direction:column; align-items:flex-start; gap:6px; }}
+    .mode-tabs {{ flex-wrap:wrap; }}
 }}
 </style>
 </head>
