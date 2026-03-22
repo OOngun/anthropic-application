@@ -1262,14 +1262,14 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .tooltip-box {{ position:fixed; background:{TEXT}; color:{BG}; padding:10px 14px; border-radius:8px; font-size:11px; font-weight:400; font-family:Inter,-apple-system,sans-serif; white-space:normal; width:260px; text-align:left; line-height:1.5; z-index:10000; pointer-events:none; box-shadow:0 4px 16px rgba(0,0,0,0.2); opacity:0; transition:opacity 0.15s ease; }}
 .tooltip-box.visible {{ opacity:1; }}
 .tooltip-box .tip-title {{ font-weight:600; font-size:12px; margin-bottom:6px; color:#fff; }}
-.tooltip-box .tip-formula {{ font-family:'IBM Plex Mono',ui-monospace,monospace; font-size:13px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); padding:10px 14px; border-radius:6px; margin:8px 0; color:#c4b5fd; line-height:1.6; }}
-.tooltip-box .tip-formula .frac {{ display:inline-flex; flex-direction:column; align-items:center; vertical-align:middle; margin:0 3px; line-height:1.1; }}
-.tooltip-box .tip-formula .frac-num {{ border-bottom:1.5px solid #c4b5fd; padding:0 5px 2px; font-size:11px; text-align:center; white-space:nowrap; }}
-.tooltip-box .tip-formula .frac-den {{ padding:2px 5px 0; font-size:11px; text-align:center; white-space:nowrap; }}
-.tooltip-box .tip-formula .paren {{ font-size:22px; font-weight:200; color:#a78bfa; vertical-align:middle; }}
-.tooltip-box .tip-formula sup {{ font-size:9px; vertical-align:super; color:#e9d5ff; }}
-.tooltip-box .tip-formula sub {{ font-size:9px; vertical-align:sub; color:#e9d5ff; }}
-.tooltip-box .tip-formula .op {{ margin:0 4px; color:#94a3b8; }}
+.tooltip-box .tip-formula {{ font-family:'IBM Plex Mono',ui-monospace,monospace; font-size:12px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); padding:8px 12px; border-radius:6px; margin:8px 0; color:#c4b5fd; display:flex; align-items:center; flex-wrap:nowrap; gap:0; white-space:nowrap; }}
+.tooltip-box .tip-formula .frac {{ display:inline-flex; flex-direction:column; align-items:center; vertical-align:middle; margin:0 2px; }}
+.tooltip-box .tip-formula .frac-num {{ border-bottom:1px solid #c4b5fd; padding:0 4px 1px; font-size:10px; text-align:center; white-space:nowrap; }}
+.tooltip-box .tip-formula .frac-den {{ padding:1px 4px 0; font-size:10px; text-align:center; white-space:nowrap; }}
+.tooltip-box .tip-formula .paren {{ font-weight:300; color:#a78bfa; font-size:14px; align-self:stretch; display:flex; align-items:center; }}
+.tooltip-box .tip-formula sup {{ font-size:8px; vertical-align:super; color:#e9d5ff; margin-left:1px; }}
+.tooltip-box .tip-formula sub {{ font-size:8px; vertical-align:sub; color:#e9d5ff; }}
+.tooltip-box .tip-formula .op {{ margin:0 3px; color:#94a3b8; }}
 .tooltip-box .tip-body {{ color:rgba(255,255,255,0.8); margin-top:2px; }}
 .tooltip-box .tip-bench {{ font-size:10px; color:rgba(255,255,255,0.5); margin-top:6px; padding-top:6px; border-top:1px solid rgba(255,255,255,0.1); }}
 .tip-defs {{ display:none; }}
