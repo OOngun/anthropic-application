@@ -236,28 +236,75 @@ cmgr12 = cmgr(portfolio_tokens, 12)
 # ============================================================
 
 # Aggregate revenue GA
-agg_rev_ga = startup_ga.groupby('month').agg(
-    new_revenue=('new_revenue', 'sum'),
-    expansion_revenue=('expansion_revenue', 'sum'),
-    resurrected_revenue=('resurrected_revenue', 'sum'),
-    churned_revenue=('churned_revenue', 'sum'),
-    contraction_revenue=('contraction_revenue', 'sum'),
-    retained_revenue=('retained_revenue', 'sum'),
-    total_revenue=('total_revenue', 'sum'),
-).reset_index().sort_values('month')
+# === RECOMPUTE GA FROM ACTUAL MONTHLY REVENUE (following Social Capital SQL logic) ===
+# The CSV GA data doesn't balance. Recompute using the identity:
+#   Retained = min(this_month, last_month) for partners active both months
+#   New = first month revenue for that partner
+#   Expansion = this_month - last_month for partners spending MORE
+#   Contraction = last_month - this_month for partners spending LESS (shown negative)
+#   Resurrected = revenue from partners inactive last month but active now (not new)
+#   Churned = revenue lost from partners active last month but not this month (shown negative)
 
+months_sorted = sorted(monthly_usage['month'].unique())
+first_months = monthly_usage.groupby('startup_id')['month'].min().to_dict()
+
+ga_rows = []
+for i in range(1, len(months_sorted)):
+    prev_m, curr_m = months_sorted[i-1], months_sorted[i]
+    prev = monthly_usage[monthly_usage['month'] == prev_m].set_index('startup_id')['revenue_usd']
+    curr = monthly_usage[monthly_usage['month'] == curr_m].set_index('startup_id')['revenue_usd']
+    all_ids = set(prev.index) | set(curr.index)
+
+    new_rev = expansion_rev = resurrected_rev = retained_rev = 0
+    churned_rev = contraction_rev = 0
+
+    for sid in all_ids:
+        p = prev.get(sid, 0)
+        c = curr.get(sid, 0)
+        is_new = (first_months.get(sid) == curr_m)
+
+        if c > 0 and p > 0:
+            retained_rev += min(c, p)
+            if c > p:
+                expansion_rev += (c - p)
+            elif c < p:
+                contraction_rev += (p - c)
+        elif c > 0 and p == 0:
+            if is_new:
+                new_rev += c
+            else:
+                resurrected_rev += c
+        elif c == 0 and p > 0:
+            churned_rev += p
+
+    total_rev = new_rev + retained_rev + expansion_rev + resurrected_rev
+    ga_rows.append({
+        'month': curr_m, 'total_revenue': total_rev,
+        'retained_revenue': retained_rev, 'new_revenue': new_rev,
+        'expansion_revenue': expansion_rev, 'resurrected_revenue': resurrected_rev,
+        'churned_revenue': churned_rev, 'contraction_revenue': contraction_rev,
+    })
+
+agg_rev_ga = pd.DataFrame(ga_rows).sort_values('month')
 agg_rev_ga['gross_ret'] = agg_rev_ga['retained_revenue'] / agg_rev_ga['total_revenue'].shift(1) * 100
+
+# Verify identity: total = retained + new + expansion + resurrected
+_check = agg_rev_ga.iloc[-1]
+_sum = _check['retained_revenue'] + _check['new_revenue'] + _check['expansion_revenue'] + _check['resurrected_revenue']
+assert abs(_sum - _check['total_revenue']) < 0.01, f"GA identity broken: {_sum} != {_check['total_revenue']}"
 
 # Latest month GA percentages (for waterfall bars)
 latest_ga = agg_rev_ga.iloc[-1]
-prior_total = agg_rev_ga.iloc[-2]['total_revenue'] if len(agg_rev_ga) >= 2 else 1
+prior_ga = agg_rev_ga.iloc[-2] if len(agg_rev_ga) >= 2 else None
+prior_total = prior_ga['total_revenue'] if prior_ga is not None else 1
 
 wf_new_pct = latest_ga['new_revenue'] / prior_total * 100 if prior_total > 0 else 0
 wf_expansion_pct = latest_ga['expansion_revenue'] / prior_total * 100 if prior_total > 0 else 0
 wf_resurrected_pct = latest_ga['resurrected_revenue'] / prior_total * 100 if prior_total > 0 else 0
 wf_contraction_pct = latest_ga['contraction_revenue'] / prior_total * 100 if prior_total > 0 else 0
 wf_churned_pct = latest_ga['churned_revenue'] / prior_total * 100 if prior_total > 0 else 0
-wf_net_pct = (latest_ga['total_revenue'] - prior_total) / prior_total * 100 if prior_total > 0 else 0
+# Net growth now equals sum of components (identity holds)
+wf_net_pct = wf_new_pct + wf_expansion_pct + wf_resurrected_pct - wf_contraction_pct - wf_churned_pct
 
 # Compute all-time average GA percentages for comparison
 ga_pct_history = pd.DataFrame()
@@ -711,7 +758,7 @@ tier1_html = f'''
     <div class="pulse-panels">
         <div class="pulse-panel">
             <div class="panel-title">GROWTH ACCOUNTING WATERFALL</div>
-            <div class="panel-subtitle">Latest month vs prior &middot; ▸ = {n_months_avg}-month avg</div>
+            <div class="panel-subtitle">{pd.Timestamp(latest_ga['month']).strftime('%b %Y')} vs {pd.Timestamp(prior_ga['month']).strftime('%b %Y')} &middot; Prior revenue: ${prior_total:,.0f} &middot; ▸ = {n_months_avg}-month avg</div>
             <div class="waterfall-rows">
                 {wf_bar('New', wf_new_pct, avg_new_pct, GAIN)}
                 {wf_bar('Expansion', wf_expansion_pct, avg_expansion_pct, GAIN)}
@@ -731,6 +778,9 @@ tier1_html = f'''
                     <span class="wf-value" style="font-weight:600">{'+' if wf_net_pct >= 0 else ''}{wf_net_pct:.1f}%</span>
                     <span class="wf-delta" style="color:{SUCCESS if wf_net_pct > avg_net_pct + 0.5 else DANGER if wf_net_pct < avg_net_pct - 0.5 else MUTED}">{'↑' if wf_net_pct > avg_net_pct + 0.5 else '↓' if wf_net_pct < avg_net_pct - 0.5 else '→'}</span>
                 </div>
+            </div>
+            <div class="wf-summary">
+                ${latest_ga['total_revenue']:,.0f} current &middot; {'↑' if wf_net_pct >= 0 else '↓'} ${abs(latest_ga['total_revenue'] - prior_total):,.0f} ({'+' if wf_net_pct >= 0 else ''}{wf_net_pct:.1f}%) &middot; Avg net: {avg_net_pct:+.1f}%/mo
             </div>
             <div class="wf-legend">
                 <span class="wf-legend-item"><span class="wf-dot" style="background:{GAIN}"></span>Gains</span>
@@ -1262,6 +1312,7 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .wf-delta {{ font-size:14px; font-weight:600; text-align:center; cursor:help; }}
 .wf-net .wf-label {{ font-weight:600; color:{TEXT}; }}
 .wf-divider {{ height:1px; background:{BORDER_SUBTLE}; margin:4px 0; }}
+.wf-summary {{ font-size:11px; color:{DIM}; margin-top:14px; padding:8px 12px; background:{CARD}; border-radius:6px; border:1px solid {GRID}; }}
 .wf-legend {{ display:flex; gap:16px; margin-top:12px; }}
 .wf-legend-item {{ font-size:11px; color:{MUTED}; display:flex; align-items:center; gap:4px; }}
 .wf-dot {{ width:8px; height:8px; border-radius:50%; }}
