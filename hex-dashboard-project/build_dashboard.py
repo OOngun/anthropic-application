@@ -481,7 +481,33 @@ startup_charts = {}
 for sid in ALL_SIDS:
     charts = {}
     d_usage = monthly_usage[monthly_usage['startup_id'] == sid].sort_values('month')
-    d_ga = startup_ga[startup_ga['startup_id'] == sid].sort_values('month')
+
+    # Compute per-company GA from monthly_usage (not CSV) so all 23 partners have data
+    _company_ga_rows = []
+    _rev_vals = d_usage['revenue_usd'].values
+    _months_vals = d_usage['month'].values
+    for _j in range(1, len(_rev_vals)):
+        _p, _c = _rev_vals[_j-1], _rev_vals[_j]
+        _ret = min(_c, _p) if _c > 0 and _p > 0 else 0
+        _exp = (_c - _p) if _c > _p and _p > 0 else 0
+        _contr = (_p - _c) if _p > _c and _c > 0 else 0
+        _new = _c if _c > 0 and _p == 0 and _j == 0 else 0
+        _res = _c if _c > 0 and _p == 0 and _j > 0 else 0
+        _churn = _p if _p > 0 and _c == 0 else 0
+        _qr = (_exp + _new + _res) / (_contr + _churn) if (_contr + _churn) > 0 else 10.0
+        _gret = _ret / _p * 100 if _p > 0 else 0
+        _company_ga_rows.append({
+            'month': _months_vals[_j],
+            'new_revenue': _new, 'expansion_revenue': _exp,
+            'resurrected_revenue': _res, 'retained_revenue': _ret,
+            'churned_revenue': _churn, 'contraction_revenue': _contr,
+            'total_revenue': _ret + _new + _exp + _res,
+            'quick_ratio': _qr, 'gross_retention_pct': _gret,
+        })
+    d_ga = pd.DataFrame(_company_ga_rows) if _company_ga_rows else pd.DataFrame(
+        columns=['month','new_revenue','expansion_revenue','resurrected_revenue',
+                 'retained_revenue','churned_revenue','contraction_revenue',
+                 'total_revenue','quick_ratio','gross_retention_pct'])
 
     # Revenue
     f = go.Figure()
