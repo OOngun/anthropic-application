@@ -554,23 +554,81 @@ def wf_bar(label, pct, color, is_loss=False):
         <span class="wf-value" style="color:{color}">{sign}{abs(pct):.1f}%</span>
     </div>'''
 
-# CMGR bar scaling
-cmgr_max_val = max(abs(cmgr3), abs(cmgr6), abs(cmgr12), 0.01)
+# ============================================================
+# COMBINED GA + CMGR CHART (Plotly — replaces static CMGR bars)
+# ============================================================
+# Revenue Growth Accounting stacked bars + CMGR trailing lines on secondary axis
 
-def cmgr_bar(label, val):
-    width = abs(val) / cmgr_max_val * 100
-    return f'''<div class="cmgr-row">
-        <span class="cmgr-label">{label}</span>
-        <div class="cmgr-bar-track"><div class="cmgr-bar-fill" style="width:{width:.1f}%"></div></div>
-        <span class="cmgr-value">{val*100:.1f}%</span>
-    </div>'''
+fig_ga_cmgr = go.Figure()
 
-# Deceleration note
-cmgr_note = ''
+# GA bars — gains above axis, losses below
+fig_ga_cmgr.add_trace(go.Bar(x=agg_rev_ga['month'], y=agg_rev_ga['retained_revenue'], name='Retained',
+    marker_color='#94a3b8', opacity=0.5, hovertemplate='Retained: $%{y:,.0f}<extra></extra>'))
+fig_ga_cmgr.add_trace(go.Bar(x=agg_rev_ga['month'], y=agg_rev_ga['new_revenue'], name='New',
+    marker_color=GAIN, hovertemplate='New: $%{y:,.0f}<extra></extra>'))
+fig_ga_cmgr.add_trace(go.Bar(x=agg_rev_ga['month'], y=agg_rev_ga['expansion_revenue'], name='Expansion',
+    marker_color='#34d399', hovertemplate='Expansion: $%{y:,.0f}<extra></extra>'))
+fig_ga_cmgr.add_trace(go.Bar(x=agg_rev_ga['month'], y=agg_rev_ga['resurrected_revenue'], name='Resurrected',
+    marker_color='#6ee7b7', hovertemplate='Resurrected: $%{y:,.0f}<extra></extra>'))
+fig_ga_cmgr.add_trace(go.Bar(x=agg_rev_ga['month'], y=-agg_rev_ga['contraction_revenue'], name='Contraction',
+    marker_color='#fb923c', hovertemplate='Contraction: -$%{y:,.0f}<extra></extra>'))
+fig_ga_cmgr.add_trace(go.Bar(x=agg_rev_ga['month'], y=-agg_rev_ga['churned_revenue'], name='Churned',
+    marker_color=LOSS, hovertemplate='Churned: -$%{y:,.0f}<extra></extra>'))
+
+# CMGR trailing lines on secondary y-axis
+# Compute rolling CMGR at each month
+months_list = portfolio_tokens.index.tolist()
+cmgr3_series, cmgr6_series, cmgr12_series = [], [], []
+cmgr_months = []
+for i in range(len(months_list)):
+    m = months_list[i]
+    sub = portfolio_tokens.iloc[:i+1]
+    c3 = cmgr(sub, 3) if len(sub) > 3 else None
+    c6 = cmgr(sub, 6) if len(sub) > 6 else None
+    c12 = cmgr(sub, 12) if len(sub) > 12 else None
+    cmgr_months.append(m)
+    cmgr3_series.append(c3)
+    cmgr6_series.append(c6)
+    cmgr12_series.append(c12)
+
+cmgr_df = pd.DataFrame({'month': cmgr_months, 'cmgr3': cmgr3_series, 'cmgr6': cmgr6_series, 'cmgr12': cmgr12_series})
+
+for col, name, color, dash in [
+    ('cmgr3', 'CMGR-3', '#3B6BE0', 'solid'),
+    ('cmgr6', 'CMGR-6', '#6366f1', 'dash'),
+    ('cmgr12', 'CMGR-12', '#a78bfa', 'dot'),
+]:
+    valid = cmgr_df.dropna(subset=[col])
+    if len(valid) > 0:
+        fig_ga_cmgr.add_trace(go.Scatter(
+            x=valid['month'], y=valid[col] * 100, name=name,
+            mode='lines', line=dict(color=color, width=2.5, dash=dash),
+            yaxis='y2', visible='legendonly',
+            hovertemplate=f'{name}: %{{y:.1f}}%<extra></extra>'))
+
+ga_cmgr_layout = layout('Growth Accounting + CMGR', h=380)
+ga_cmgr_layout['barmode'] = 'relative'
+ga_cmgr_layout['yaxis']['tickprefix'] = '$'
+ga_cmgr_layout['yaxis']['tickformat'] = ','
+ga_cmgr_layout['yaxis']['title'] = 'Revenue'
+ga_cmgr_layout['yaxis2'] = dict(
+    overlaying='y', side='right', showgrid=False, zeroline=False,
+    title='CMGR %', ticksuffix='%',
+    titlefont=dict(color='#3B6BE0', size=11),
+    tickfont=dict(color='#3B6BE0', size=10))
+ga_cmgr_layout['legend'] = dict(
+    bgcolor='rgba(0,0,0,0)', orientation='h', yanchor='bottom', y=1.02,
+    xanchor='left', x=0, font=dict(size=10))
+fig_ga_cmgr.update_layout(**ga_cmgr_layout)
+
+ga_cmgr_div = to_div(fig_ga_cmgr, 'pulse-ga-cmgr')
+
+# Deceleration note for inline display
+cmgr_note_html = ''
 if cmgr3 < cmgr12 and cmgr12 > 0:
-    cmgr_note = '<div class="cmgr-note decel">Growth has <strong>decelerated</strong> — CMGR3 trails CMGR12</div>'
+    cmgr_note_html = f'<div class="cmgr-note decel">CMGR3 ({cmgr3*100:.1f}%) trails CMGR12 ({cmgr12*100:.1f}%) — growth has <strong>decelerated</strong></div>'
 elif cmgr3 > cmgr12 and cmgr12 > 0:
-    cmgr_note = '<div class="cmgr-note accel">Growth is <strong>accelerating</strong> — CMGR3 leads CMGR12</div>'
+    cmgr_note_html = f'<div class="cmgr-note accel">CMGR3 ({cmgr3*100:.1f}%) leads CMGR12 ({cmgr12*100:.1f}%) — growth is <strong>accelerating</strong></div>'
 
 # Net churn display
 net_churn_display = f'{net_churn:.1f}%'
@@ -627,15 +685,11 @@ tier1_html = f'''
             </div>
         </div>
 
-        <div class="pulse-panel">
-            <div class="panel-title">CMGR TRAILING WINDOWS</div>
-            <div class="panel-subtitle">Compound Monthly Growth Rate — token consumption</div>
-            <div class="cmgr-rows">
-                {cmgr_bar('CMGR3', cmgr3)}
-                {cmgr_bar('CMGR6', cmgr6)}
-                {cmgr_bar('CMGR12', cmgr12)}
-            </div>
-            {cmgr_note}
+        <div class="pulse-panel pulse-panel-chart">
+            <div class="panel-title">GROWTH ACCOUNTING + CMGR</div>
+            <div class="panel-subtitle">Revenue breakdown with compound monthly growth rate (click legend to toggle CMGR lines)</div>
+            {ga_cmgr_div}
+            {cmgr_note_html}
         </div>
     </div>
 </div>
@@ -1023,6 +1077,7 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 
 .pulse-panels {{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }}
 .pulse-panel {{ background:#fff; border:0.5px solid {GRID}; border-radius:12px; padding:20px; }}
+.pulse-panel-chart {{ padding:12px 8px 4px; overflow:hidden; }}
 .panel-title {{ font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:{MUTED}; font-weight:600; margin-bottom:4px; }}
 .panel-subtitle {{ font-size:11px; color:{MUTED}; margin-bottom:16px; }}
 
