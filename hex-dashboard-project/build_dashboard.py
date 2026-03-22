@@ -1068,32 +1068,7 @@ def startup_tab_html(sid):
 
     {startup_kpis(sid)}
 
-    <!-- SECTION 1: Developer Adoption (renamed from Growth Accounting — Users) -->
-    <div class="analysis-section" data-section="{sid}-user-ga">
-        <div class="analysis-header" onclick="toggleSection(this)">
-            <div class="analysis-title"><span class="chevron">&#x25BC;</span> Developer Adoption</div>
-            <div class="analysis-summary">
-                <span class="sum-item">Devs <span class="sum-val">{m['active_devs']}</span></span>
-                <span class="sum-item">QR <span class="sum-val">{latest_dqr:.1f}x</span></span>
-            </div>
-        </div>
-        <div class="analysis-body">
-            <div class="mode-tabs" data-section="{sid}-user-ga">
-                <div class="mode-tab active" data-mode="qr">Quick Ratio</div>
-                <div class="mode-tab" data-mode="ga">Growth Accounting</div>
-                {'<div class="mode-tab" data-mode="retention">Cohort Retention</div>' if 'dev_retention' in ch else ''}
-            </div>
-            <div class="mode-panel active" data-mode="qr">
-                <div class="row-1"><div class="card">{ch['dev_qr']}</div></div>
-            </div>
-            <div class="mode-panel" data-mode="ga">
-                <div class="row-1"><div class="card">{ch['dev_ga']}</div></div>
-            </div>
-            {'<div class="mode-panel" data-mode="retention"><div class="row-1"><div class="card">' + ch['dev_retention'] + '</div></div></div>' if 'dev_retention' in ch else ''}
-        </div>
-    </div>
-
-    <!-- SECTION 2: Growth Overview (renamed from Growth Accounting — Revenue) -->
+    <!-- SECTION 1: Growth Overview — Revenue GA first -->
     <div class="analysis-section" data-section="{sid}-rev-ga">
         <div class="analysis-header" onclick="toggleSection(this)">
             <div class="analysis-title"><span class="chevron">&#x25BC;</span> Growth Overview</div>
@@ -1104,15 +1079,15 @@ def startup_tab_html(sid):
         </div>
         <div class="analysis-body">
             <div class="mode-tabs" data-section="{sid}-rev-ga">
-                <div class="mode-tab active" data-mode="qr">Quick Ratio</div>
-                <div class="mode-tab" data-mode="ga">Growth Accounting</div>
+                <div class="mode-tab active" data-mode="ga">Growth Accounting</div>
+                <div class="mode-tab" data-mode="qr">Quick Ratio</div>
                 <div class="mode-tab" data-mode="rev-tok">Revenue & Tokens</div>
             </div>
-            <div class="mode-panel active" data-mode="qr">
-                <div class="row-1"><div class="card">{ch.get('spend_qr', '')}</div></div>
-            </div>
-            <div class="mode-panel" data-mode="ga">
+            <div class="mode-panel active" data-mode="ga">
                 <div class="row-1"><div class="card">{ch['growth_acct']}</div></div>
+            </div>
+            <div class="mode-panel" data-mode="qr">
+                <div class="row-1"><div class="card">{ch.get('spend_qr', '')}</div></div>
             </div>
             <div class="mode-panel" data-mode="rev-tok">
                 <div class="row-2">
@@ -1120,6 +1095,31 @@ def startup_tab_html(sid):
                     <div class="card">{ch['tokens']}</div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- SECTION 2: Developer Adoption — GA first -->
+    <div class="analysis-section" data-section="{sid}-user-ga">
+        <div class="analysis-header" onclick="toggleSection(this)">
+            <div class="analysis-title"><span class="chevron">&#x25BC;</span> Developer Adoption</div>
+            <div class="analysis-summary">
+                <span class="sum-item">Devs <span class="sum-val">{m['active_devs']}</span></span>
+                <span class="sum-item">QR <span class="sum-val">{latest_dqr:.1f}x</span></span>
+            </div>
+        </div>
+        <div class="analysis-body">
+            <div class="mode-tabs" data-section="{sid}-user-ga">
+                <div class="mode-tab active" data-mode="ga">Growth Accounting</div>
+                <div class="mode-tab" data-mode="qr">Quick Ratio</div>
+                {'<div class="mode-tab" data-mode="retention">Cohort Retention</div>' if 'dev_retention' in ch else ''}
+            </div>
+            <div class="mode-panel active" data-mode="ga">
+                <div class="row-1"><div class="card">{ch['dev_ga']}</div></div>
+            </div>
+            <div class="mode-panel" data-mode="qr">
+                <div class="row-1"><div class="card">{ch['dev_qr']}</div></div>
+            </div>
+            {'<div class="mode-panel" data-mode="retention"><div class="row-1"><div class="card">' + ch['dev_retention'] + '</div></div></div>' if 'dev_retention' in ch else ''}
         </div>
     </div>
 
