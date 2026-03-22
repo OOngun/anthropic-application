@@ -615,8 +615,8 @@ cmgr_months = []
 for i in range(len(months_list)):
     m = months_list[i]
     sub = portfolio_tokens.iloc[:i+1]
-    c3 = cmgr(sub, 3) if len(sub) > 3 else None
-    c6 = cmgr(sub, 6) if len(sub) > 6 else None
+    c3 = cmgr(sub, 3) if len(sub) > 6 else None   # skip first 6 months
+    c6 = cmgr(sub, 6) if len(sub) > 9 else None   # skip first 9 months
     c12 = cmgr(sub, 12) if len(sub) > 12 else None
     cmgr_months.append(m)
     cmgr3_series.append(c3)
@@ -658,8 +658,16 @@ ga_cmgr_layout['yaxis2'] = dict(
     titlefont=dict(color='#3B6BE0', size=11),
     tickfont=dict(color='#3B6BE0', size=10))
 ga_cmgr_layout['legend'] = dict(
-    bgcolor='rgba(0,0,0,0)', orientation='h', yanchor='bottom', y=1.02,
+    bgcolor='rgba(0,0,0,0)', orientation='h', yanchor='bottom', y=1.10,
     xanchor='left', x=0, font=dict(size=10))
+ga_cmgr_layout['margin'] = dict(t=90, b=40, l=60, r=60)
+# Cap y2 axis to remove early outlier distortion
+stable_cmgr = [v for v in cmgr3_series + cmgr6_series + cmgr12_series if v is not None and abs(v) < 1.0]
+if stable_cmgr:
+    y2_max = max(stable_cmgr) * 100
+    y2_min = min(min(stable_cmgr) * 100, 0)
+    y2_pad = max((y2_max - y2_min) * 0.15, 3)
+    ga_cmgr_layout['yaxis2']['range'] = [y2_min - y2_pad, y2_max + y2_pad]
 fig_ga_cmgr.update_layout(**ga_cmgr_layout)
 
 ga_cmgr_div = to_div(fig_ga_cmgr, 'pulse-ga-cmgr')
