@@ -1159,14 +1159,14 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .assumptions .a-item strong {{ color:{TEXT}; font-weight:600; }}
 
 .tabs {{ display:flex; padding:0 32px; border-bottom:1px solid {GRID}; background:{BG}; position:sticky; top:0; z-index:100; }}
-.tab {{ padding:12px 20px; font-size:13px; font-weight:500; color:{MUTED}; cursor:pointer; border-bottom:2px solid transparent; transition:all .15s; user-select:none; }}
+.tab {{ padding:12px 20px; font-size:13px; font-weight:500; color:{MUTED}; cursor:pointer; border-bottom:2px solid transparent; transition:color .2s ease, border-color .2s ease; user-select:none; }}
 .tab:hover {{ color:{DIM}; }}
-.tab.active {{ color:{TEXT}; border-bottom-color:{ACCENT}; }}
+.tab.active {{ color:{TEXT}; border-bottom-color:{ACCENT}; font-weight:600; }}
 .tab .dot {{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; vertical-align:middle; }}
 
 .content {{ padding:28px 32px; }}
 .tab-panel {{ display:none; }}
-.tab-panel.active {{ display:block; }}
+.tab-panel.active {{ display:block; animation:fadeIn 0.2s ease; }}
 
 .section-header {{ font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:{MUTED}; margin:24px 0 12px; padding-bottom:6px; border-bottom:1px solid {GRID}; }}
 .section-header:first-child {{ margin-top:0; }}
@@ -1209,16 +1209,17 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .analysis-summary {{ font-size:11px; color:{MUTED}; display:flex; gap:16px; }}
 .analysis-summary .sum-item {{ white-space:nowrap; }}
 .analysis-summary .sum-val {{ font-weight:600; color:{DIM}; }}
-.analysis-body {{ padding:0 20px 16px; transition:max-height 0.35s ease, opacity 0.25s ease; overflow:hidden; }}
-.analysis-section.collapsed .analysis-body {{ max-height:0 !important; padding:0 20px; opacity:0; }}
+.analysis-body {{ padding:0 20px 16px; transition:max-height 0.4s cubic-bezier(0.4,0,0.2,1), opacity 0.3s ease, padding 0.3s ease; overflow:hidden; }}
+.analysis-section.collapsed .analysis-body {{ max-height:0 !important; padding-top:0; padding-bottom:0; opacity:0; }}
 
 /* Mode tabs within sections */
 .mode-tabs {{ display:flex; gap:2px; margin-bottom:14px; background:{BG}; border-radius:6px; padding:2px; border:1px solid {GRID}; width:fit-content; }}
-.mode-tab {{ padding:6px 14px; font-size:11px; font-weight:500; color:{MUTED}; cursor:pointer; border-radius:4px; transition:all 0.15s; user-select:none; white-space:nowrap; }}
-.mode-tab:hover {{ color:{DIM}; }}
+.mode-tab {{ padding:6px 14px; font-size:11px; font-weight:500; color:{MUTED}; cursor:pointer; border-radius:4px; transition:background 0.2s ease, color 0.2s ease; user-select:none; white-space:nowrap; }}
+.mode-tab:hover {{ color:{DIM}; background:rgba(71,57,130,0.03); }}
 .mode-tab.active {{ background:{ACCENT_LIGHT}; color:{TEXT}; font-weight:600; }}
-.mode-panel {{ display:none; }}
+.mode-panel {{ display:none; animation:fadeIn 0.25s ease; }}
 .mode-panel.active {{ display:block; }}
+@keyframes fadeIn {{ from {{ opacity:0; transform:translateY(4px); }} to {{ opacity:1; transform:translateY(0); }} }}
 
 /* Chart descriptions */
 .chart-desc {{ font-size:11px; color:{DIM}; line-height:1.6; margin-top:10px; padding:0 4px; }}
@@ -1228,7 +1229,8 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .pulse-block {{ margin-bottom:40px; padding-bottom:32px; border-bottom:1px solid {GRID}; }}
 
 .pulse-cards {{ display:grid; grid-template-columns:repeat(4, 1fr); gap:14px; margin-bottom:20px; }}
-.pulse-card {{ background:{CARD}; border:1px solid {GRID}; border-radius:10px; padding:18px 20px; }}
+.pulse-card {{ background:{CARD}; border:1px solid {GRID}; border-radius:10px; padding:18px 20px; transition:border-color 0.2s ease, box-shadow 0.2s ease; }}
+.pulse-card:hover {{ border-color:#d4d0da; box-shadow:0 1px 4px rgba(0,0,0,0.04); }}
 .pc-label {{ font-size:10px; text-transform:uppercase; letter-spacing:0.05em; color:{MUTED}; font-weight:600; margin-bottom:4px; }}
 .pc-value {{ font-size:24px; font-weight:700; color:{TEXT}; font-variant-numeric:tabular-nums; }}
 .pc-sub {{ font-size:11px; color:{MUTED}; margin-top:3px; }}
@@ -1308,6 +1310,7 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .perf-table td {{ padding:10px 14px; border-bottom:1px solid {BORDER_SUBTLE}; white-space:nowrap; color:{DIM}; font-variant-numeric:tabular-nums; }}
 .perf-table td.num {{ text-align:right; }}
 .perf-table tr:last-child td {{ border-bottom:none; }}
+.perf-table .perf-row {{ transition:background 0.15s ease; }}
 .perf-table .perf-row:hover {{ background:{ACCENT_SURFACE}; }}
 .perf-table .perf-row td:first-child {{ font-weight:600; color:{TEXT}; }}
 
@@ -1427,12 +1430,20 @@ html {{ scroll-behavior:smooth; }}
     }}, true);
 }})();
 
+// Plotly resize helper
+function resizePlotlyCharts(container) {{
+    if (typeof Plotly !== 'undefined') {{
+        const plots = (container || document).querySelectorAll('.js-plotly-plot');
+        plots.forEach(p => Plotly.Plots.resize(p));
+    }}
+}}
+
 // Section collapse/expand
 function toggleSection(header) {{
     const section = header.closest('.analysis-section');
     section.classList.toggle('collapsed');
     if (!section.classList.contains('collapsed')) {{
-        setTimeout(() => window.dispatchEvent(new Event('resize')), 100);
+        setTimeout(() => resizePlotlyCharts(section), 120);
     }}
 }}
 
@@ -1448,7 +1459,7 @@ document.querySelectorAll('.mode-tabs').forEach(tabGroup => {{
             body.querySelectorAll('.mode-panel[data-mode="' + mode + '"]').forEach(p => {{
                 p.classList.add('active');
             }});
-            setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+            setTimeout(() => resizePlotlyCharts(body), 80);
         }});
     }});
 }});
@@ -1459,8 +1470,9 @@ document.querySelectorAll('.tab').forEach(tab => {{
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
         tab.classList.add('active');
-        document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
-        setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+        const panel = document.getElementById('panel-' + tab.dataset.tab);
+        panel.classList.add('active');
+        setTimeout(() => resizePlotlyCharts(panel), 80);
         window.scrollTo({{ top: 0, behavior: 'smooth' }});
     }});
 }});

@@ -26,14 +26,14 @@ body { font-family:'IBM Plex Sans',-apple-system,sans-serif; background:#FFFCFC;
 .assumptions .a-item strong { color:#14141C; font-weight:600; }
 
 .tabs { display:flex; padding:0 32px; border-bottom:1px solid #E9E5E8; background:#FFFCFC; position:sticky; top:0; z-index:100; }
-.tab { padding:12px 20px; font-size:13px; font-weight:500; color:#7B7185; cursor:pointer; border-bottom:2px solid transparent; transition:all .15s; user-select:none; }
+.tab { padding:12px 20px; font-size:13px; font-weight:500; color:#7B7185; cursor:pointer; border-bottom:2px solid transparent; transition:color .2s ease, border-color .2s ease; user-select:none; }
 .tab:hover { color:#43394C; }
-.tab.active { color:#14141C; border-bottom-color:#472D7B; }
+.tab.active { color:#14141C; border-bottom-color:#472D7B; font-weight:600; }
 .tab .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; vertical-align:middle; }
 
 .content { padding:28px 32px; }
 .tab-panel { display:none; }
-.tab-panel.active { display:block; }
+.tab-panel.active { display:block; animation:fadeIn 0.2s ease; }
 
 .section-header { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:#7B7185; margin:24px 0 12px; padding-bottom:6px; border-bottom:1px solid #E9E5E8; }
 .section-header:first-child { margin-top:0; }
@@ -76,16 +76,17 @@ body { font-family:'IBM Plex Sans',-apple-system,sans-serif; background:#FFFCFC;
 .analysis-summary { font-size:11px; color:#7B7185; display:flex; gap:16px; }
 .analysis-summary .sum-item { white-space:nowrap; }
 .analysis-summary .sum-val { font-weight:600; color:#43394C; }
-.analysis-body { padding:0 20px 16px; transition:max-height 0.35s ease, opacity 0.25s ease; overflow:hidden; }
-.analysis-section.collapsed .analysis-body { max-height:0 !important; padding:0 20px; opacity:0; }
+.analysis-body { padding:0 20px 16px; transition:max-height 0.4s cubic-bezier(0.4,0,0.2,1), opacity 0.3s ease, padding 0.3s ease; overflow:hidden; }
+.analysis-section.collapsed .analysis-body { max-height:0 !important; padding-top:0; padding-bottom:0; opacity:0; }
 
 /* Mode tabs within sections */
 .mode-tabs { display:flex; gap:2px; margin-bottom:14px; background:#FFFCFC; border-radius:6px; padding:2px; border:1px solid #E9E5E8; width:fit-content; }
-.mode-tab { padding:6px 14px; font-size:11px; font-weight:500; color:#7B7185; cursor:pointer; border-radius:4px; transition:all 0.15s; user-select:none; white-space:nowrap; }
-.mode-tab:hover { color:#43394C; }
+.mode-tab { padding:6px 14px; font-size:11px; font-weight:500; color:#7B7185; cursor:pointer; border-radius:4px; transition:background 0.2s ease, color 0.2s ease; user-select:none; white-space:nowrap; }
+.mode-tab:hover { color:#43394C; background:rgba(71,57,130,0.03); }
 .mode-tab.active { background:rgba(71, 57, 130, 0.07); color:#14141C; font-weight:600; }
-.mode-panel { display:none; }
+.mode-panel { display:none; animation:fadeIn 0.25s ease; }
 .mode-panel.active { display:block; }
+@keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
 
 /* Chart descriptions */
 .chart-desc { font-size:11px; color:#43394C; line-height:1.6; margin-top:10px; padding:0 4px; }
@@ -95,7 +96,8 @@ body { font-family:'IBM Plex Sans',-apple-system,sans-serif; background:#FFFCFC;
 .pulse-block { margin-bottom:40px; padding-bottom:32px; border-bottom:1px solid #E9E5E8; }
 
 .pulse-cards { display:grid; grid-template-columns:repeat(4, 1fr); gap:14px; margin-bottom:20px; }
-.pulse-card { background:#F8FAFB; border:1px solid #E9E5E8; border-radius:10px; padding:18px 20px; }
+.pulse-card { background:#F8FAFB; border:1px solid #E9E5E8; border-radius:10px; padding:18px 20px; transition:border-color 0.2s ease, box-shadow 0.2s ease; }
+.pulse-card:hover { border-color:#d4d0da; box-shadow:0 1px 4px rgba(0,0,0,0.04); }
 .pc-label { font-size:10px; text-transform:uppercase; letter-spacing:0.05em; color:#7B7185; font-weight:600; margin-bottom:4px; }
 .pc-value { font-size:24px; font-weight:700; color:#14141C; font-variant-numeric:tabular-nums; }
 .pc-sub { font-size:11px; color:#7B7185; margin-top:3px; }
@@ -175,6 +177,7 @@ body { font-family:'IBM Plex Sans',-apple-system,sans-serif; background:#FFFCFC;
 .perf-table td { padding:10px 14px; border-bottom:1px solid #ECEDF2; white-space:nowrap; color:#43394C; font-variant-numeric:tabular-nums; }
 .perf-table td.num { text-align:right; }
 .perf-table tr:last-child td { border-bottom:none; }
+.perf-table .perf-row { transition:background 0.15s ease; }
 .perf-table .perf-row:hover { background:rgba(71, 57, 130, 0.04); }
 .perf-table .perf-row td:first-child { font-weight:600; color:#14141C; }
 
@@ -982,12 +985,20 @@ html { scroll-behavior:smooth; }
     }, true);
 })();
 
+// Plotly resize helper
+function resizePlotlyCharts(container) {
+    if (typeof Plotly !== 'undefined') {
+        const plots = (container || document).querySelectorAll('.js-plotly-plot');
+        plots.forEach(p => Plotly.Plots.resize(p));
+    }
+}
+
 // Section collapse/expand
 function toggleSection(header) {
     const section = header.closest('.analysis-section');
     section.classList.toggle('collapsed');
     if (!section.classList.contains('collapsed')) {
-        setTimeout(() => window.dispatchEvent(new Event('resize')), 100);
+        setTimeout(() => resizePlotlyCharts(section), 120);
     }
 }
 
@@ -1003,7 +1014,7 @@ document.querySelectorAll('.mode-tabs').forEach(tabGroup => {
             body.querySelectorAll('.mode-panel[data-mode="' + mode + '"]').forEach(p => {
                 p.classList.add('active');
             });
-            setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+            setTimeout(() => resizePlotlyCharts(body), 80);
         });
     });
 });
@@ -1014,8 +1025,9 @@ document.querySelectorAll('.tab').forEach(tab => {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
         tab.classList.add('active');
-        document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
-        setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+        const panel = document.getElementById('panel-' + tab.dataset.tab);
+        panel.classList.add('active');
+        setTimeout(() => resizePlotlyCharts(panel), 80);
         window.scrollTo({ top: 0, behavior: 'smooth' });
     });
 });
