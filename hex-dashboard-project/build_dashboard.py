@@ -1049,8 +1049,8 @@ for i, s in enumerate(scoreboard_data):
 scoreboard_html = f'''
 <div class="scoreboard-section">
     <div class="pl-header">
-        <div class="pl-title">GROWTH SCOREBOARD</div>
-        <div class="pl-subtitle">Scale × velocity — ranked by projected 12-month token run-rate</div>
+        <div class="pl-title">POWER LAW TRACKER</div>
+        <div class="pl-subtitle">Identifying breakout partners — scale × velocity, ranked by projected 12-month run-rate</div>
     </div>
     <div class="partner-list card">
         <table class="perf-table scoreboard-table">
