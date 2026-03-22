@@ -1164,15 +1164,15 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .tab.active {{ color:{TEXT}; border-bottom-color:{ACCENT}; }}
 .tab .dot {{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; vertical-align:middle; }}
 
-.content {{ padding:24px 32px; }}
+.content {{ padding:28px 32px; }}
 .tab-panel {{ display:none; }}
 .tab-panel.active {{ display:block; }}
 
 .section-header {{ font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:{MUTED}; margin:24px 0 12px; padding-bottom:6px; border-bottom:1px solid {GRID}; }}
 .section-header:first-child {{ margin-top:0; }}
 
-.kpi-row {{ display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:20px; }}
-.kpi {{ background:{CARD}; border:1px solid {GRID}; border-radius:8px; padding:14px 18px; }}
+.kpi-row {{ display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:14px; margin-bottom:24px; }}
+.kpi {{ background:{CARD}; border:1px solid {GRID}; border-radius:10px; padding:16px 20px; }}
 .kpi-l {{ font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:{MUTED}; margin-bottom:2px; }}
 .kpi-v {{ font-size:24px; font-weight:700; }}
 .kpi-s {{ font-size:11px; color:{MUTED}; }}
@@ -1181,7 +1181,7 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .row-1 {{ display:grid; grid-template-columns:1fr; gap:16px; margin-bottom:16px; }}
 .row-2 {{ display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }}
 
-.startup-hero {{ background:{CARD}; border:1px solid {GRID}; border-radius:8px; padding:18px 20px; margin-bottom:16px; }}
+.startup-hero {{ background:{CARD}; border:1px solid {GRID}; border-radius:10px; padding:20px 24px; margin-bottom:20px; }}
 .hero-top {{ display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }}
 .hero-name {{ font-size:18px; font-weight:700; margin-right:10px; color:{TEXT}; }}
 .badge {{ font-size:9px; font-weight:700; padding:2px 8px; border-radius:10px; color:#fff; letter-spacing:.04em; vertical-align:middle; }}
@@ -1200,7 +1200,7 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .kpi-breakdown-row span.kpi-s {{ margin-left:auto; }}
 
 /* Collapsible analysis sections */
-.analysis-section {{ background:{CARD}; border:1px solid {GRID}; border-radius:10px; margin-bottom:16px; overflow:hidden; }}
+.analysis-section {{ background:{CARD}; border:1px solid {GRID}; border-radius:10px; margin-bottom:18px; overflow:hidden; }}
 .analysis-header {{ display:flex; align-items:center; justify-content:space-between; padding:14px 20px; cursor:pointer; user-select:none; transition:background 0.15s; }}
 .analysis-header:hover {{ background:{ACCENT_SURFACE}; }}
 .analysis-title {{ font-size:13px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:{TEXT}; display:flex; align-items:center; gap:8px; }}
@@ -1225,19 +1225,19 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .chart-desc strong {{ color:{DIM}; font-weight:600; }}
 
 /* ========== TIER 1: PULSE BLOCK ========== */
-.pulse-block {{ margin-bottom:28px; }}
+.pulse-block {{ margin-bottom:40px; padding-bottom:32px; border-bottom:1px solid {GRID}; }}
 
-.pulse-cards {{ display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; margin-bottom:16px; }}
-.pulse-card {{ background:{CARD}; border-radius:8px; padding:16px 18px; }}
+.pulse-cards {{ display:grid; grid-template-columns:repeat(4, 1fr); gap:14px; margin-bottom:20px; }}
+.pulse-card {{ background:{CARD}; border:1px solid {GRID}; border-radius:10px; padding:18px 20px; }}
 .pc-label {{ font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:{MUTED}; font-weight:500; margin-bottom:4px; }}
-.pc-value {{ font-size:22px; font-weight:500; color:{TEXT}; }}
-.pc-sub {{ font-size:11px; color:{MUTED}; margin-top:2px; }}
+.pc-value {{ font-size:24px; font-weight:600; color:{TEXT}; font-variant-numeric:tabular-nums; }}
+.pc-sub {{ font-size:11px; color:{MUTED}; margin-top:3px; }}
 
 .pulse-panels {{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }}
-.pulse-panel {{ background:#fff; border:0.5px solid {GRID}; border-radius:12px; padding:20px; }}
-.pulse-panel-chart {{ padding:12px 8px 4px; overflow:hidden; }}
-.panel-title {{ font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:{MUTED}; font-weight:600; margin-bottom:4px; }}
-.panel-subtitle {{ font-size:11px; color:{MUTED}; margin-bottom:16px; }}
+.pulse-panel {{ background:#fff; border:1px solid {GRID}; border-radius:12px; padding:22px 24px; }}
+.pulse-panel-chart {{ padding:14px 10px 6px; overflow:hidden; }}
+.panel-title {{ font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:{MUTED}; font-weight:600; margin-bottom:6px; }}
+.panel-subtitle {{ font-size:11px; color:{MUTED}; margin-bottom:18px; }}
 
 /* Waterfall rows */
 .waterfall-rows {{ display:flex; flex-direction:column; gap:8px; }}
@@ -1286,13 +1286,14 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .cmgr-note.accel {{ background:rgba(34,197,94,0.08); color:{SUCCESS}; }}
 
 /* ========== TIER 2: PARTNER LIST ========== */
-.partner-list-section {{ margin-top:4px; }}
-.pl-header {{ margin-bottom:12px; }}
-.pl-title {{ font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:{MUTED}; }}
-.pl-subtitle {{ font-size:11px; color:{MUTED}; margin-top:2px; }}
+.partner-list-section {{ margin-top:0; margin-bottom:40px; padding-bottom:32px; border-bottom:1px solid {GRID}; }}
+.pl-header {{ margin-bottom:14px; }}
+.pl-title {{ font-size:13px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:{TEXT}; }}
+.pl-subtitle {{ font-size:12px; color:{MUTED}; margin-top:3px; }}
 
 /* Scoreboard */
-.scoreboard-section {{ margin-top:24px; }}
+.scoreboard-section {{ margin-top:0; }}
+.scoreboard-section .pl-title {{ font-size:13px; }}
 .scoreboard-table .rank-col {{ width:30px; }}
 .rank-cell {{ font-size:13px; font-weight:600; color:{MUTED}; text-align:center; }}
 .scoreboard-table td {{ font-size:12px; font-variant-numeric:tabular-nums; }}
