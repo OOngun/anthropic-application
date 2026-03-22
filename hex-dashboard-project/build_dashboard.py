@@ -1258,9 +1258,9 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .wf-avg-dot {{ width:2px; height:12px; background:{TEXT}; opacity:0.35; border-radius:1px; }}
 
 /* Hover tooltips */
-[data-tooltip] {{ position:relative; cursor:help; }}
-[data-tooltip]:hover::after {{ content:attr(data-tooltip); position:absolute; bottom:120%; left:50%; transform:translateX(-50%); background:{TEXT}; color:{BG}; padding:6px 10px; border-radius:6px; font-size:11px; font-weight:400; white-space:normal; width:220px; text-align:left; line-height:1.4; z-index:1000; pointer-events:none; box-shadow:0 4px 12px rgba(0,0,0,0.15); }}
-[data-tooltip]:hover::before {{ content:''; position:absolute; bottom:110%; left:50%; transform:translateX(-50%); border:5px solid transparent; border-top-color:{TEXT}; z-index:1001; }}
+[data-tooltip] {{ cursor:help; }}
+.tooltip-box {{ position:fixed; background:{TEXT}; color:{BG}; padding:8px 12px; border-radius:8px; font-size:11px; font-weight:400; font-family:Inter,-apple-system,sans-serif; white-space:normal; width:240px; text-align:left; line-height:1.5; z-index:10000; pointer-events:none; box-shadow:0 4px 16px rgba(0,0,0,0.2); opacity:0; transition:opacity 0.15s ease; }}
+.tooltip-box.visible {{ opacity:1; }}
 
 /* CMGR rows */
 .cmgr-rows {{ display:flex; flex-direction:column; gap:12px; }}
@@ -1371,6 +1371,40 @@ html {{ scroll-behavior:smooth; }}
 </div>
 
 <script>
+// ======== TOOLTIP ENGINE ========
+(function() {{
+    const tip = document.createElement('div');
+    tip.className = 'tooltip-box';
+    document.body.appendChild(tip);
+    let hideTimeout;
+
+    document.addEventListener('mouseenter', function(e) {{
+        const el = e.target.closest('[data-tooltip]');
+        if (!el) return;
+        clearTimeout(hideTimeout);
+        tip.textContent = el.getAttribute('data-tooltip');
+        tip.classList.add('visible');
+
+        const rect = el.getBoundingClientRect();
+        let top = rect.top - tip.offsetHeight - 8;
+        let left = rect.left + rect.width / 2 - tip.offsetWidth / 2;
+
+        // Keep within viewport
+        if (top < 4) top = rect.bottom + 8;
+        if (left < 4) left = 4;
+        if (left + tip.offsetWidth > window.innerWidth - 4) left = window.innerWidth - tip.offsetWidth - 4;
+
+        tip.style.top = top + 'px';
+        tip.style.left = left + 'px';
+    }}, true);
+
+    document.addEventListener('mouseleave', function(e) {{
+        const el = e.target.closest('[data-tooltip]');
+        if (!el) return;
+        hideTimeout = setTimeout(() => tip.classList.remove('visible'), 100);
+    }}, true);
+}})();
+
 // Section collapse/expand
 function toggleSection(header) {{
     const section = header.closest('.analysis-section');
