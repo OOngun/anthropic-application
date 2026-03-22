@@ -865,7 +865,13 @@ for m in company_metrics:
     la = m['last_active_days']
     la_display = f'{la}d ago' if la > 0 else 'Today'
 
-    partner_rows += f'''<tr class="perf-row" data-sid="{m['sid']}" style="cursor:pointer">
+    s_row = startups[startups['startup_id'] == m['sid']]
+    archetype = s_row.iloc[0]['archetype'] if len(s_row) > 0 and 'archetype' in s_row.columns else 'unknown'
+
+    partner_rows += f'''<tr class="perf-row" data-sid="{m['sid']}" data-name="{m['name'].lower()}"
+        data-arch="{archetype}" data-payback="{m['roi']:.4f}" data-cmgr="{cmgr3_val:.6f}"
+        data-qr="{m['avg_qr']:.4f}" data-gret="{m['gross_retention']:.2f}" data-active="{m['last_active_days']}"
+        style="cursor:pointer">
         <td><span class="dot-sm" style="background:{COLORS[m['sid']]}"></span>{m['name']} <span class="stage-badge">{m['stage']}</span></td>
         <td class="payback-cell">
             <div class="payback-bar{bar_extra_class}">
@@ -879,22 +885,35 @@ for m in company_metrics:
         <td class="metric-cell num {last_cls}">{la_display}</td>
     </tr>'''
 
+# Build archetype filter chips
+archetypes = startups['archetype'].dropna().unique().tolist()
+archetype_chips = ''.join(f'<button class="arch-chip active" data-arch="{a}">{a.title()}</button>' for a in sorted(archetypes))
+
 tier2_html = f'''
 <div class="partner-list-section">
     <div class="pl-header">
         <div class="pl-title">PARTNER LIST</div>
         <div class="pl-subtitle">Click a partner to view full analysis</div>
     </div>
+    <div class="pl-controls">
+        <input type="text" class="pl-search" id="pl-search" placeholder="Search partners..." autocomplete="off" />
+        <div class="pl-filters">
+            <span class="pl-filter-label">Filter:</span>
+            <button class="arch-chip active" data-arch="all">All</button>
+            {archetype_chips}
+        </div>
+        <div class="pl-count"><span id="pl-visible-count">{len(company_metrics)}</span> of {len(company_metrics)} partners</div>
+    </div>
     <div class="partner-list card">
-        <table class="perf-table">
+        <table class="perf-table" id="partner-table">
             <thead>
                 <tr>
-                    <th>Company</th>
-                    <th data-tip="credit-payback">Credit Payback</th>
-                    <th class="num" data-tip="cmgr">CMGR-3</th>
-                    <th class="num" data-tip="quick-ratio">Quick Ratio</th>
-                    <th class="num" data-tip="gross-retention">Gross Ret.</th>
-                    <th class="num" data-tip="last-active">Last Active</th>
+                    <th class="sortable" data-sort="name">Company <span class="sort-icon">⇅</span></th>
+                    <th class="sortable" data-sort="payback" data-tip="credit-payback">Credit Payback <span class="sort-icon">⇅</span></th>
+                    <th class="num sortable" data-sort="cmgr" data-tip="cmgr">CMGR-3 <span class="sort-icon">⇅</span></th>
+                    <th class="num sortable" data-sort="qr" data-tip="quick-ratio">Quick Ratio <span class="sort-icon">⇅</span></th>
+                    <th class="num sortable" data-sort="gret" data-tip="gross-retention">Gross Ret. <span class="sort-icon">⇅</span></th>
+                    <th class="num sortable" data-sort="active" data-tip="last-active">Last Active <span class="sort-icon">⇅</span></th>
                 </tr>
             </thead>
             <tbody>{partner_rows}</tbody>
@@ -1386,6 +1405,26 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .pl-title {{ font-size:13px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:{TEXT}; }}
 .pl-subtitle {{ font-size:12px; color:{MUTED}; margin-top:3px; }}
 
+/* Partner list controls */
+.pl-controls {{ display:flex; align-items:center; gap:12px; margin-bottom:14px; flex-wrap:wrap; }}
+.pl-search {{ padding:7px 12px; border:1px solid {GRID}; border-radius:8px; font-size:12px; font-family:Inter,sans-serif; background:{CARD}; color:{TEXT}; width:200px; outline:none; transition:border-color 0.2s; }}
+.pl-search:focus {{ border-color:#3b82f6; }}
+.pl-search::placeholder {{ color:{MUTED}; }}
+.pl-filters {{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; }}
+.pl-filter-label {{ font-size:10px; text-transform:uppercase; letter-spacing:0.05em; color:{DIM}; font-weight:600; }}
+.arch-chip {{ padding:4px 10px; border-radius:12px; border:1px solid {GRID}; background:transparent; color:{MUTED}; font-size:11px; font-family:Inter,sans-serif; cursor:pointer; transition:all 0.15s; }}
+.arch-chip:hover {{ border-color:{MUTED}; }}
+.arch-chip.active {{ background:rgba(59,130,246,0.08); border-color:rgba(59,130,246,0.3); color:{TEXT}; }}
+.pl-count {{ font-size:11px; color:{DIM}; margin-left:auto; }}
+
+/* Sortable columns */
+.sortable {{ cursor:pointer; user-select:none; transition:color 0.15s; }}
+.sortable:hover {{ color:{TEXT}; }}
+.sort-icon {{ font-size:10px; color:{DIM}; margin-left:2px; }}
+.sortable.sort-asc .sort-icon::after {{ content:'↑'; }}
+.sortable.sort-desc .sort-icon::after {{ content:'↓'; }}
+.sortable.sort-asc .sort-icon, .sortable.sort-desc .sort-icon {{ color:#3b82f6; }}
+
 /* Scoreboard */
 .scoreboard-section {{ margin-top:0; }}
 .scoreboard-section .pl-title {{ font-size:13px; }}
@@ -1599,6 +1638,110 @@ document.querySelectorAll('.perf-row').forEach(row => {{
         if (tab) tab.click();
     }});
 }});
+
+// ======== PARTNER LIST: SEARCH, FILTER, SORT ========
+(function() {{
+    const table = document.getElementById('partner-table');
+    if (!table) return;
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('.perf-row'));
+    const searchInput = document.getElementById('pl-search');
+    const countEl = document.getElementById('pl-visible-count');
+    const chips = document.querySelectorAll('.arch-chip');
+
+    let activeArch = 'all';
+    let searchTerm = '';
+    let sortCol = null;
+    let sortDir = 'desc';
+
+    function applyFilters() {{
+        let visible = 0;
+        rows.forEach(row => {{
+            const name = row.dataset.name || '';
+            const arch = row.dataset.arch || '';
+            const matchSearch = !searchTerm || name.includes(searchTerm.toLowerCase());
+            const matchArch = activeArch === 'all' || arch === activeArch;
+            const show = matchSearch && matchArch;
+            row.style.display = show ? '' : 'none';
+            if (show) visible++;
+        }});
+        if (countEl) countEl.textContent = visible;
+    }}
+
+    // Search
+    if (searchInput) {{
+        searchInput.addEventListener('input', (e) => {{
+            searchTerm = e.target.value;
+            applyFilters();
+        }});
+    }}
+
+    // Archetype filter chips
+    chips.forEach(chip => {{
+        chip.addEventListener('click', () => {{
+            const arch = chip.dataset.arch;
+            if (arch === 'all') {{
+                activeArch = 'all';
+                chips.forEach(c => c.classList.toggle('active', c.dataset.arch === 'all'));
+            }} else {{
+                // Deactivate "All" chip
+                chips.forEach(c => {{ if (c.dataset.arch === 'all') c.classList.remove('active'); }});
+                if (activeArch === arch) {{
+                    // Toggle off → back to all
+                    activeArch = 'all';
+                    chip.classList.remove('active');
+                    chips.forEach(c => {{ if (c.dataset.arch === 'all') c.classList.add('active'); }});
+                }} else {{
+                    chips.forEach(c => {{ if (c.dataset.arch !== 'all') c.classList.remove('active'); }});
+                    activeArch = arch;
+                    chip.classList.add('active');
+                }}
+            }}
+            applyFilters();
+        }});
+    }});
+
+    // Column sorting
+    const headers = table.querySelectorAll('.sortable');
+    headers.forEach(th => {{
+        th.addEventListener('click', () => {{
+            const col = th.dataset.sort;
+            if (sortCol === col) {{
+                sortDir = sortDir === 'desc' ? 'asc' : 'desc';
+            }} else {{
+                sortCol = col;
+                sortDir = 'desc';
+            }}
+
+            // Update header styles
+            headers.forEach(h => {{
+                h.classList.remove('sort-asc', 'sort-desc');
+                h.querySelector('.sort-icon').textContent = '⇅';
+            }});
+            th.classList.add(sortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+            th.querySelector('.sort-icon').textContent = sortDir === 'asc' ? '↑' : '↓';
+
+            // Sort rows
+            rows.sort((a, b) => {{
+                let va, vb;
+                if (col === 'name') {{
+                    va = a.dataset.name || '';
+                    vb = b.dataset.name || '';
+                    return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+                }}
+                va = parseFloat(a.dataset[col]) || 0;
+                vb = parseFloat(b.dataset[col]) || 0;
+                // For "active" (last active days), lower is better, so invert
+                if (col === 'active') {{
+                    return sortDir === 'asc' ? va - vb : vb - va;
+                }}
+                return sortDir === 'asc' ? va - vb : vb - va;
+            }});
+
+            rows.forEach(row => tbody.appendChild(row));
+        }});
+    }});
+}})();
 
 // Table scroll indicator
 document.querySelectorAll('.partner-list').forEach(wrap => {{

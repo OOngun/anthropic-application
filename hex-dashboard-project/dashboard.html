@@ -162,6 +162,26 @@ body { font-family:'IBM Plex Sans',-apple-system,sans-serif; background:#FFFCFC;
 .pl-title { font-size:13px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:#14141C; }
 .pl-subtitle { font-size:12px; color:#7B7185; margin-top:3px; }
 
+/* Partner list controls */
+.pl-controls { display:flex; align-items:center; gap:12px; margin-bottom:14px; flex-wrap:wrap; }
+.pl-search { padding:7px 12px; border:1px solid #E9E5E8; border-radius:8px; font-size:12px; font-family:Inter,sans-serif; background:#F8FAFB; color:#14141C; width:200px; outline:none; transition:border-color 0.2s; }
+.pl-search:focus { border-color:#3b82f6; }
+.pl-search::placeholder { color:#7B7185; }
+.pl-filters { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.pl-filter-label { font-size:10px; text-transform:uppercase; letter-spacing:0.05em; color:#43394C; font-weight:600; }
+.arch-chip { padding:4px 10px; border-radius:12px; border:1px solid #E9E5E8; background:transparent; color:#7B7185; font-size:11px; font-family:Inter,sans-serif; cursor:pointer; transition:all 0.15s; }
+.arch-chip:hover { border-color:#7B7185; }
+.arch-chip.active { background:rgba(59,130,246,0.08); border-color:rgba(59,130,246,0.3); color:#14141C; }
+.pl-count { font-size:11px; color:#43394C; margin-left:auto; }
+
+/* Sortable columns */
+.sortable { cursor:pointer; user-select:none; transition:color 0.15s; }
+.sortable:hover { color:#14141C; }
+.sort-icon { font-size:10px; color:#43394C; margin-left:2px; }
+.sortable.sort-asc .sort-icon::after { content:'↑'; }
+.sortable.sort-desc .sort-icon::after { content:'↓'; }
+.sortable.sort-asc .sort-icon, .sortable.sort-desc .sort-icon { color:#3b82f6; }
+
 /* Scoreboard */
 .scoreboard-section { margin-top:0; }
 .scoreboard-section .pl-title { font-size:13px; }
@@ -401,19 +421,31 @@ html { scroll-behavior:smooth; }
         <div class="pl-title">PARTNER LIST</div>
         <div class="pl-subtitle">Click a partner to view full analysis</div>
     </div>
+    <div class="pl-controls">
+        <input type="text" class="pl-search" id="pl-search" placeholder="Search partners..." autocomplete="off" />
+        <div class="pl-filters">
+            <span class="pl-filter-label">Filter:</span>
+            <button class="arch-chip active" data-arch="all">All</button>
+            <button class="arch-chip active" data-arch="churned">Churned</button><button class="arch-chip active" data-arch="declining">Declining</button><button class="arch-chip active" data-arch="fine">Fine</button><button class="arch-chip active" data-arch="minimal">Minimal</button><button class="arch-chip active" data-arch="rocket">Rocket</button><button class="arch-chip active" data-arch="star">Star</button><button class="arch-chip active" data-arch="steady">Steady</button><button class="arch-chip active" data-arch="strong">Strong</button>
+        </div>
+        <div class="pl-count"><span id="pl-visible-count">23</span> of 23 partners</div>
+    </div>
     <div class="partner-list card">
-        <table class="perf-table">
+        <table class="perf-table" id="partner-table">
             <thead>
                 <tr>
-                    <th>Company</th>
-                    <th data-tip="credit-payback">Credit Payback</th>
-                    <th class="num" data-tip="cmgr">CMGR-3</th>
-                    <th class="num" data-tip="quick-ratio">Quick Ratio</th>
-                    <th class="num" data-tip="gross-retention">Gross Ret.</th>
-                    <th class="num" data-tip="last-active">Last Active</th>
+                    <th class="sortable" data-sort="name">Company <span class="sort-icon">⇅</span></th>
+                    <th class="sortable" data-sort="payback" data-tip="credit-payback">Credit Payback <span class="sort-icon">⇅</span></th>
+                    <th class="num sortable" data-sort="cmgr" data-tip="cmgr">CMGR-3 <span class="sort-icon">⇅</span></th>
+                    <th class="num sortable" data-sort="qr" data-tip="quick-ratio">Quick Ratio <span class="sort-icon">⇅</span></th>
+                    <th class="num sortable" data-sort="gret" data-tip="gross-retention">Gross Ret. <span class="sort-icon">⇅</span></th>
+                    <th class="num sortable" data-sort="active" data-tip="last-active">Last Active <span class="sort-icon">⇅</span></th>
                 </tr>
             </thead>
-            <tbody><tr class="perf-row" data-sid="S009" style="cursor:pointer">
+            <tbody><tr class="perf-row" data-sid="S009" data-name="retailpulse"
+        data-arch="fine" data-payback="1.0317" data-cmgr="0.505700"
+        data-qr="nan" data-gret="0.00" data-active="10"
+        style="cursor:pointer">
         <td><span class="dot-sm" style="background:#E9C46A"></span>RetailPulse <span class="stage-badge">Seed</span></td>
         <td class="payback-cell">
             <div class="payback-bar payback-overflow">
@@ -425,7 +457,10 @@ html { scroll-behavior:smooth; }
         <td class="metric-cell num metric-red">nanx</td>
         <td class="metric-cell num metric-red">0%</td>
         <td class="metric-cell num metric-amber">10d ago</td>
-    </tr><tr class="perf-row" data-sid="S008" style="cursor:pointer">
+    </tr><tr class="perf-row" data-sid="S008" data-name="codereview.ai"
+        data-arch="fine" data-payback="1.0292" data-cmgr="0.302232"
+        data-qr="nan" data-gret="0.00" data-active="2"
+        style="cursor:pointer">
         <td><span class="dot-sm" style="background:#2A9D8F"></span>CodeReview.ai <span class="stage-badge">Seed</span></td>
         <td class="payback-cell">
             <div class="payback-bar payback-overflow">
@@ -437,7 +472,10 @@ html { scroll-behavior:smooth; }
         <td class="metric-cell num metric-red">nanx</td>
         <td class="metric-cell num metric-red">0%</td>
         <td class="metric-cell num metric-green">2d ago</td>
-    </tr><tr class="perf-row" data-sid="S005" style="cursor:pointer">
+    </tr><tr class="perf-row" data-sid="S005" data-name="legallens"
+        data-arch="strong" data-payback="2.1921" data-cmgr="0.162815"
+        data-qr="nan" data-gret="0.00" data-active="3"
+        style="cursor:pointer">
         <td><span class="dot-sm" style="background:#FDE725"></span>LegalLens <span class="stage-badge">Series A</span></td>
         <td class="payback-cell">
             <div class="payback-bar payback-overflow">
@@ -449,7 +487,10 @@ html { scroll-behavior:smooth; }
         <td class="metric-cell num metric-red">nanx</td>
         <td class="metric-cell num metric-red">0%</td>
         <td class="metric-cell num metric-green">3d ago</td>
-    </tr><tr class="perf-row" data-sid="S014" style="cursor:pointer">
+    </tr><tr class="perf-row" data-sid="S014" data-name="policypal"
+        data-arch="fine" data-payback="1.2330" data-cmgr="0.145804"
+        data-qr="nan" data-gret="0.00" data-active="5"
+        style="cursor:pointer">
         <td><span class="dot-sm" style="background:#BC6C25"></span>PolicyPal <span class="stage-badge">Seed</span></td>
         <td class="payback-cell">
             <div class="payback-bar payback-overflow">
@@ -461,7 +502,10 @@ html { scroll-behavior:smooth; }
         <td class="metric-cell num metric-red">nanx</td>
         <td class="metric-cell num metric-red">0%</td>
         <td class="metric-cell num metric-green">5d ago</td>
-    </tr><tr class="perf-row" data-sid="S001" style="cursor:pointer">
+    </tr><tr class="perf-row" data-sid="S001" data-name="medscribe ai"
+        data-arch="rocket" data-payback="4.1416" data-cmgr="0.125729"
+        data-qr="4.3100" data-gret="93.50" data-active="2"
+        style="cursor:pointer">
         <td><span class="dot-sm" style="background:#472D7B"></span>MedScribe AI <span class="stage-badge">Series A</span></td>
         <td class="payback-cell">
             <div class="payback-bar payback-overflow">
@@ -473,7 +517,10 @@ html { scroll-behavior:smooth; }
         <td class="metric-cell num metric-green">4.3x</td>
         <td class="metric-cell num metric-green">94%</td>
         <td class="metric-cell num metric-green">2d ago</td>
-    </tr><tr class="perf-row" data-sid="S004" style="cursor:pointer">
+    </tr><tr class="perf-row" data-sid="S004" data-name="novamed ai"
+        data-arch="star" data-payback="3.6321" data-cmgr="0.090186"
+        data-qr="nan" data-gret="0.00" data-active="2"
+        style="cursor:pointer">
         <td><span class="dot-sm" style="background:#5EC962"></span>NovaMed AI <span class="stage-badge">Series B</span></td>
         <td class="payback-cell">
             <div class="payback-bar payback-overflow">
@@ -485,7 +532,10 @@ html { scroll-behavior:smooth; }
         <td class="metric-cell num metric-red">nanx</td>
         <td class="metric-cell num metric-red">0%</td>
         <td class="metric-cell num metric-green">2d ago</td>
-    </tr><tr class="perf-row" data-sid="S006" style="cursor:pointer">
+    </tr><tr class="perf-row" data-sid="S006" data-name="supplychainiq"
+        data-arch="strong" data-payback="4.2099" data-cmgr="0.051500"
+        data-qr="nan" data-gret="0.00" data-active="5"
+        style="cursor:pointer">
         <td><span class="dot-sm" style="background:#E76F51"></span>SupplyChainIQ <span class="stage-badge">Series A</span></td>
         <td class="payback-cell">
             <div class="payback-bar payback-overflow">
@@ -497,7 +547,10 @@ html { scroll-behavior:smooth; }
         <td class="metric-cell num metric-red">nanx</td>
         <td class="metric-cell num metric-red">0%</td>
         <td class="metric-cell num metric-green">5d ago</td>
-    </tr><tr class="perf-row" data-sid="S010" style="cursor:pointer">
+    </tr><tr class="perf-row" data-sid="S010" data-name="chatassist"
+        data-arch="fine" data-payback="1.4978" data-cmgr="0.004264"
+        data-qr="nan" data-gret="0.00" data-active="3"
+        style="cursor:pointer">
         <td><span class="dot-sm" style="background:#F4A261"></span>ChatAssist <span class="stage-badge">Seed</span></td>
         <td class="payback-cell">
             <div class="payback-bar payback-overflow">
@@ -509,7 +562,10 @@ html { scroll-behavior:smooth; }
         <td class="metric-cell num metric-red">nanx</td>
         <td class="metric-cell num metric-red">0%</td>
         <td class="metric-cell num metric-green">3d ago</td>
-    </tr><tr class="perf-row" data-sid="S019" style="cursor:pointer">
+    </tr><tr class="perf-row" data-sid="S019" data-name="quickdraft"
+        data-arch="churned" data-payback="0.6996" data-cmgr="0.000000"
+        data-qr="nan" data-gret="0.00" data-active="5"
+        style="cursor:pointer">
         <td><span class="dot-sm" style="background:#F94144"></span>QuickDraft <span class="stage-badge">Seed</span></td>
         <td class="payback-cell">
             <div class="payback-bar">
@@ -521,7 +577,10 @@ html { scroll-behavior:smooth; }
         <td class="metric-cell num metric-red">nanx</td>
         <td class="metric-cell num metric-red">0%</td>
         <td class="metric-cell num metric-green">5d ago</td>
-    </tr><tr class="perf-row" data-sid="S020" style="cursor:pointer">
+    </tr><tr class="perf-row" data-sid="S020" data-name="airecruiter"
+        data-arch="churned" data-payback="0.5397" data-cmgr="0.000000"
+        data-qr="nan" data-gret="0.00" data-active="10"
+        style="cursor:pointer">
         <td><span class="dot-sm" style="background:#F3722C"></span>AIRecruiter <span class="stage-badge">Seed</span></td>
         <td class="payback-cell">
             <div class="payback-bar">
@@ -533,7 +592,10 @@ html { scroll-behavior:smooth; }
         <td class="metric-cell num metric-red">nanx</td>
         <td class="metric-cell num metric-red">0%</td>
         <td class="metric-cell num metric-amber">10d ago</td>
-    </tr><tr class="perf-row" data-sid="S021" style="cursor:pointer">
+    </tr><tr class="perf-row" data-sid="S021" data-name="proptech ai"
+        data-arch="churned" data-payback="2.1892" data-cmgr="0.000000"
+        data-qr="nan" data-gret="0.00" data-active="10"
+        style="cursor:pointer">
         <td><span class="dot-sm" style="background:#577590"></span>PropTech AI <span class="stage-badge">Seed</span></td>
         <td class="payback-cell">
             <div class="payback-bar payback-overflow">
@@ -545,7 +607,10 @@ html { scroll-behavior:smooth; }
         <td class="metric-cell num metric-red">nanx</td>
         <td class="metric-cell num metric-red">0%</td>
         <td class="metric-cell num metric-amber">10d ago</td>
-    </tr><tr class="perf-row" data-sid="S022" style="cursor:pointer">
+    </tr><tr class="perf-row" data-sid="S022" data-name="noteai"
+        data-arch="minimal" data-payback="0.0000" data-cmgr="0.000000"
+        data-qr="nan" data-gret="0.00" data-active="18"
+        style="cursor:pointer">
         <td><span class="dot-sm" style="background:#43AA8B"></span>NoteAI <span class="stage-badge">Pre-Seed</span></td>
         <td class="payback-cell">
             <div class="payback-bar">
@@ -557,7 +622,10 @@ html { scroll-behavior:smooth; }
         <td class="metric-cell num metric-red">nanx</td>
         <td class="metric-cell num metric-red">0%</td>
         <td class="metric-cell num metric-red">18d ago</td>
-    </tr><tr class="perf-row" data-sid="S023" style="cursor:pointer">
+    </tr><tr class="perf-row" data-sid="S023" data-name="greentech ai"
+        data-arch="minimal" data-payback="0.0000" data-cmgr="0.000000"
+        data-qr="nan" data-gret="0.00" data-active="18"
+        style="cursor:pointer">
         <td><span class="dot-sm" style="background:#F8961E"></span>GreenTech AI <span class="stage-badge">Pre-Seed</span></td>
         <td class="payback-cell">
             <div class="payback-bar">
@@ -569,7 +637,10 @@ html { scroll-behavior:smooth; }
         <td class="metric-cell num metric-red">nanx</td>
         <td class="metric-cell num metric-red">0%</td>
         <td class="metric-cell num metric-red">18d ago</td>
-    </tr><tr class="perf-row" data-sid="S017" style="cursor:pointer">
+    </tr><tr class="perf-row" data-sid="S017" data-name="marketinggpt"
+        data-arch="declining" data-payback="1.0168" data-cmgr="-0.002230"
+        data-qr="nan" data-gret="0.00" data-active="3"
+        style="cursor:pointer">
         <td><span class="dot-sm" style="background:#48CAE4"></span>MarketingGPT <span class="stage-badge">Seed</span></td>
         <td class="payback-cell">
             <div class="payback-bar payback-overflow">
@@ -581,7 +652,10 @@ html { scroll-behavior:smooth; }
         <td class="metric-cell num metric-red">nanx</td>
         <td class="metric-cell num metric-red">0%</td>
         <td class="metric-cell num metric-green">3d ago</td>
-    </tr><tr class="perf-row" data-sid="S002" style="cursor:pointer">
+    </tr><tr class="perf-row" data-sid="S002" data-name="eigen technologies"
+        data-arch="steady" data-payback="1.5762" data-cmgr="-0.011170"
+        data-qr="2.5467" data-gret="93.40" data-active="5"
+        style="cursor:pointer">
         <td><span class="dot-sm" style="background:#3B528B"></span>Eigen Technologies <span class="stage-badge">Series B</span></td>
         <td class="payback-cell">
             <div class="payback-bar payback-overflow">
@@ -593,7 +667,10 @@ html { scroll-behavior:smooth; }
         <td class="metric-cell num metric-green">2.5x</td>
         <td class="metric-cell num metric-green">93%</td>
         <td class="metric-cell num metric-green">5d ago</td>
-    </tr><tr class="perf-row" data-sid="S012" style="cursor:pointer">
+    </tr><tr class="perf-row" data-sid="S012" data-name="salesforge"
+        data-arch="fine" data-payback="1.1675" data-cmgr="-0.015879"
+        data-qr="nan" data-gret="0.00" data-active="5"
+        style="cursor:pointer">
         <td><span class="dot-sm" style="background:#283618"></span>SalesForge <span class="stage-badge">Seed</span></td>
         <td class="payback-cell">
             <div class="payback-bar payback-overflow">
@@ -605,7 +682,10 @@ html { scroll-behavior:smooth; }
         <td class="metric-cell num metric-red">nanx</td>
         <td class="metric-cell num metric-red">0%</td>
         <td class="metric-cell num metric-green">5d ago</td>
-    </tr><tr class="perf-row" data-sid="S003" style="cursor:pointer">
+    </tr><tr class="perf-row" data-sid="S003" data-name="builderkit"
+        data-arch="declining" data-payback="1.0439" data-cmgr="-0.050567"
+        data-qr="0.4083" data-gret="83.50" data-active="11"
+        style="cursor:pointer">
         <td><span class="dot-sm" style="background:#21918C"></span>BuilderKit <span class="stage-badge">Series B</span></td>
         <td class="payback-cell">
             <div class="payback-bar payback-overflow">
@@ -617,7 +697,10 @@ html { scroll-behavior:smooth; }
         <td class="metric-cell num metric-red">0.4x</td>
         <td class="metric-cell num metric-green">84%</td>
         <td class="metric-cell num metric-amber">11d ago</td>
-    </tr><tr class="perf-row" data-sid="S013" style="cursor:pointer">
+    </tr><tr class="perf-row" data-sid="S013" data-name="docustream"
+        data-arch="fine" data-payback="0.7422" data-cmgr="-0.051314"
+        data-qr="nan" data-gret="0.00" data-active="18"
+        style="cursor:pointer">
         <td><span class="dot-sm" style="background:#DDA15E"></span>DocuStream <span class="stage-badge">Seed</span></td>
         <td class="payback-cell">
             <div class="payback-bar">
@@ -629,7 +712,10 @@ html { scroll-behavior:smooth; }
         <td class="metric-cell num metric-red">nanx</td>
         <td class="metric-cell num metric-red">0%</td>
         <td class="metric-cell num metric-red">18d ago</td>
-    </tr><tr class="perf-row" data-sid="S016" style="cursor:pointer">
+    </tr><tr class="perf-row" data-sid="S016" data-name="voiceai labs"
+        data-arch="declining" data-payback="1.0894" data-cmgr="-0.054536"
+        data-qr="nan" data-gret="0.00" data-active="10"
+        style="cursor:pointer">
         <td><span class="dot-sm" style="background:#023E8A"></span>VoiceAI Labs <span class="stage-badge">Series A</span></td>
         <td class="payback-cell">
             <div class="payback-bar payback-overflow">
@@ -641,7 +727,10 @@ html { scroll-behavior:smooth; }
         <td class="metric-cell num metric-red">nanx</td>
         <td class="metric-cell num metric-red">0%</td>
         <td class="metric-cell num metric-amber">10d ago</td>
-    </tr><tr class="perf-row" data-sid="S015" style="cursor:pointer">
+    </tr><tr class="perf-row" data-sid="S015" data-name="menumind"
+        data-arch="fine" data-payback="0.8807" data-cmgr="-0.088083"
+        data-qr="nan" data-gret="0.00" data-active="5"
+        style="cursor:pointer">
         <td><span class="dot-sm" style="background:#0077B6"></span>MenuMind <span class="stage-badge">Seed</span></td>
         <td class="payback-cell">
             <div class="payback-bar">
@@ -653,7 +742,10 @@ html { scroll-behavior:smooth; }
         <td class="metric-cell num metric-red">nanx</td>
         <td class="metric-cell num metric-red">0%</td>
         <td class="metric-cell num metric-green">5d ago</td>
-    </tr><tr class="perf-row" data-sid="S007" style="cursor:pointer">
+    </tr><tr class="perf-row" data-sid="S007" data-name="tutorbot"
+        data-arch="fine" data-payback="1.3341" data-cmgr="-0.091545"
+        data-qr="nan" data-gret="0.00" data-active="10"
+        style="cursor:pointer">
         <td><span class="dot-sm" style="background:#264653"></span>TutorBot <span class="stage-badge">Seed</span></td>
         <td class="payback-cell">
             <div class="payback-bar payback-overflow">
@@ -665,7 +757,10 @@ html { scroll-behavior:smooth; }
         <td class="metric-cell num metric-red">nanx</td>
         <td class="metric-cell num metric-red">0%</td>
         <td class="metric-cell num metric-amber">10d ago</td>
-    </tr><tr class="perf-row" data-sid="S018" style="cursor:pointer">
+    </tr><tr class="perf-row" data-sid="S018" data-name="finbot analytics"
+        data-arch="declining" data-payback="0.9439" data-cmgr="-0.107461"
+        data-qr="nan" data-gret="0.00" data-active="18"
+        style="cursor:pointer">
         <td><span class="dot-sm" style="background:#90BE6D"></span>FinBot Analytics <span class="stage-badge">Seed</span></td>
         <td class="payback-cell">
             <div class="payback-bar">
@@ -677,7 +772,10 @@ html { scroll-behavior:smooth; }
         <td class="metric-cell num metric-red">nanx</td>
         <td class="metric-cell num metric-red">0%</td>
         <td class="metric-cell num metric-red">18d ago</td>
-    </tr><tr class="perf-row" data-sid="S011" style="cursor:pointer">
+    </tr><tr class="perf-row" data-sid="S011" data-name="dataclean"
+        data-arch="fine" data-payback="0.9467" data-cmgr="-0.324279"
+        data-qr="nan" data-gret="0.00" data-active="2"
+        style="cursor:pointer">
         <td><span class="dot-sm" style="background:#606C38"></span>DataClean <span class="stage-badge">Seed</span></td>
         <td class="payback-cell">
             <div class="payback-bar">
@@ -4692,6 +4790,110 @@ document.querySelectorAll('.perf-row').forEach(row => {
         if (tab) tab.click();
     });
 });
+
+// ======== PARTNER LIST: SEARCH, FILTER, SORT ========
+(function() {
+    const table = document.getElementById('partner-table');
+    if (!table) return;
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('.perf-row'));
+    const searchInput = document.getElementById('pl-search');
+    const countEl = document.getElementById('pl-visible-count');
+    const chips = document.querySelectorAll('.arch-chip');
+
+    let activeArch = 'all';
+    let searchTerm = '';
+    let sortCol = null;
+    let sortDir = 'desc';
+
+    function applyFilters() {
+        let visible = 0;
+        rows.forEach(row => {
+            const name = row.dataset.name || '';
+            const arch = row.dataset.arch || '';
+            const matchSearch = !searchTerm || name.includes(searchTerm.toLowerCase());
+            const matchArch = activeArch === 'all' || arch === activeArch;
+            const show = matchSearch && matchArch;
+            row.style.display = show ? '' : 'none';
+            if (show) visible++;
+        });
+        if (countEl) countEl.textContent = visible;
+    }
+
+    // Search
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            searchTerm = e.target.value;
+            applyFilters();
+        });
+    }
+
+    // Archetype filter chips
+    chips.forEach(chip => {
+        chip.addEventListener('click', () => {
+            const arch = chip.dataset.arch;
+            if (arch === 'all') {
+                activeArch = 'all';
+                chips.forEach(c => c.classList.toggle('active', c.dataset.arch === 'all'));
+            } else {
+                // Deactivate "All" chip
+                chips.forEach(c => { if (c.dataset.arch === 'all') c.classList.remove('active'); });
+                if (activeArch === arch) {
+                    // Toggle off → back to all
+                    activeArch = 'all';
+                    chip.classList.remove('active');
+                    chips.forEach(c => { if (c.dataset.arch === 'all') c.classList.add('active'); });
+                } else {
+                    chips.forEach(c => { if (c.dataset.arch !== 'all') c.classList.remove('active'); });
+                    activeArch = arch;
+                    chip.classList.add('active');
+                }
+            }
+            applyFilters();
+        });
+    });
+
+    // Column sorting
+    const headers = table.querySelectorAll('.sortable');
+    headers.forEach(th => {
+        th.addEventListener('click', () => {
+            const col = th.dataset.sort;
+            if (sortCol === col) {
+                sortDir = sortDir === 'desc' ? 'asc' : 'desc';
+            } else {
+                sortCol = col;
+                sortDir = 'desc';
+            }
+
+            // Update header styles
+            headers.forEach(h => {
+                h.classList.remove('sort-asc', 'sort-desc');
+                h.querySelector('.sort-icon').textContent = '⇅';
+            });
+            th.classList.add(sortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+            th.querySelector('.sort-icon').textContent = sortDir === 'asc' ? '↑' : '↓';
+
+            // Sort rows
+            rows.sort((a, b) => {
+                let va, vb;
+                if (col === 'name') {
+                    va = a.dataset.name || '';
+                    vb = b.dataset.name || '';
+                    return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+                }
+                va = parseFloat(a.dataset[col]) || 0;
+                vb = parseFloat(b.dataset[col]) || 0;
+                // For "active" (last active days), lower is better, so invert
+                if (col === 'active') {
+                    return sortDir === 'asc' ? va - vb : vb - va;
+                }
+                return sortDir === 'asc' ? va - vb : vb - va;
+            });
+
+            rows.forEach(row => tbody.appendChild(row));
+        });
+    });
+})();
 
 // Table scroll indicator
 document.querySelectorAll('.partner-list').forEach(wrap => {
