@@ -22,8 +22,15 @@ engagement = pd.read_csv(f'{OUTPUT_DIR}/engagement_depth.csv')
 startup_ga = pd.read_csv(f'{OUTPUT_DIR}/startup_growth_accounting.csv')
 startup_ga['month'] = pd.to_datetime(startup_ga['month'])
 
-COLORS = {'S001': '#472D7B', 'S002': '#3B528B', 'S003': '#21918C'}
-NAMES = {'S001': 'MedScribe AI', 'S002': 'Eigen Technologies', 'S003': 'BuilderKit'}
+# Dynamic: build COLORS and NAMES from startups CSV
+ALL_SIDS = startups['startup_id'].tolist()
+_palette = ['#472D7B', '#3B528B', '#21918C', '#5EC962', '#FDE725',
+            '#E76F51', '#264653', '#2A9D8F', '#E9C46A', '#F4A261',
+            '#606C38', '#283618', '#DDA15E', '#BC6C25', '#0077B6',
+            '#023E8A', '#48CAE4', '#90BE6D', '#F94144', '#F3722C',
+            '#577590', '#43AA8B', '#F8961E']
+COLORS = {sid: _palette[i % len(_palette)] for i, sid in enumerate(ALL_SIDS)}
+NAMES = {row['startup_id']: row['startup_name'] for _, row in startups.iterrows()}
 
 # ============================================================
 # COMPUTE DEVELOPER GROWTH ACCOUNTING (synthetic decomposition)
@@ -31,7 +38,7 @@ NAMES = {'S001': 'MedScribe AI', 'S002': 'Eigen Technologies', 'S003': 'BuilderK
 
 np.random.seed(42)
 dev_ga_records = []
-for sid in ['S001', 'S002', 'S003']:
+for sid in ALL_SIDS:
     u = monthly_usage[monthly_usage['startup_id'] == sid].sort_values('month')
     prev_devs = 0
     cumulative_ever = 0
@@ -68,7 +75,7 @@ dev_ga['dev_quick_ratio'] = dev_ga.apply(
 # Developer retention cohorts (synthetic)
 np.random.seed(99)
 dev_cohort_records = []
-for sid in ['S001', 'S002', 'S003']:
+for sid in ALL_SIDS:
     u = monthly_usage[monthly_usage['startup_id'] == sid].sort_values('month')
     months = u['month'].tolist()
     n_months = len(months)
@@ -95,7 +102,7 @@ dev_cohorts = pd.DataFrame(dev_cohort_records)
 # ============================================================
 
 cohort_data = []
-for sid in ['S001', 'S002', 'S003']:
+for sid in ALL_SIDS:
     u = monthly_usage[monthly_usage['startup_id'] == sid].sort_values('month')
     onboard_month = u.iloc[0]['month']
     for i, row in u.iterrows():
@@ -141,7 +148,7 @@ CMGR_BLUE = '#3B6BE0'
 # ============================================================
 
 company_metrics = []
-for sid in ['S001', 'S002', 'S003']:
+for sid in ALL_SIDS:
     u = monthly_usage[monthly_usage['startup_id'] == sid].sort_values('month')
     c = credits[credits['startup_id'] == sid]['amount_usd'].sum()
     ue = unit_economics[unit_economics['startup_id'] == sid]
@@ -398,7 +405,7 @@ model_fills = {'Sonnet': 'rgba(59,82,139,0.6)', 'Opus': 'rgba(71,45,123,0.6)', '
 
 startup_charts = {}
 
-for sid in ['S001', 'S002', 'S003']:
+for sid in ALL_SIDS:
     charts = {}
     d_usage = monthly_usage[monthly_usage['startup_id'] == sid].sort_values('month')
     d_ga = startup_ga[startup_ga['startup_id'] == sid].sort_values('month')
@@ -915,9 +922,9 @@ def startup_kpis(sid):
         <div class="kpi-v">${m["total_rev"]:,.0f}</div>
         <div class="kpi-s">all time &middot; <span class="expand-hint">click to expand</span></div>
         <div class="kpi-breakdown">
-            <div class="kpi-breakdown-row"><span class="dot-sm" style="background:{MODEL_COLORS['sonnet']}"></span>Sonnet <span style="color:{MODEL_COLORS['sonnet']}">${m["sonnet_total"]:,.0f}</span> <span class="kpi-s">{m["sonnet_total"]/m["total_rev"]*100:.0f}%</span></div>
-            <div class="kpi-breakdown-row"><span class="dot-sm" style="background:{MODEL_COLORS['opus']}"></span>Opus <span style="color:{MODEL_COLORS['opus']}">${m["opus_total"]:,.0f}</span> <span class="kpi-s">{m["opus_total"]/m["total_rev"]*100:.0f}%</span></div>
-            <div class="kpi-breakdown-row"><span class="dot-sm" style="background:{MODEL_COLORS['haiku']}"></span>Haiku <span style="color:{MODEL_COLORS['haiku']}">${m["haiku_total"]:,.0f}</span> <span class="kpi-s">{m["haiku_total"]/m["total_rev"]*100:.0f}%</span></div>
+            <div class="kpi-breakdown-row"><span class="dot-sm" style="background:{MODEL_COLORS['sonnet']}"></span>Sonnet <span style="color:{MODEL_COLORS['sonnet']}">${m["sonnet_total"]:,.0f}</span> <span class="kpi-s">{m["sonnet_total"]/max(m["total_rev"],1)*100:.0f}%</span></div>
+            <div class="kpi-breakdown-row"><span class="dot-sm" style="background:{MODEL_COLORS['opus']}"></span>Opus <span style="color:{MODEL_COLORS['opus']}">${m["opus_total"]:,.0f}</span> <span class="kpi-s">{m["opus_total"]/max(m["total_rev"],1)*100:.0f}%</span></div>
+            <div class="kpi-breakdown-row"><span class="dot-sm" style="background:{MODEL_COLORS['haiku']}"></span>Haiku <span style="color:{MODEL_COLORS['haiku']}">${m["haiku_total"]:,.0f}</span> <span class="kpi-s">{m["haiku_total"]/max(m["total_rev"],1)*100:.0f}%</span></div>
         </div>
     </div>'''
     html += kpi('Latest MRR', f'${m["latest_mrr"]:,.0f}', 'API revenue')
@@ -992,7 +999,7 @@ def startup_tab_html(sid):
             <div class="analysis-title"><span class="chevron">&#x25BC;</span> Growth Overview</div>
             <div class="analysis-summary">
                 <span class="sum-item">MRR <span class="sum-val">${m['latest_mrr']:,.0f}</span></span>
-                <span class="sum-item">CMGR-3 <span class="sum-val">{m['cmgr3']*100:.1f}%</span></span>
+                <span class="sum-item">CMGR-3 <span class="sum-val">{f"{m['cmgr3']*100:.1f}%" if m['cmgr3'] is not None else "n/a"}</span></span>
             </div>
         </div>
         <div class="analysis-body">
@@ -1486,24 +1493,14 @@ html {{ scroll-behavior:smooth; }}
 
 <div class="tabs">
     <div class="tab active" data-tab="portfolio">Pulse</div>
-    <div class="tab" data-tab="s001"><span class="dot" style="background:{COLORS['S001']}"></span>MedScribe AI</div>
-    <div class="tab" data-tab="s002"><span class="dot" style="background:{COLORS['S002']}"></span>Eigen Technologies</div>
-    <div class="tab" data-tab="s003"><span class="dot" style="background:{COLORS['S003']}"></span>BuilderKit</div>
+    {''.join(f'<div class="tab" data-tab="{sid.lower()}"><span class="dot" style="background:{COLORS[sid]}"></span>{NAMES[sid]}</div>' for sid in ALL_SIDS)}
 </div>
 
 <div class="content">
     <div class="tab-panel active" id="panel-portfolio">
         {portfolio_content}
     </div>
-    <div class="tab-panel" id="panel-s001">
-        {startup_tab_html('S001')}
-    </div>
-    <div class="tab-panel" id="panel-s002">
-        {startup_tab_html('S002')}
-    </div>
-    <div class="tab-panel" id="panel-s003">
-        {startup_tab_html('S003')}
-    </div>
+    {''.join(f'<div class="tab-panel" id="panel-{sid.lower()}">{startup_tab_html(sid)}</div>' for sid in ALL_SIDS)}
 </div>
 
 <script>
