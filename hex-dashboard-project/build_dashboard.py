@@ -207,13 +207,25 @@ for sid in ALL_SIDS:
     else:
         momentum = 0
 
-    avg_qr = ga['quick_ratio'].tail(6).mean()
+    avg_qr = ga['quick_ratio'].tail(6).mean() if len(ga) > 0 and 'quick_ratio' in ga.columns and not ga['quick_ratio'].isna().all() else 0
 
     # Latest gross retention for this company
-    latest_gross_ret = ga['gross_retention_pct'].iloc[-1] if len(ga) > 0 and 'gross_retention_pct' in ga.columns else 0
+    latest_gross_ret = ga['gross_retention_pct'].iloc[-1] if len(ga) > 0 and 'gross_retention_pct' in ga.columns and not ga['gross_retention_pct'].isna().all() else 0
 
-    # Days since last active (simulate: latest month data is "current")
-    last_active_days = np.random.choice([2, 5, 10, 18, 3])  # synthetic
+    # Days since last active — based on whether latest month has revenue
+    if latest['revenue_usd'] > 0:
+        last_active_days = np.random.choice([1, 2, 3, 5])
+    elif len(u) >= 2 and u.iloc[-2]['revenue_usd'] > 0:
+        last_active_days = np.random.choice([15, 20, 25])
+    else:
+        # Find last month with revenue
+        active_months = u[u['revenue_usd'] > 0]
+        if len(active_months) > 0:
+            last_active_month = active_months.iloc[-1]['month']
+            days_diff = (u.iloc[-1]['month'] - last_active_month).days
+            last_active_days = max(days_diff, 30)
+        else:
+            last_active_days = 999
 
     company_metrics.append(dict(
         sid=sid, name=NAMES[sid], vertical=s['vertical'], stage=s['stage'],
@@ -262,44 +274,105 @@ cmgr12 = cmgr(portfolio_tokens, 12)
 # TIER 1 DATA: WATERFALL, METRIC CARDS
 # ============================================================
 
-# Aggregate revenue GA
-# === GA FROM CSV, NORMALISED TO BALANCE ===
-# The CSV has sub-partner decomposition (simulating developer-level GA within each partner).
-# With only 3 always-active partners, partner-level GA would only show retained + expansion/contraction.
-# The CSV data provides richer decomposition but doesn't sum perfectly — we normalise gains
-# so retained + new + expansion + resurrected = actual total revenue, preserving proportions.
+# === COMPUTE GA FROM MONTHLY_USAGE FOR ALL 23 PARTNERS ===
+# Following the Social Capital SQL logic exactly:
+#   Retained = min(this_month, last_month) for partners active both months
+#   New = revenue from partners in their first month ever
+#   Expansion = this_month - last_month when spending MORE
+#   Contraction = last_month - this_month when spending LESS (but still active)
+#   Resurrected = revenue from partners inactive last month, active now, not new
+#   Churned = revenue from partners active last month, inactive now
+# With 23 partners (including churned/minimal), this now produces realistic GA.
 
-agg_rev_ga = startup_ga.groupby('month').agg(
-    new_revenue=('new_revenue', 'sum'),
-    expansion_revenue=('expansion_revenue', 'sum'),
-    resurrected_revenue=('resurrected_revenue', 'sum'),
-    churned_revenue=('churned_revenue', 'sum'),
-    contraction_revenue=('contraction_revenue', 'sum'),
-    retained_revenue=('retained_revenue', 'sum'),
-    total_revenue=('total_revenue', 'sum'),
-).reset_index().sort_values('month')
+months_sorted = sorted(monthly_usage['month'].unique())
+first_active_month = {}
+for sid in ALL_SIDS:
+    active = monthly_usage[(monthly_usage['startup_id'] == sid) & (monthly_usage['revenue_usd'] > 0)]
+    if len(active) > 0:
+        first_active_month[sid] = active['month'].min()
 
-# Get actual monthly revenue from usage data for the true total
-actual_rev = monthly_usage.groupby('month')['revenue_usd'].sum().reset_index()
-actual_rev.columns = ['month', 'actual_revenue']
-agg_rev_ga = agg_rev_ga.merge(actual_rev, on='month', how='left')
+ga_rows = []
+per_partner_ga = {}  # store per-partner GA for company detail tabs
 
-# Normalise: scale gain components so they sum to actual revenue
-for idx in agg_rev_ga.index:
-    gains_sum = (agg_rev_ga.loc[idx, 'retained_revenue'] + agg_rev_ga.loc[idx, 'new_revenue'] +
-                 agg_rev_ga.loc[idx, 'expansion_revenue'] + agg_rev_ga.loc[idx, 'resurrected_revenue'])
-    actual = agg_rev_ga.loc[idx, 'actual_revenue']
-    if gains_sum > 0 and actual > 0:
-        scale = actual / gains_sum
-        agg_rev_ga.loc[idx, 'retained_revenue'] *= scale
-        agg_rev_ga.loc[idx, 'new_revenue'] *= scale
-        agg_rev_ga.loc[idx, 'expansion_revenue'] *= scale
-        agg_rev_ga.loc[idx, 'resurrected_revenue'] *= scale
-    agg_rev_ga.loc[idx, 'total_revenue'] = actual
+for i in range(1, len(months_sorted)):
+    prev_m, curr_m = months_sorted[i-1], months_sorted[i]
+    prev = monthly_usage[monthly_usage['month'] == prev_m].set_index('startup_id')['revenue_usd']
+    curr = monthly_usage[monthly_usage['month'] == curr_m].set_index('startup_id')['revenue_usd']
+    all_ids = set(prev.index) | set(curr.index)
 
+    new_rev = expansion_rev = resurrected_rev = retained_rev = 0
+    churned_rev = contraction_rev = 0
+
+    for sid in all_ids:
+        p = prev.get(sid, 0)
+        c = curr.get(sid, 0)
+        is_new = (first_active_month.get(sid) == curr_m)
+
+        if c > 0 and p > 0:
+            retained_rev += min(c, p)
+            if c > p:
+                expansion_rev += (c - p)
+            elif c < p:
+                contraction_rev += (p - c)
+        elif c > 0 and p == 0:
+            if is_new:
+                new_rev += c
+            else:
+                resurrected_rev += c
+        elif c == 0 and p > 0:
+            churned_rev += p
+
+    total_rev = new_rev + retained_rev + expansion_rev + resurrected_rev
+    ga_rows.append({
+        'month': curr_m, 'total_revenue': total_rev,
+        'retained_revenue': retained_rev, 'new_revenue': new_rev,
+        'expansion_revenue': expansion_rev, 'resurrected_revenue': resurrected_rev,
+        'churned_revenue': churned_rev, 'contraction_revenue': contraction_rev,
+    })
+
+agg_rev_ga = pd.DataFrame(ga_rows).sort_values('month')
 agg_rev_ga['gross_ret'] = agg_rev_ga['retained_revenue'] / agg_rev_ga['total_revenue'].shift(1) * 100
 
-# Verify identity holds after normalisation
+# Also compute per-partner QR and gross retention for the partner list
+per_partner_qr = {}
+per_partner_gret = {}
+for sid in ALL_SIDS:
+    u = monthly_usage[monthly_usage['startup_id'] == sid].sort_values('month')
+    if len(u) < 2:
+        per_partner_qr[sid] = 0
+        per_partner_gret[sid] = 0
+        continue
+    last_rev = u.iloc[-1]['revenue_usd']
+    prev_rev = u.iloc[-2]['revenue_usd']
+    # Simple QR: expansion / contraction for this partner
+    if last_rev > 0 and prev_rev > 0:
+        per_partner_gret[sid] = min(last_rev, prev_rev) / prev_rev * 100
+        # For single-partner QR, use 6-month trailing
+        gains = losses = 0
+        for j in range(max(1, len(u)-6), len(u)):
+            c = u.iloc[j]['revenue_usd']
+            p = u.iloc[j-1]['revenue_usd']
+            if c > p: gains += (c - p)
+            elif c < p: losses += (p - c)
+            if c == 0 and p > 0: losses += p
+            if c > 0 and p == 0: gains += c
+        per_partner_qr[sid] = gains / losses if losses > 0 else 10.0
+    elif last_rev == 0 and prev_rev > 0:
+        per_partner_qr[sid] = 0
+        per_partner_gret[sid] = 0
+    else:
+        per_partner_qr[sid] = 0
+        per_partner_gret[sid] = 0
+
+# Update company_metrics with properly computed QR and gross retention
+for m in company_metrics:
+    sid = m['sid']
+    if sid in per_partner_qr:
+        m['avg_qr'] = per_partner_qr[sid]
+    if sid in per_partner_gret:
+        m['gross_retention'] = per_partner_gret[sid]
+
+# Verify identity
 _check = agg_rev_ga.iloc[-1]
 _sum = _check['retained_revenue'] + _check['new_revenue'] + _check['expansion_revenue'] + _check['resurrected_revenue']
 assert abs(_sum - _check['total_revenue']) < 1.0, f"GA identity broken: {_sum:.0f} != {_check['total_revenue']:.0f}"
@@ -868,11 +941,17 @@ for m in company_metrics:
     s_row = startups[startups['startup_id'] == m['sid']]
     archetype = s_row.iloc[0]['archetype'] if len(s_row) > 0 and 'archetype' in s_row.columns else 'unknown'
 
+    rev_display = f'${m["latest_mrr"]:,.0f}' if m['latest_mrr'] >= 1 else '$0'
+    mau_display = f'{m["active_devs"]}'
+
     partner_rows += f'''<tr class="perf-row" data-sid="{m['sid']}" data-name="{m['name'].lower()}"
-        data-arch="{archetype}" data-payback="{m['roi']:.4f}" data-cmgr="{cmgr3_val:.6f}"
+        data-arch="{archetype}" data-revenue="{m['latest_mrr']:.2f}" data-mau="{m['active_devs']}"
+        data-payback="{m['roi']:.4f}" data-cmgr="{cmgr3_val:.6f}"
         data-qr="{m['avg_qr']:.4f}" data-gret="{m['gross_retention']:.2f}" data-active="{m['last_active_days']}"
         style="cursor:pointer">
         <td><span class="dot-sm" style="background:{COLORS[m['sid']]}"></span>{m['name']} <span class="stage-badge">{m['stage']}</span></td>
+        <td class="metric-cell num">{rev_display}</td>
+        <td class="metric-cell num">{mau_display}</td>
         <td class="payback-cell">
             <div class="payback-bar{bar_extra_class}">
                 <div class="payback-fill" style="width:{payback_pct}%;background:{bar_color}"></div>
@@ -909,6 +988,8 @@ tier2_html = f'''
             <thead>
                 <tr>
                     <th class="sortable" data-sort="name">Company <span class="sort-icon">⇅</span></th>
+                    <th class="num sortable" data-sort="revenue">Revenue <span class="sort-icon">⇅</span></th>
+                    <th class="num sortable" data-sort="mau">MAU <span class="sort-icon">⇅</span></th>
                     <th class="sortable" data-sort="payback" data-tip="credit-payback">Credit Payback <span class="sort-icon">⇅</span></th>
                     <th class="num sortable" data-sort="cmgr" data-tip="cmgr">CMGR-3 <span class="sort-icon">⇅</span></th>
                     <th class="num sortable" data-sort="qr" data-tip="quick-ratio">Quick Ratio <span class="sort-icon">⇅</span></th>
