@@ -154,6 +154,24 @@ for sid in ['S001', 'S002', 'S003']:
     total_rev = u['revenue_usd'].sum()
     total_tok = u['total_tokens'].sum()
 
+    # CMGR (Compound Monthly Growth Rate) — trailing 3, 6, 12 months
+    def company_cmgr(series, months):
+        if len(series) <= months:
+            return None
+        end = series.iloc[-1]
+        start = series.iloc[-(months + 1)]
+        return (end / start) ** (1 / months) - 1 if start > 0 else None
+
+    tok_series = u['total_tokens']
+    rev_series = u['revenue_usd']
+    cmgr3_tok = company_cmgr(tok_series, 3)
+    cmgr6_tok = company_cmgr(tok_series, 6)
+    cmgr12_tok = company_cmgr(tok_series, 12)
+    cmgr3_rev = company_cmgr(rev_series, 3)
+    cmgr6_rev = company_cmgr(rev_series, 6)
+    cmgr12_rev = company_cmgr(rev_series, 12)
+
+    # Keep CAGR for backward compat but deprioritise
     if first['total_tokens'] > 0 and n_months > 0:
         token_cagr = (latest['total_tokens'] / first['total_tokens']) ** (12 / n_months) - 1
     else:
@@ -194,6 +212,8 @@ for sid in ['S001', 'S002', 'S003']:
         sid=sid, name=NAMES[sid], vertical=s['vertical'], stage=s['stage'],
         latest_mrr=latest['revenue_usd'], total_rev=total_rev, total_tokens=total_tok,
         token_cagr=token_cagr, rev_cagr=rev_cagr,
+        cmgr3=cmgr3_tok, cmgr6=cmgr6_tok, cmgr12=cmgr12_tok,
+        cmgr3_rev=cmgr3_rev, cmgr6_rev=cmgr6_rev, cmgr12_rev=cmgr12_rev,
         sonnet_rev=sonnet_rev, opus_rev=opus_rev, haiku_rev=haiku_rev,
         sonnet_total=sonnet_total, opus_total=opus_total, haiku_total=haiku_total,
         credits=c, roi=roi, payback=payback,
@@ -211,7 +231,7 @@ company_metrics[0]['last_active_days'] = 2   # MedScribe: very active
 company_metrics[1]['last_active_days'] = 5   # Eigen: active
 company_metrics[2]['last_active_days'] = 11  # BuilderKit: somewhat dormant
 
-company_metrics.sort(key=lambda x: x['token_cagr'], reverse=True)
+company_metrics.sort(key=lambda x: x['cmgr3'] or 0, reverse=True)
 
 # ============================================================
 # CMGR COMPUTATION (Tier 1)
@@ -828,7 +848,8 @@ for m in company_metrics:
     overflow = m['roi'] > 1
     bar_extra_class = ' payback-overflow' if overflow else ''
 
-    cagr_cls = metric_class(m['token_cagr'], (2.0, 0.5))
+    cmgr3_val = m['cmgr3'] if m['cmgr3'] is not None else 0
+    cagr_cls = metric_class(cmgr3_val, (0.10, 0.03))  # >10% green, 3-10% amber, <3% red
     qr_cls = metric_class(m['avg_qr'], (2.0, 1.0))
     gret_cls = metric_class(m['gross_retention'], (80, 60))
     last_cls = metric_class(m['last_active_days'], (7, 14), invert=True)
@@ -845,7 +866,7 @@ for m in company_metrics:
                 <span class="payback-label">{bar_label}</span>
             </div>
         </td>
-        <td class="metric-cell num {cagr_cls}">{fmt_pct(m['token_cagr'])}</td>
+        <td class="metric-cell num {cagr_cls}">{f'{cmgr3_val*100:.1f}%' if m['cmgr3'] is not None else 'n/a'}</td>
         <td class="metric-cell num {qr_cls}">{m['avg_qr']:.1f}x</td>
         <td class="metric-cell num {gret_cls}">{m['gross_retention']:.0f}%</td>
         <td class="metric-cell num {last_cls}">{la_display}</td>
@@ -863,7 +884,7 @@ tier2_html = f'''
                 <tr>
                     <th>Company</th>
                     <th data-tip="credit-payback">Credit Payback</th>
-                    <th class="num" data-tip="token-cagr">Token CAGR</th>
+                    <th class="num" data-tip="cmgr">CMGR-3</th>
                     <th class="num" data-tip="quick-ratio">Quick Ratio</th>
                     <th class="num" data-tip="gross-retention">Gross Ret.</th>
                     <th class="num" data-tip="last-active">Last Active</th>
@@ -900,7 +921,19 @@ def startup_kpis(sid):
         </div>
     </div>'''
     html += kpi('Latest MRR', f'${m["latest_mrr"]:,.0f}', 'API revenue')
-    html += kpi('Token CAGR', fmt_pct(m['token_cagr']), 'annualized', cagr_color)
+    cmgr3_display = f'{m["cmgr3"]*100:.1f}%' if m['cmgr3'] is not None else 'n/a'
+    cmgr6_display = f'{m["cmgr6"]*100:.1f}%' if m['cmgr6'] is not None else 'n/a'
+    cmgr12_display = f'{m["cmgr12"]*100:.1f}%' if m['cmgr12'] is not None else 'n/a'
+    cmgr_color = SUCCESS if (m['cmgr3'] or 0) > 0.10 else WARNING if (m['cmgr3'] or 0) > 0.03 else DANGER
+    html += f'''<div class="kpi" data-tip="cmgr">
+        <div class="kpi-l">CMGR</div>
+        <div class="kpi-v" style="color:{cmgr_color}">{cmgr3_display}</div>
+        <div class="kpi-s">trailing 3mo</div>
+        <div class="kpi-breakdown" style="display:block;margin-top:6px">
+            <div class="kpi-breakdown-row">6mo: {cmgr6_display}</div>
+            <div class="kpi-breakdown-row">12mo: {cmgr12_display}</div>
+        </div>
+    </div>'''
     html += kpi('Credit ROI', f'{m["roi"]:.1f}x', f'${m["credits"]:,.0f} invested', roi_color)
     html += kpi('Active Devs', f'{m["active_devs"]}', 'current month')
     html += kpi('Dev Quick Ratio', f'{latest_dqr:.1f}x' if not np.isnan(latest_dqr) else 'N/A', 'new+resurrected / churned', dqr_color)
@@ -959,7 +992,7 @@ def startup_tab_html(sid):
             <div class="analysis-title"><span class="chevron">&#x25BC;</span> Growth Overview</div>
             <div class="analysis-summary">
                 <span class="sum-item">MRR <span class="sum-val">${m['latest_mrr']:,.0f}</span></span>
-                <span class="sum-item">CAGR <span class="sum-val">{m['token_cagr']*100:.0f}%</span></span>
+                <span class="sum-item">CMGR-3 <span class="sum-val">{m['cmgr3']*100:.1f}%</span></span>
             </div>
         </div>
         <div class="analysis-body">
@@ -1619,10 +1652,11 @@ document.querySelectorAll('.partner-list').forEach(wrap => {{
     <div class="tip-body">Above 1&times; = investment has paid back. The progress bar shows proximity to breakeven.</div>
 </div>
 
-<div id="tip-token-cagr">
-    <div class="tip-title">Token CAGR</div>
-    <div class="tip-formula"><span class="paren">(</span><span class="frac"><span class="frac-num">V<sub>latest</sub></span><span class="frac-den">V<sub>first</sub></span></span><span class="paren">)</span><sup>12/n</sup><span class="op">&minus;</span>1</div>
-    <div class="tip-body">Compound Annual Growth Rate of token consumption. Annualised from monthly volumes.</div>
+<div id="tip-cmgr">
+    <div class="tip-title">CMGR — Compound Monthly Growth Rate</div>
+    <div class="tip-formula"><span class="paren">(</span><span class="frac"><span class="frac-num">V<sub>end</sub></span><span class="frac-den">V<sub>start</sub></span></span><span class="paren">)</span><sup>1/n</sup><span class="op">&minus;</span>1</div>
+    <div class="tip-body">Monthly compounding growth rate over a trailing window. CMGR-3 = last 3 months, CMGR-6 = last 6, CMGR-12 = last 12. If CMGR-3 &lt; CMGR-12, growth has decelerated.</div>
+    <div class="tip-bench">&gt; 10% strong &middot; 3&ndash;10% healthy &middot; &lt; 3% slow</div>
 </div>
 
 <div id="tip-last-active">
