@@ -658,9 +658,9 @@ ga_cmgr_layout['yaxis2'] = dict(
     titlefont=dict(color='#3B6BE0', size=11),
     tickfont=dict(color='#3B6BE0', size=10))
 ga_cmgr_layout['legend'] = dict(
-    bgcolor='rgba(0,0,0,0)', orientation='h', yanchor='bottom', y=1.10,
+    bgcolor='rgba(0,0,0,0)', orientation='h', yanchor='top', y=-0.15,
     xanchor='left', x=0, font=dict(size=10))
-ga_cmgr_layout['margin'] = dict(t=90, b=40, l=60, r=60)
+ga_cmgr_layout['margin'] = dict(t=40, b=80, l=60, r=60)
 # Cap y2 axis to remove early outlier distortion
 stable_cmgr = [v for v in cmgr3_series + cmgr6_series + cmgr12_series if v is not None and abs(v) < 1.0]
 if stable_cmgr:
@@ -1340,14 +1340,22 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 
 html {{ scroll-behavior:smooth; }}
 
+@media (max-width:1100px) {{
+    .pulse-panels {{ grid-template-columns:1fr; }}
+}}
+
 @media (max-width:900px) {{
     .row-2 {{ grid-template-columns:1fr; }}
     .kpi-row {{ grid-template-columns:1fr 1fr; }}
     .pulse-cards {{ grid-template-columns:1fr 1fr; }}
-    .pulse-panels {{ grid-template-columns:1fr; }}
     .assumptions {{ flex-direction:column; gap:8px; }}
     .content {{ padding:16px; }}
     .topbar {{ padding:16px; }}
+    .waterfall-row {{ grid-template-columns:80px 1fr 55px 18px; gap:6px; }}
+    .wf-label {{ font-size:12px; }}
+    .wf-value {{ font-size:12px; }}
+    .perf-table {{ display:block; overflow-x:auto; -webkit-overflow-scrolling:touch; }}
+    .scoreboard {{ display:block; overflow-x:auto; -webkit-overflow-scrolling:touch; }}
 }}
 
 @media (max-width:680px) {{
