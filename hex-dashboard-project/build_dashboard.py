@@ -259,6 +259,26 @@ wf_contraction_pct = latest_ga['contraction_revenue'] / prior_total * 100 if pri
 wf_churned_pct = latest_ga['churned_revenue'] / prior_total * 100 if prior_total > 0 else 0
 wf_net_pct = (latest_ga['total_revenue'] - prior_total) / prior_total * 100 if prior_total > 0 else 0
 
+# Compute all-time average GA percentages for comparison
+ga_pct_history = pd.DataFrame()
+ga_pct_history['month'] = agg_rev_ga['month']
+shifted_total = agg_rev_ga['total_revenue'].shift(1)
+ga_pct_history['new_pct'] = agg_rev_ga['new_revenue'] / shifted_total * 100
+ga_pct_history['expansion_pct'] = agg_rev_ga['expansion_revenue'] / shifted_total * 100
+ga_pct_history['resurrected_pct'] = agg_rev_ga['resurrected_revenue'] / shifted_total * 100
+ga_pct_history['contraction_pct'] = agg_rev_ga['contraction_revenue'] / shifted_total * 100
+ga_pct_history['churned_pct'] = agg_rev_ga['churned_revenue'] / shifted_total * 100
+ga_pct_history['net_pct'] = (agg_rev_ga['total_revenue'] - shifted_total) / shifted_total * 100
+ga_pct_history = ga_pct_history.dropna()
+
+avg_new_pct = ga_pct_history['new_pct'].mean()
+avg_expansion_pct = ga_pct_history['expansion_pct'].mean()
+avg_resurrected_pct = ga_pct_history['resurrected_pct'].mean()
+avg_contraction_pct = ga_pct_history['contraction_pct'].mean()
+avg_churned_pct = ga_pct_history['churned_pct'].mean()
+avg_net_pct = ga_pct_history['net_pct'].mean()
+n_months_avg = len(ga_pct_history)
+
 # Net API Churn = (Churned + Contraction - Resurrected - Expansion) / Prior Revenue
 net_churn = (latest_ga['churned_revenue'] + latest_ga['contraction_revenue'] - latest_ga['resurrected_revenue'] - latest_ga['expansion_revenue']) / prior_total * 100 if prior_total > 0 else 0
 
@@ -543,15 +563,27 @@ for sid in ['S001', 'S002', 'S003']:
 # Waterfall bar max for scaling
 wf_max = max(abs(wf_new_pct), abs(wf_expansion_pct), abs(wf_resurrected_pct), abs(wf_contraction_pct), abs(wf_churned_pct), abs(wf_net_pct), 1)
 
-def wf_bar(label, pct, color, is_loss=False):
+def wf_bar(label, pct, avg_pct, color, is_loss=False):
     width = abs(pct) / wf_max * 100
+    avg_width = abs(avg_pct) / wf_max * 100
     sign = '-' if is_loss else '+'
+    # Delta: for gains, higher is better; for losses, lower is better
+    if is_loss:
+        delta = avg_pct - pct  # positive = improving (less loss)
+    else:
+        delta = pct - avg_pct  # positive = improving (more gain)
+    delta_color = SUCCESS if delta > 0.5 else DANGER if delta < -0.5 else MUTED
+    delta_arrow = '↑' if delta > 0.5 else '↓' if delta < -0.5 else '→'
     return f'''<div class="waterfall-row">
         <span class="wf-label">{label}</span>
         <div class="waterfall-bar">
-            <div class="wf-track"><div class="wf-fill" style="width:{width:.1f}%;background:{color}"></div></div>
+            <div class="wf-track">
+                <div class="wf-fill" style="width:{width:.1f}%;background:{color}"></div>
+                <div class="wf-avg-marker" style="left:{avg_width:.1f}%" title="Avg: {sign}{abs(avg_pct):.1f}%"></div>
+            </div>
         </div>
         <span class="wf-value" style="color:{color}">{sign}{abs(pct):.1f}%</span>
+        <span class="wf-delta" style="color:{delta_color}" title="vs {n_months_avg}-month avg ({sign}{abs(avg_pct):.1f}%)">{delta_arrow}</span>
     </div>'''
 
 # ============================================================
@@ -646,22 +678,22 @@ net_churn_note = 'Negative = growing' if net_churn < 0 else 'Positive = shrinkin
 tier1_html = f'''
 <div class="pulse-block">
     <div class="pulse-cards">
-        <div class="pulse-card">
+        <div class="pulse-card" data-tooltip="Partners with at least one API call in the last 30 days. A declining count signals portfolio churn before it shows in revenue.">
             <div class="pc-label">ACTIVE PARTNERS</div>
             <div class="pc-value">{active_partners}</div>
             <div class="pc-sub">API activity in last 30d</div>
         </div>
-        <div class="pulse-card">
+        <div class="pulse-card" data-tooltip="Quick Ratio = (New + Resurrected + Expansion) / (Churned + Contraction). Measures growth efficiency. Above 4x is very healthy. Below 1x means the portfolio is shrinking.">
             <div class="pc-label">QUICK RATIO</div>
             <div class="pc-value">{portfolio_qr:.1f}x</div>
             <div class="pc-sub">(new+res+exp) / (churn+contr)</div>
         </div>
-        <div class="pulse-card">
+        <div class="pulse-card" data-tooltip="Net Churn = (Churned + Contraction − Resurrected − Expansion) / Prior Period Revenue. Negative means the existing base is growing even without new partners — the holy grail.">
             <div class="pc-label">NET API CHURN</div>
             <div class="pc-value">{net_churn_display}</div>
             <div class="pc-sub">{net_churn_note}</div>
         </div>
-        <div class="pulse-card">
+        <div class="pulse-card" data-tooltip="Gross Retention = Retained Revenue / Prior Period Revenue. The floor — how much revenue survives without any new business or expansion. B2B benchmark: above 70% is healthy.">
             <div class="pc-label">GROSS RETENTION</div>
             <div class="pc-value">{latest_gross_ret:.0f}%</div>
             <div class="pc-sub">30-day rolling</div>
@@ -671,26 +703,31 @@ tier1_html = f'''
     <div class="pulse-panels">
         <div class="pulse-panel">
             <div class="panel-title">GROWTH ACCOUNTING WATERFALL</div>
-            <div class="panel-subtitle">Latest month vs prior month revenue</div>
+            <div class="panel-subtitle">Latest month vs prior &middot; ▸ = {n_months_avg}-month avg</div>
             <div class="waterfall-rows">
-                {wf_bar('New', wf_new_pct, GAIN)}
-                {wf_bar('Expansion', wf_expansion_pct, GAIN)}
-                {wf_bar('Resurrected', wf_resurrected_pct, GAIN)}
+                {wf_bar('New', wf_new_pct, avg_new_pct, GAIN)}
+                {wf_bar('Expansion', wf_expansion_pct, avg_expansion_pct, GAIN)}
+                {wf_bar('Resurrected', wf_resurrected_pct, avg_resurrected_pct, GAIN)}
                 <div class="wf-divider"></div>
-                {wf_bar('Contraction', wf_contraction_pct, LOSS, True)}
-                {wf_bar('Churned', wf_churned_pct, LOSS, True)}
+                {wf_bar('Contraction', wf_contraction_pct, avg_contraction_pct, LOSS, True)}
+                {wf_bar('Churned', wf_churned_pct, avg_churned_pct, LOSS, True)}
                 <div class="wf-divider"></div>
                 <div class="waterfall-row wf-net">
                     <span class="wf-label">Net Growth</span>
                     <div class="waterfall-bar">
-                        <div class="wf-track"><div class="wf-fill" style="width:{abs(wf_net_pct)/wf_max*100:.1f}%;background:{GAIN if wf_net_pct >= 0 else LOSS}"></div></div>
+                        <div class="wf-track">
+                            <div class="wf-fill" style="width:{abs(wf_net_pct)/wf_max*100:.1f}%;background:{GAIN if wf_net_pct >= 0 else LOSS}"></div>
+                            <div class="wf-avg-marker" style="left:{abs(avg_net_pct)/wf_max*100:.1f}%" title="Avg: {avg_net_pct:+.1f}%"></div>
+                        </div>
                     </div>
                     <span class="wf-value" style="font-weight:600">{'+' if wf_net_pct >= 0 else ''}{wf_net_pct:.1f}%</span>
+                    <span class="wf-delta" style="color:{SUCCESS if wf_net_pct > avg_net_pct + 0.5 else DANGER if wf_net_pct < avg_net_pct - 0.5 else MUTED}">{'↑' if wf_net_pct > avg_net_pct + 0.5 else '↓' if wf_net_pct < avg_net_pct - 0.5 else '→'}</span>
                 </div>
             </div>
             <div class="wf-legend">
                 <span class="wf-legend-item"><span class="wf-dot" style="background:{GAIN}"></span>Gains</span>
                 <span class="wf-legend-item"><span class="wf-dot" style="background:{LOSS}"></span>Losses</span>
+                <span class="wf-legend-item"><span class="wf-avg-dot"></span>Avg</span>
             </div>
         </div>
 
@@ -774,11 +811,11 @@ tier2_html = f'''
             <thead>
                 <tr>
                     <th>Company</th>
-                    <th>Credit Payback</th>
-                    <th>Token CAGR</th>
-                    <th>Quick Ratio</th>
-                    <th>Gross Retention</th>
-                    <th>Last Active</th>
+                    <th data-tooltip="Revenue generated / credits granted. Above 1x = investment has paid back. Progress bar shows how close to breakeven.">Credit Payback</th>
+                    <th data-tooltip="Compound Annual Growth Rate of token consumption. Annualised from monthly volumes. Catches breakout partners growing faster than portfolio average.">Token CAGR</th>
+                    <th data-tooltip="(New + Resurrected) / Churned developers. Measures developer growth quality. Above 2x = strong. Below 1x = shrinking.">Quick Ratio</th>
+                    <th data-tooltip="Retained revenue / prior month revenue. How much spend survives without new business. Above 80% is healthy for early-stage API partners.">Gross Retention</th>
+                    <th data-tooltip="Days since the partner last made an API call. Above 14 days = at risk of churning. Above 30 days = likely dormant.">Last Active</th>
                 </tr>
             </thead>
             <tbody>{partner_rows}</tbody>
@@ -1058,14 +1095,14 @@ scoreboard_html = f'''
                 <tr>
                     <th class="rank-col">#</th>
                     <th>Company</th>
-                    <th>Monthly Tokens</th>
-                    <th>CMGR-3</th>
-                    <th>CMGR-6</th>
-                    <th>CMGR-12</th>
-                    <th>Abs. Growth</th>
-                    <th>GW Score</th>
-                    <th>Proj. 12mo</th>
-                    <th>Rev Impact 6mo</th>
+                    <th data-tooltip="Total API tokens consumed in the most recent month. Reflects current scale of integration with Claude.">Monthly Tokens</th>
+                    <th data-tooltip="Compound Monthly Growth Rate over trailing 3 months. CMGR = (end/start)^(1/3) − 1. Captures recent momentum.">CMGR-3</th>
+                    <th data-tooltip="Compound Monthly Growth Rate over trailing 6 months. Smooths out short-term volatility. Compare with CMGR-3 to detect acceleration or deceleration.">CMGR-6</th>
+                    <th data-tooltip="Compound Monthly Growth Rate over trailing 12 months. The long-term structural growth rate. If CMGR-3 < CMGR-12, growth is decelerating.">CMGR-12</th>
+                    <th data-tooltip="Absolute Monthly Growth = current tokens × CMGR-3. How many NEW tokens this partner adds per month. Rewards scale — a large partner growing slowly adds more than a tiny one growing fast.">Abs. Growth</th>
+                    <th data-tooltip="Growth-Weighted Score = log₁₀(tokens) × CMGR-3 × 100. Balances scale and velocity using a log transform so neither dimension completely dominates.">GW Score</th>
+                    <th data-tooltip="Projected 12-month Run-Rate = current tokens × (1 + CMGR-3)^12. Where this partner lands in a year if current growth continues. The primary ranking metric.">Proj. 12mo</th>
+                    <th data-tooltip="Revenue Impact = current monthly revenue × (1 + CMGR-3)^6. Projected revenue in 6 months. Factors in model mix since Opus tokens generate more revenue than Haiku.">Rev Impact 6mo</th>
                 </tr>
             </thead>
             <tbody>{sb_rows}</tbody>
@@ -1204,17 +1241,26 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 
 /* Waterfall rows */
 .waterfall-rows {{ display:flex; flex-direction:column; gap:8px; }}
-.waterfall-row {{ display:grid; grid-template-columns:100px 1fr 60px; align-items:center; gap:8px; }}
+.waterfall-row {{ display:grid; grid-template-columns:100px 1fr 60px 20px; align-items:center; gap:8px; }}
 .wf-label {{ font-size:12px; color:{DIM}; text-align:right; }}
 .waterfall-bar {{ flex:1; }}
-.wf-track {{ height:18px; background:{BORDER_SUBTLE}; border-radius:3px; overflow:hidden; }}
+.wf-track {{ height:18px; background:{BORDER_SUBTLE}; border-radius:3px; overflow:visible; position:relative; }}
 .wf-fill {{ height:100%; border-radius:3px; transition:width 0.4s ease; }}
+.wf-avg-marker {{ position:absolute; top:-2px; width:2px; height:22px; background:{TEXT}; opacity:0.35; border-radius:1px; }}
+.wf-avg-marker::after {{ content:'▸'; position:absolute; top:-1px; left:4px; font-size:8px; color:{MUTED}; }}
 .wf-value {{ font-size:12px; font-weight:500; text-align:right; }}
+.wf-delta {{ font-size:14px; font-weight:600; text-align:center; cursor:help; }}
 .wf-net .wf-label {{ font-weight:600; color:{TEXT}; }}
 .wf-divider {{ height:1px; background:{BORDER_SUBTLE}; margin:4px 0; }}
 .wf-legend {{ display:flex; gap:16px; margin-top:12px; }}
 .wf-legend-item {{ font-size:11px; color:{MUTED}; display:flex; align-items:center; gap:4px; }}
 .wf-dot {{ width:8px; height:8px; border-radius:50%; }}
+.wf-avg-dot {{ width:2px; height:12px; background:{TEXT}; opacity:0.35; border-radius:1px; }}
+
+/* Hover tooltips */
+[data-tooltip] {{ position:relative; cursor:help; }}
+[data-tooltip]:hover::after {{ content:attr(data-tooltip); position:absolute; bottom:120%; left:50%; transform:translateX(-50%); background:{TEXT}; color:{BG}; padding:6px 10px; border-radius:6px; font-size:11px; font-weight:400; white-space:normal; width:220px; text-align:left; line-height:1.4; z-index:1000; pointer-events:none; box-shadow:0 4px 12px rgba(0,0,0,0.15); }}
+[data-tooltip]:hover::before {{ content:''; position:absolute; bottom:110%; left:50%; transform:translateX(-50%); border:5px solid transparent; border-top-color:{TEXT}; z-index:1001; }}
 
 /* CMGR rows */
 .cmgr-rows {{ display:flex; flex-direction:column; gap:12px; }}
