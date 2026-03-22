@@ -121,15 +121,15 @@ BG = '#FFFCFC'
 CARD = '#F8FAFB'
 TEXT = '#14141C'
 GRID = '#E9E5E8'
-MUTED = '#8E8494'
+MUTED = '#7B7185'
 DIM = '#43394C'
 ACCENT = '#472D7B'
 ACCENT_LIGHT = 'rgba(71, 57, 130, 0.07)'
 ACCENT_SURFACE = 'rgba(71, 57, 130, 0.04)'
 BORDER_SUBTLE = '#ECEDF2'
-SUCCESS = '#22C55E'
-WARNING = '#EAB308'
-DANGER = '#EF4444'
+SUCCESS = '#16A34A'
+WARNING = '#CA8A04'
+DANGER = '#DC2626'
 
 # Tier 1 color tokens
 GAIN = '#1D9E75'
@@ -1155,7 +1155,7 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .topbar .meta {{ font-size:11px; color:{MUTED}; }}
 
 .assumptions {{ padding:10px 32px; background:{ACCENT_SURFACE}; border-bottom:1px solid {GRID}; display:flex; gap:32px; flex-wrap:wrap; }}
-.assumptions .a-item {{ font-size:11px; color:{MUTED}; }}
+.assumptions .a-item {{ font-size:11px; color:{DIM}; }}
 .assumptions .a-item strong {{ color:{TEXT}; font-weight:600; }}
 
 .tabs {{ display:flex; padding:0 32px; border-bottom:1px solid {GRID}; background:{BG}; position:sticky; top:0; z-index:100; }}
@@ -1168,12 +1168,12 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .tab-panel {{ display:none; }}
 .tab-panel.active {{ display:block; }}
 
-.section-header {{ font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:{MUTED}; margin:24px 0 12px; padding-bottom:6px; border-bottom:1px solid {GRID}; }}
+.section-header {{ font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:{MUTED}; margin:24px 0 12px; padding-bottom:6px; border-bottom:1px solid {GRID}; }}
 .section-header:first-child {{ margin-top:0; }}
 
 .kpi-row {{ display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:14px; margin-bottom:24px; }}
 .kpi {{ background:{CARD}; border:1px solid {GRID}; border-radius:10px; padding:16px 20px; }}
-.kpi-l {{ font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:{MUTED}; margin-bottom:2px; }}
+.kpi-l {{ font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:{MUTED}; font-weight:600; margin-bottom:3px; }}
 .kpi-v {{ font-size:24px; font-weight:700; font-variant-numeric:tabular-nums; }}
 .kpi-s {{ font-size:11px; color:{MUTED}; }}
 
@@ -1203,7 +1203,7 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .analysis-section {{ background:{CARD}; border:1px solid {GRID}; border-radius:10px; margin-bottom:18px; overflow:hidden; }}
 .analysis-header {{ display:flex; align-items:center; justify-content:space-between; padding:14px 20px; cursor:pointer; user-select:none; transition:background 0.15s; }}
 .analysis-header:hover {{ background:{ACCENT_SURFACE}; }}
-.analysis-title {{ font-size:13px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:{TEXT}; display:flex; align-items:center; gap:8px; }}
+.analysis-title {{ font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:{TEXT}; display:flex; align-items:center; gap:8px; }}
 .analysis-title .chevron {{ font-size:10px; color:{MUTED}; transition:transform 0.25s; }}
 .analysis-section.collapsed .chevron {{ transform:rotate(-90deg); }}
 .analysis-summary {{ font-size:11px; color:{MUTED}; display:flex; gap:16px; }}
@@ -1221,22 +1221,22 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .mode-panel.active {{ display:block; }}
 
 /* Chart descriptions */
-.chart-desc {{ font-size:11px; color:{MUTED}; line-height:1.6; margin-top:8px; padding:0 4px; }}
-.chart-desc strong {{ color:{DIM}; font-weight:600; }}
+.chart-desc {{ font-size:11px; color:{DIM}; line-height:1.6; margin-top:10px; padding:0 4px; }}
+.chart-desc strong {{ color:{TEXT}; font-weight:600; }}
 
 /* ========== TIER 1: PULSE BLOCK ========== */
 .pulse-block {{ margin-bottom:40px; padding-bottom:32px; border-bottom:1px solid {GRID}; }}
 
 .pulse-cards {{ display:grid; grid-template-columns:repeat(4, 1fr); gap:14px; margin-bottom:20px; }}
 .pulse-card {{ background:{CARD}; border:1px solid {GRID}; border-radius:10px; padding:18px 20px; }}
-.pc-label {{ font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:{MUTED}; font-weight:500; margin-bottom:4px; }}
-.pc-value {{ font-size:24px; font-weight:600; color:{TEXT}; font-variant-numeric:tabular-nums; }}
+.pc-label {{ font-size:10px; text-transform:uppercase; letter-spacing:0.05em; color:{MUTED}; font-weight:600; margin-bottom:4px; }}
+.pc-value {{ font-size:24px; font-weight:700; color:{TEXT}; font-variant-numeric:tabular-nums; }}
 .pc-sub {{ font-size:11px; color:{MUTED}; margin-top:3px; }}
 
 .pulse-panels {{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }}
 .pulse-panel {{ background:#fff; border:1px solid {GRID}; border-radius:12px; padding:22px 24px; }}
 .pulse-panel-chart {{ padding:14px 10px 6px; overflow:hidden; }}
-.panel-title {{ font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:{MUTED}; font-weight:600; margin-bottom:6px; }}
+.panel-title {{ font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:{MUTED}; font-weight:700; margin-bottom:6px; }}
 .panel-subtitle {{ font-size:11px; color:{MUTED}; margin-bottom:18px; }}
 
 /* Waterfall rows */
@@ -1324,7 +1324,7 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 /* Metric cell color coding */
 .metric-cell {{ font-weight:500; font-variant-numeric:tabular-nums; }}
 .metric-cell.metric-green {{ color:{SUCCESS}; }}
-.metric-cell.metric-amber {{ color:#CA8A04; }}
+.metric-cell.metric-amber {{ color:{WARNING}; }}
 .metric-cell.metric-red {{ color:{DANGER}; }}
 
 html {{ scroll-behavior:smooth; }}
