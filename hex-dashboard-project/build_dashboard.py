@@ -794,10 +794,10 @@ for m in company_metrics:
                 <span class="payback-label">{bar_label}</span>
             </div>
         </td>
-        <td class="metric-cell {cagr_cls}">{fmt_pct(m['token_cagr'])}</td>
-        <td class="metric-cell {qr_cls}">{m['avg_qr']:.1f}x</td>
-        <td class="metric-cell {gret_cls}">{m['gross_retention']:.0f}%</td>
-        <td class="metric-cell {last_cls}">{la_display}</td>
+        <td class="metric-cell num {cagr_cls}">{fmt_pct(m['token_cagr'])}</td>
+        <td class="metric-cell num {qr_cls}">{m['avg_qr']:.1f}x</td>
+        <td class="metric-cell num {gret_cls}">{m['gross_retention']:.0f}%</td>
+        <td class="metric-cell num {last_cls}">{la_display}</td>
     </tr>'''
 
 tier2_html = f'''
@@ -812,10 +812,10 @@ tier2_html = f'''
                 <tr>
                     <th>Company</th>
                     <th data-tip="credit-payback">Credit Payback</th>
-                    <th data-tip="token-cagr">Token CAGR</th>
-                    <th data-tip="quick-ratio">Quick Ratio</th>
-                    <th data-tip="gross-retention">Gross Retention</th>
-                    <th data-tip="last-active">Last Active</th>
+                    <th class="num" data-tip="token-cagr">Token CAGR</th>
+                    <th class="num" data-tip="quick-ratio">Quick Ratio</th>
+                    <th class="num" data-tip="gross-retention">Gross Ret.</th>
+                    <th class="num" data-tip="last-active">Last Active</th>
                 </tr>
             </thead>
             <tbody>{partner_rows}</tbody>
@@ -1073,14 +1073,14 @@ for i, s in enumerate(scoreboard_data):
     sb_rows += f'''<tr class="perf-row" data-sid="{s['sid']}" style="cursor:pointer">
         <td class="rank-cell">{rank}</td>
         <td><span class="dot-sm" style="background:{COLORS[s['sid']]}"></span>{s['name']}</td>
-        <td>{fmt_tokens(s['latest_tokens'])}</td>
-        <td class="{cmgr_class(s['cmgr3'])}">{s['cmgr3']*100:.1f}%</td>
-        <td class="{cmgr_class(s['cmgr6'])}">{s['cmgr6']*100:.1f}%</td>
-        <td class="{cmgr_class(s['cmgr12'])}">{s['cmgr12']*100:.1f}%</td>
-        <td>{fmt_tokens(s['abs_growth'])}/mo</td>
-        <td>{s['gw_score']:.0f}</td>
-        <td><strong>{fmt_tokens(s['proj_12mo'])}</strong></td>
-        <td>{fmt_dollar(s['rev_impact_6mo'])}</td>
+        <td class="num">{fmt_tokens(s['latest_tokens'])}</td>
+        <td class="num {cmgr_class(s['cmgr3'])}">{s['cmgr3']*100:.1f}%</td>
+        <td class="num {cmgr_class(s['cmgr6'])}">{s['cmgr6']*100:.1f}%</td>
+        <td class="num {cmgr_class(s['cmgr12'])}">{s['cmgr12']*100:.1f}%</td>
+        <td class="num">{fmt_tokens(s['abs_growth'])}/mo</td>
+        <td class="num">{s['gw_score']:.0f}</td>
+        <td class="num"><strong>{fmt_tokens(s['proj_12mo'])}</strong></td>
+        <td class="num">{fmt_dollar(s['rev_impact_6mo'])}</td>
     </tr>'''
 
 scoreboard_html = f'''
@@ -1095,14 +1095,14 @@ scoreboard_html = f'''
                 <tr>
                     <th class="rank-col">#</th>
                     <th>Company</th>
-                    <th data-tip="monthly-tokens">Monthly Tokens</th>
-                    <th data-tip="cmgr3">CMGR-3</th>
-                    <th data-tip="cmgr6">CMGR-6</th>
-                    <th data-tip="cmgr12">CMGR-12</th>
-                    <th data-tip="abs-growth">Abs. Growth</th>
-                    <th data-tip="gw-score">GW Score</th>
-                    <th data-tip="proj-12mo">Proj. 12mo</th>
-                    <th data-tip="rev-impact">Rev Impact 6mo</th>
+                    <th class="num" data-tip="monthly-tokens">Mo. Tokens</th>
+                    <th class="num" data-tip="cmgr3">CMGR-3</th>
+                    <th class="num" data-tip="cmgr6">CMGR-6</th>
+                    <th class="num" data-tip="cmgr12">CMGR-12</th>
+                    <th class="num" data-tip="abs-growth">Abs. Growth</th>
+                    <th class="num" data-tip="gw-score">GW Score</th>
+                    <th class="num" data-tip="proj-12mo">Proj. 12mo</th>
+                    <th class="num" data-tip="rev-impact">Rev. 6mo</th>
                 </tr>
             </thead>
             <tbody>{sb_rows}</tbody>
@@ -1174,7 +1174,7 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .kpi-row {{ display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:14px; margin-bottom:24px; }}
 .kpi {{ background:{CARD}; border:1px solid {GRID}; border-radius:10px; padding:16px 20px; }}
 .kpi-l {{ font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:{MUTED}; margin-bottom:2px; }}
-.kpi-v {{ font-size:24px; font-weight:700; }}
+.kpi-v {{ font-size:24px; font-weight:700; font-variant-numeric:tabular-nums; }}
 .kpi-s {{ font-size:11px; color:{MUTED}; }}
 
 .card {{ background:{CARD}; border:1px solid {GRID}; border-radius:8px; padding:16px; overflow:hidden; }}
@@ -1294,16 +1294,19 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 /* Scoreboard */
 .scoreboard-section {{ margin-top:0; }}
 .scoreboard-section .pl-title {{ font-size:13px; }}
-.scoreboard-table .rank-col {{ width:30px; }}
-.rank-cell {{ font-size:13px; font-weight:600; color:{MUTED}; text-align:center; }}
-.scoreboard-table td {{ font-size:12px; font-variant-numeric:tabular-nums; }}
+.scoreboard-table .rank-col {{ width:28px; }}
+.rank-cell {{ font-size:12px; font-weight:600; color:{MUTED}; text-align:center; }}
+.scoreboard-table td {{ font-size:12px; font-variant-numeric:tabular-nums; padding:9px 10px; }}
+.scoreboard-table th {{ padding:9px 10px; }}
 .partner-list {{ padding:0; overflow-x:auto; position:relative; }}
 .partner-list::after {{ content:''; position:absolute; right:0; top:0; bottom:0; width:40px; background:linear-gradient(90deg, transparent, {CARD}); pointer-events:none; opacity:0; transition:opacity 0.3s; }}
 .partner-list.scrollable::after {{ opacity:1; }}
 
-.perf-table {{ width:100%; border-collapse:collapse; font-size:13px; }}
-.perf-table th {{ text-align:left; padding:10px 14px; border-bottom:1px solid {GRID}; color:{MUTED}; font-size:11px; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; white-space:nowrap; }}
-.perf-table td {{ padding:10px 14px; border-bottom:1px solid {BORDER_SUBTLE}; white-space:nowrap; color:{DIM}; }}
+.perf-table {{ width:100%; border-collapse:collapse; font-size:13px; font-variant-numeric:tabular-nums; }}
+.perf-table th {{ text-align:left; padding:10px 14px; border-bottom:1px solid {GRID}; color:{MUTED}; font-size:10px; text-transform:uppercase; letter-spacing:0.05em; font-weight:600; white-space:nowrap; }}
+.perf-table th.num {{ text-align:right; }}
+.perf-table td {{ padding:10px 14px; border-bottom:1px solid {BORDER_SUBTLE}; white-space:nowrap; color:{DIM}; font-variant-numeric:tabular-nums; }}
+.perf-table td.num {{ text-align:right; }}
 .perf-table tr:last-child td {{ border-bottom:none; }}
 .perf-table .perf-row:hover {{ background:{ACCENT_SURFACE}; }}
 .perf-table .perf-row td:first-child {{ font-weight:600; color:{TEXT}; }}
@@ -1319,9 +1322,9 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .payback-overflow .payback-label {{ color:#fff; }}
 
 /* Metric cell color coding */
-.metric-cell {{ font-weight:500; }}
+.metric-cell {{ font-weight:500; font-variant-numeric:tabular-nums; }}
 .metric-cell.metric-green {{ color:{SUCCESS}; }}
-.metric-cell.metric-amber {{ color:{WARNING}; }}
+.metric-cell.metric-amber {{ color:#CA8A04; }}
 .metric-cell.metric-red {{ color:{DANGER}; }}
 
 html {{ scroll-behavior:smooth; }}

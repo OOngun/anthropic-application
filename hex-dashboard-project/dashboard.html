@@ -41,7 +41,7 @@ body { font-family:'IBM Plex Sans',-apple-system,sans-serif; background:#FFFCFC;
 .kpi-row { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:14px; margin-bottom:24px; }
 .kpi { background:#F8FAFB; border:1px solid #E9E5E8; border-radius:10px; padding:16px 20px; }
 .kpi-l { font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:#8E8494; margin-bottom:2px; }
-.kpi-v { font-size:24px; font-weight:700; }
+.kpi-v { font-size:24px; font-weight:700; font-variant-numeric:tabular-nums; }
 .kpi-s { font-size:11px; color:#8E8494; }
 
 .card { background:#F8FAFB; border:1px solid #E9E5E8; border-radius:8px; padding:16px; overflow:hidden; }
@@ -161,16 +161,19 @@ body { font-family:'IBM Plex Sans',-apple-system,sans-serif; background:#FFFCFC;
 /* Scoreboard */
 .scoreboard-section { margin-top:0; }
 .scoreboard-section .pl-title { font-size:13px; }
-.scoreboard-table .rank-col { width:30px; }
-.rank-cell { font-size:13px; font-weight:600; color:#8E8494; text-align:center; }
-.scoreboard-table td { font-size:12px; font-variant-numeric:tabular-nums; }
+.scoreboard-table .rank-col { width:28px; }
+.rank-cell { font-size:12px; font-weight:600; color:#8E8494; text-align:center; }
+.scoreboard-table td { font-size:12px; font-variant-numeric:tabular-nums; padding:9px 10px; }
+.scoreboard-table th { padding:9px 10px; }
 .partner-list { padding:0; overflow-x:auto; position:relative; }
 .partner-list::after { content:''; position:absolute; right:0; top:0; bottom:0; width:40px; background:linear-gradient(90deg, transparent, #F8FAFB); pointer-events:none; opacity:0; transition:opacity 0.3s; }
 .partner-list.scrollable::after { opacity:1; }
 
-.perf-table { width:100%; border-collapse:collapse; font-size:13px; }
-.perf-table th { text-align:left; padding:10px 14px; border-bottom:1px solid #E9E5E8; color:#8E8494; font-size:11px; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; white-space:nowrap; }
-.perf-table td { padding:10px 14px; border-bottom:1px solid #ECEDF2; white-space:nowrap; color:#43394C; }
+.perf-table { width:100%; border-collapse:collapse; font-size:13px; font-variant-numeric:tabular-nums; }
+.perf-table th { text-align:left; padding:10px 14px; border-bottom:1px solid #E9E5E8; color:#8E8494; font-size:10px; text-transform:uppercase; letter-spacing:0.05em; font-weight:600; white-space:nowrap; }
+.perf-table th.num { text-align:right; }
+.perf-table td { padding:10px 14px; border-bottom:1px solid #ECEDF2; white-space:nowrap; color:#43394C; font-variant-numeric:tabular-nums; }
+.perf-table td.num { text-align:right; }
 .perf-table tr:last-child td { border-bottom:none; }
 .perf-table .perf-row:hover { background:rgba(71, 57, 130, 0.04); }
 .perf-table .perf-row td:first-child { font-weight:600; color:#14141C; }
@@ -186,9 +189,9 @@ body { font-family:'IBM Plex Sans',-apple-system,sans-serif; background:#FFFCFC;
 .payback-overflow .payback-label { color:#fff; }
 
 /* Metric cell color coding */
-.metric-cell { font-weight:500; }
+.metric-cell { font-weight:500; font-variant-numeric:tabular-nums; }
 .metric-cell.metric-green { color:#22C55E; }
-.metric-cell.metric-amber { color:#EAB308; }
+.metric-cell.metric-amber { color:#CA8A04; }
 .metric-cell.metric-red { color:#EF4444; }
 
 html { scroll-behavior:smooth; }
@@ -365,10 +368,10 @@ html { scroll-behavior:smooth; }
                 <tr>
                     <th>Company</th>
                     <th data-tip="credit-payback">Credit Payback</th>
-                    <th data-tip="token-cagr">Token CAGR</th>
-                    <th data-tip="quick-ratio">Quick Ratio</th>
-                    <th data-tip="gross-retention">Gross Retention</th>
-                    <th data-tip="last-active">Last Active</th>
+                    <th class="num" data-tip="token-cagr">Token CAGR</th>
+                    <th class="num" data-tip="quick-ratio">Quick Ratio</th>
+                    <th class="num" data-tip="gross-retention">Gross Ret.</th>
+                    <th class="num" data-tip="last-active">Last Active</th>
                 </tr>
             </thead>
             <tbody><tr class="perf-row" data-sid="S001" style="cursor:pointer">
@@ -379,10 +382,10 @@ html { scroll-behavior:smooth; }
                 <span class="payback-label">4.1x</span>
             </div>
         </td>
-        <td class="metric-cell metric-green">1,586%</td>
-        <td class="metric-cell metric-green">4.3x</td>
-        <td class="metric-cell metric-green">94%</td>
-        <td class="metric-cell metric-green">2d ago</td>
+        <td class="metric-cell num metric-green">1,586%</td>
+        <td class="metric-cell num metric-green">4.3x</td>
+        <td class="metric-cell num metric-green">94%</td>
+        <td class="metric-cell num metric-green">2d ago</td>
     </tr><tr class="perf-row" data-sid="S002" style="cursor:pointer">
         <td><span class="dot-sm" style="background:#3B528B"></span>Eigen Technologies <span class="stage-badge">Series B</span></td>
         <td class="payback-cell">
@@ -391,10 +394,10 @@ html { scroll-behavior:smooth; }
                 <span class="payback-label">1.6x</span>
             </div>
         </td>
-        <td class="metric-cell metric-green">557%</td>
-        <td class="metric-cell metric-green">2.5x</td>
-        <td class="metric-cell metric-green">93%</td>
-        <td class="metric-cell metric-green">5d ago</td>
+        <td class="metric-cell num metric-green">557%</td>
+        <td class="metric-cell num metric-green">2.5x</td>
+        <td class="metric-cell num metric-green">93%</td>
+        <td class="metric-cell num metric-green">5d ago</td>
     </tr><tr class="perf-row" data-sid="S003" style="cursor:pointer">
         <td><span class="dot-sm" style="background:#21918C"></span>BuilderKit <span class="stage-badge">Series B</span></td>
         <td class="payback-cell">
@@ -403,10 +406,10 @@ html { scroll-behavior:smooth; }
                 <span class="payback-label">1.0x</span>
             </div>
         </td>
-        <td class="metric-cell metric-green">204%</td>
-        <td class="metric-cell metric-red">0.4x</td>
-        <td class="metric-cell metric-green">84%</td>
-        <td class="metric-cell metric-amber">11d ago</td>
+        <td class="metric-cell num metric-green">204%</td>
+        <td class="metric-cell num metric-red">0.4x</td>
+        <td class="metric-cell num metric-green">84%</td>
+        <td class="metric-cell num metric-amber">11d ago</td>
     </tr></tbody>
         </table>
     </div>
@@ -424,49 +427,49 @@ html { scroll-behavior:smooth; }
                 <tr>
                     <th class="rank-col">#</th>
                     <th>Company</th>
-                    <th data-tip="monthly-tokens">Monthly Tokens</th>
-                    <th data-tip="cmgr3">CMGR-3</th>
-                    <th data-tip="cmgr6">CMGR-6</th>
-                    <th data-tip="cmgr12">CMGR-12</th>
-                    <th data-tip="abs-growth">Abs. Growth</th>
-                    <th data-tip="gw-score">GW Score</th>
-                    <th data-tip="proj-12mo">Proj. 12mo</th>
-                    <th data-tip="rev-impact">Rev Impact 6mo</th>
+                    <th class="num" data-tip="monthly-tokens">Mo. Tokens</th>
+                    <th class="num" data-tip="cmgr3">CMGR-3</th>
+                    <th class="num" data-tip="cmgr6">CMGR-6</th>
+                    <th class="num" data-tip="cmgr12">CMGR-12</th>
+                    <th class="num" data-tip="abs-growth">Abs. Growth</th>
+                    <th class="num" data-tip="gw-score">GW Score</th>
+                    <th class="num" data-tip="proj-12mo">Proj. 12mo</th>
+                    <th class="num" data-tip="rev-impact">Rev. 6mo</th>
                 </tr>
             </thead>
             <tbody><tr class="perf-row" data-sid="S001" style="cursor:pointer">
         <td class="rank-cell">1</td>
         <td><span class="dot-sm" style="background:#472D7B"></span>MedScribe AI</td>
-        <td>2.7B</td>
-        <td class="metric-amber">12.6%</td>
-        <td class="metric-amber">13.6%</td>
-        <td class="metric-amber">14.8%</td>
-        <td>345.1M/mo</td>
-        <td>119</td>
-        <td><strong>11.4B</strong></td>
-        <td>$56K</td>
+        <td class="num">2.7B</td>
+        <td class="num metric-amber">12.6%</td>
+        <td class="num metric-amber">13.6%</td>
+        <td class="num metric-amber">14.8%</td>
+        <td class="num">345.1M/mo</td>
+        <td class="num">119</td>
+        <td class="num"><strong>11.4B</strong></td>
+        <td class="num">$56K</td>
     </tr><tr class="perf-row" data-sid="S002" style="cursor:pointer">
         <td class="rank-cell">2</td>
         <td><span class="dot-sm" style="background:#3B528B"></span>Eigen Technologies</td>
-        <td>552.8M</td>
-        <td class="metric-red">-1.1%</td>
-        <td class="metric-red">2.6%</td>
-        <td class="metric-red">4.0%</td>
-        <td>0/mo</td>
-        <td>-10</td>
-        <td><strong>483.1M</strong></td>
-        <td>$5K</td>
+        <td class="num">552.8M</td>
+        <td class="num metric-red">-1.1%</td>
+        <td class="num metric-red">2.6%</td>
+        <td class="num metric-red">4.0%</td>
+        <td class="num">0/mo</td>
+        <td class="num">-10</td>
+        <td class="num"><strong>483.1M</strong></td>
+        <td class="num">$5K</td>
     </tr><tr class="perf-row" data-sid="S003" style="cursor:pointer">
         <td class="rank-cell">3</td>
         <td><span class="dot-sm" style="background:#21918C"></span>BuilderKit</td>
-        <td>103.0M</td>
-        <td class="metric-red">-5.1%</td>
-        <td class="metric-red">-3.6%</td>
-        <td class="metric-red">-3.6%</td>
-        <td>0/mo</td>
-        <td>-41</td>
-        <td><strong>55.3M</strong></td>
-        <td>$754</td>
+        <td class="num">103.0M</td>
+        <td class="num metric-red">-5.1%</td>
+        <td class="num metric-red">-3.6%</td>
+        <td class="num metric-red">-3.6%</td>
+        <td class="num">0/mo</td>
+        <td class="num">-41</td>
+        <td class="num"><strong>55.3M</strong></td>
+        <td class="num">$754</td>
     </tr></tbody>
         </table>
     </div>
