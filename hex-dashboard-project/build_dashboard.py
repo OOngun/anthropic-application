@@ -602,8 +602,9 @@ for col, name, color, dash in [
     if len(valid) > 0:
         fig_ga_cmgr.add_trace(go.Scatter(
             x=valid['month'], y=valid[col] * 100, name=name,
-            mode='lines', line=dict(color=color, width=2.5, dash=dash),
-            yaxis='y2', visible='legendonly',
+            mode='lines+markers', line=dict(color=color, width=3, dash=dash),
+            marker=dict(size=5),
+            yaxis='y2',
             hovertemplate=f'{name}: %{{y:.1f}}%<extra></extra>'))
 
 ga_cmgr_layout = layout('Growth Accounting + CMGR', h=380)
@@ -611,9 +612,17 @@ ga_cmgr_layout['barmode'] = 'relative'
 ga_cmgr_layout['yaxis']['tickprefix'] = '$'
 ga_cmgr_layout['yaxis']['tickformat'] = ','
 ga_cmgr_layout['yaxis']['title'] = 'Revenue'
+# Compute sensible y2 range from actual CMGR values
+all_cmgr_vals = [v for v in cmgr3_series + cmgr6_series + cmgr12_series if v is not None]
+cmgr_min_pct = min(all_cmgr_vals) * 100 if all_cmgr_vals else 0
+cmgr_max_pct = max(all_cmgr_vals) * 100 if all_cmgr_vals else 100
+cmgr_padding = max((cmgr_max_pct - cmgr_min_pct) * 0.15, 5)
+
 ga_cmgr_layout['yaxis2'] = dict(
-    overlaying='y', side='right', showgrid=False, zeroline=False,
+    overlaying='y', side='right', showgrid=False, zeroline=True,
+    zerolinecolor='rgba(59,107,224,0.2)',
     title='CMGR %', ticksuffix='%',
+    range=[cmgr_min_pct - cmgr_padding, cmgr_max_pct + cmgr_padding],
     titlefont=dict(color='#3B6BE0', size=11),
     tickfont=dict(color='#3B6BE0', size=10))
 ga_cmgr_layout['legend'] = dict(
@@ -961,12 +970,124 @@ def startup_tab_html(sid):
     return html
 
 # ============================================================
-# PORTFOLIO CONTENT = Tier 1 + Tier 2 only
+# GROWTH SCOREBOARD (scale × velocity table)
+# ============================================================
+
+def fmt_tokens(v):
+    if v >= 1e9: return f'{v/1e9:.1f}B'
+    if v >= 1e6: return f'{v/1e6:.1f}M'
+    if v >= 1e3: return f'{v/1e3:.0f}K'
+    return f'{v:.0f}'
+
+def fmt_dollar(v):
+    if v >= 1e6: return f'${v/1e6:.1f}M'
+    if v >= 1e3: return f'${v/1e3:.0f}K'
+    return f'${v:,.0f}'
+
+scoreboard_data = []
+for m in company_metrics:
+    sid = m['sid']
+    u = monthly_usage[monthly_usage['startup_id'] == sid].sort_values('month')
+    tok_series = u['total_tokens']
+    latest_tokens = u.iloc[-1]['total_tokens']
+    latest_rev = u.iloc[-1]['revenue_usd']
+
+    # Per-company CMGR
+    c3 = cmgr(tok_series, 3) if len(tok_series) > 3 else 0
+    c6 = cmgr(tok_series, 6) if len(tok_series) > 6 else 0
+    c12 = cmgr(tok_series, 12) if len(tok_series) > 12 else 0
+
+    # Metric 1: Absolute Monthly Token Growth
+    abs_growth = latest_tokens * c3 if c3 > 0 else 0
+
+    # Metric 2: Growth-Weighted Volume Score
+    import math
+    gw_score = math.log10(max(latest_tokens, 1)) * c3 * 100
+
+    # Metric 3: Projected 12-month Token Run-Rate
+    proj_12mo = latest_tokens * (1 + c3) ** 12 if c3 > -1 else 0
+
+    # Metric 4: Revenue Impact (6-month projected)
+    rev_impact_6mo = latest_rev * (1 + c3) ** 6 if c3 > -1 else 0
+
+    scoreboard_data.append(dict(
+        sid=sid, name=m['name'], latest_tokens=latest_tokens, latest_rev=latest_rev,
+        cmgr3=c3, cmgr6=c6, cmgr12=c12,
+        abs_growth=abs_growth, gw_score=gw_score,
+        proj_12mo=proj_12mo, rev_impact_6mo=rev_impact_6mo,
+    ))
+
+# Sort by projected 12-month run-rate (default)
+scoreboard_data.sort(key=lambda x: x['proj_12mo'], reverse=True)
+
+# Build table rows
+sb_rows = ''
+for i, s in enumerate(scoreboard_data):
+    rank = i + 1
+    # Color CMGR cells
+    def cmgr_class(v):
+        if v > 0.15: return 'metric-green'
+        if v > 0.05: return 'metric-amber'
+        return 'metric-red'
+
+    # Highlight top projected run-rate
+    proj_class = 'metric-green' if s['proj_12mo'] > scoreboard_data[0]['proj_12mo'] * 0.5 else ''
+
+    sb_rows += f'''<tr class="perf-row" data-sid="{s['sid']}" style="cursor:pointer">
+        <td class="rank-cell">{rank}</td>
+        <td><span class="dot-sm" style="background:{COLORS[s['sid']]}"></span>{s['name']}</td>
+        <td>{fmt_tokens(s['latest_tokens'])}</td>
+        <td class="{cmgr_class(s['cmgr3'])}">{s['cmgr3']*100:.1f}%</td>
+        <td class="{cmgr_class(s['cmgr6'])}">{s['cmgr6']*100:.1f}%</td>
+        <td class="{cmgr_class(s['cmgr12'])}">{s['cmgr12']*100:.1f}%</td>
+        <td>{fmt_tokens(s['abs_growth'])}/mo</td>
+        <td>{s['gw_score']:.0f}</td>
+        <td><strong>{fmt_tokens(s['proj_12mo'])}</strong></td>
+        <td>{fmt_dollar(s['rev_impact_6mo'])}</td>
+    </tr>'''
+
+scoreboard_html = f'''
+<div class="scoreboard-section">
+    <div class="pl-header">
+        <div class="pl-title">GROWTH SCOREBOARD</div>
+        <div class="pl-subtitle">Scale × velocity — ranked by projected 12-month token run-rate</div>
+    </div>
+    <div class="partner-list card">
+        <table class="perf-table scoreboard-table">
+            <thead>
+                <tr>
+                    <th class="rank-col">#</th>
+                    <th>Company</th>
+                    <th>Monthly Tokens</th>
+                    <th>CMGR-3</th>
+                    <th>CMGR-6</th>
+                    <th>CMGR-12</th>
+                    <th>Abs. Growth</th>
+                    <th>GW Score</th>
+                    <th>Proj. 12mo</th>
+                    <th>Rev Impact 6mo</th>
+                </tr>
+            </thead>
+            <tbody>{sb_rows}</tbody>
+        </table>
+    </div>
+    <p class="chart-desc">
+        <strong>Abs. Growth</strong> = tokens × CMGR-3 (new tokens added per month).
+        <strong>GW Score</strong> = log(tokens) × CMGR-3 (balances scale and velocity).
+        <strong>Proj. 12mo</strong> = current tokens compounded at CMGR-3 for 12 months.
+        <strong>Rev Impact</strong> = current revenue compounded at CMGR-3 for 6 months.
+    </p>
+</div>
+'''
+
+# ============================================================
+# PORTFOLIO CONTENT = Tier 1 + Tier 2 + Growth Scoreboard
 # ============================================================
 
 portfolio_content = f'''
 {tier1_html}
 {tier2_html}
+{scoreboard_html}
 '''
 
 # ============================================================
@@ -1111,6 +1232,12 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .pl-header {{ margin-bottom:12px; }}
 .pl-title {{ font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:{MUTED}; }}
 .pl-subtitle {{ font-size:11px; color:{MUTED}; margin-top:2px; }}
+
+/* Scoreboard */
+.scoreboard-section {{ margin-top:24px; }}
+.scoreboard-table .rank-col {{ width:30px; }}
+.rank-cell {{ font-size:13px; font-weight:600; color:{MUTED}; text-align:center; }}
+.scoreboard-table td {{ font-size:12px; font-variant-numeric:tabular-nums; }}
 .partner-list {{ padding:0; overflow-x:auto; position:relative; }}
 .partner-list::after {{ content:''; position:absolute; right:0; top:0; bottom:0; width:40px; background:linear-gradient(90deg, transparent, {CARD}); pointer-events:none; opacity:0; transition:opacity 0.3s; }}
 .partner-list.scrollable::after {{ opacity:1; }}
