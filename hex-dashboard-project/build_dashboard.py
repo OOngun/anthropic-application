@@ -1221,19 +1221,14 @@ def metric_class(val, thresholds, invert=False):
 
 partner_rows = ''
 for m in company_metrics:
-    # Credit payback progress bar
-    payback_pct = min(m['roi'] * 100, 100)
+    # Credit payback: compact "Nx" text
     if m['roi'] >= 1:
         bar_color = SUCCESS
-        bar_label = f'{m["roi"]:.1f}x'
     elif m['roi'] >= 0.5:
         bar_color = WARNING
-        bar_label = f'{payback_pct:.0f}%'
     else:
         bar_color = DANGER
-        bar_label = f'{payback_pct:.0f}%'
-    overflow = m['roi'] > 1
-    bar_extra_class = ' payback-overflow' if overflow else ''
+    bar_label = f'{m["roi"]:.1f}x'
 
     cmgr3_val = m['cmgr3'] if m['cmgr3'] is not None else 0
     cagr_cls = metric_class(cmgr3_val, (0.10, 0.03))  # >10% green, 3-10% amber, <3% red
