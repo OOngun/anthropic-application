@@ -2116,8 +2116,17 @@ document.querySelectorAll('.perf-row, .top5-row').forEach(row => {{
     // Excluded archetypes set (empty = show all)
     const excludedArchs = new Set();
     let searchTerm = '';
-    let sortCol = null;
+    let sortCol = 'revenue';
     let sortDir = 'desc';
+
+    // Highlight default sort column
+    (function() {{
+        const th = table.querySelector('.sortable[data-sort="revenue"]');
+        if (th) {{
+            th.classList.add('sort-desc');
+            th.querySelector('.sort-icon').textContent = '↓';
+        }}
+    }})();
 
     function applyFilters() {{
         let visible = 0;
