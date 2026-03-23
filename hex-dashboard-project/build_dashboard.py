@@ -1906,6 +1906,12 @@ document.querySelectorAll('.partner-list').forEach(wrap => {{
     <div class="tip-bench">&gt; 10% strong &middot; 3&ndash;10% healthy &middot; &lt; 3% slow</div>
 </div>
 
+<div id="tip-active-devs">
+    <div class="tip-title">Active Developers</div>
+    <div class="tip-body">Distinct API keys with &ge;1 call in the trailing 30 days. This is a simplification &mdash; the mapping between API keys and actual developers is ambiguous (one dev may use multiple keys, or a team may share one). For consistency, we treat each active API key as one developer.</div>
+    <div class="tip-bench">Revenue is driven by tokens &times; model pricing, not developer count. Dev count is an adoption signal &mdash; more devs generally means deeper integration.</div>
+</div>
+
 <div id="tip-last-active">
     <div class="tip-title">Last Active</div>
     <div class="tip-body">Days since this partner last made an API call.</div>

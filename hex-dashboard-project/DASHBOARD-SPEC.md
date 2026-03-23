@@ -182,7 +182,13 @@ Click into any company for granular breakdown across three sections:
 3. **Developer Retention Curve** — cohort lines showing % of developers still active at month 1, 2, 3...
 4. **Total Active Developers** — simple line showing MAD over time
 
-**Note on "users":** This depends on how the partner integrates. If they use Anthropic Console with workspace members, we see real seat count. If they use raw API keys, we use distinct active API keys as a proxy. The dashboard should flag which measurement is in use per partner.
+**Definition: "Active Developers"**
+
+Throughout this dashboard, "Active Developers" is defined as **distinct API keys with at least 1 API call in the trailing 30 days**.
+
+This is a simplification. In practice, the mapping between API keys and actual developers is ambiguous — one developer may use multiple keys (e.g. dev vs production), or a team may share a single key. Alternative measurements include workspace seats (if the partner uses Anthropic Console) or distinct user-agent strings. For the sake of simplicity and consistency, we treat each active API key as one developer.
+
+**Revenue is not driven by developer count.** Revenue = tokens × model pricing. Developer count is an adoption/integration depth signal — more developers generally correlates with more features built on Claude, which correlates with more tokens, but the relationship is not mechanical. A startup with 2 devs running a high-volume batch pipeline can generate more revenue than one with 20 devs doing light prototyping.
 
 ---
 
