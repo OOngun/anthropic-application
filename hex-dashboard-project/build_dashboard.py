@@ -1511,7 +1511,7 @@ top5_html = f'''
     </table>
 </div>'''
 
-pulse_content = tier1_html + top5_html
+pulse_content = tier1_html + tier2_html
 partners_content = f'''{tier2_html}
 {scoreboard_html}'''
 
@@ -1972,7 +1972,8 @@ document.querySelectorAll('.perf-row, .top5-row').forEach(row => {{
     const countEl = document.getElementById('pl-visible-count');
     const chips = document.querySelectorAll('.arch-chip');
 
-    let activeArch = 'all';
+    // Excluded archetypes set (empty = show all)
+    const excludedArchs = new Set();
     let searchTerm = '';
     let sortCol = null;
     let sortDir = 'desc';
@@ -1983,12 +1984,17 @@ document.querySelectorAll('.perf-row, .top5-row').forEach(row => {{
             const name = row.dataset.name || '';
             const arch = row.dataset.arch || '';
             const matchSearch = !searchTerm || name.includes(searchTerm.toLowerCase());
-            const matchArch = activeArch === 'all' || arch === activeArch;
+            const matchArch = !excludedArchs.has(arch);
             const show = matchSearch && matchArch;
             row.style.display = show ? '' : 'none';
             if (show) visible++;
         }});
         if (countEl) countEl.textContent = visible;
+    }}
+
+    function updateAllChip() {{
+        const allChip = document.querySelector('.arch-chip[data-arch="all"]');
+        if (allChip) allChip.classList.toggle('active', excludedArchs.size === 0);
     }}
 
     // Search
@@ -1999,27 +2005,26 @@ document.querySelectorAll('.perf-row, .top5-row').forEach(row => {{
         }});
     }}
 
-    // Archetype filter chips
+    // Archetype filter chips — toggle to EXCLUDE
     chips.forEach(chip => {{
         chip.addEventListener('click', () => {{
             const arch = chip.dataset.arch;
             if (arch === 'all') {{
-                activeArch = 'all';
-                chips.forEach(c => c.classList.toggle('active', c.dataset.arch === 'all'));
+                // Reset: clear all exclusions
+                excludedArchs.clear();
+                chips.forEach(c => c.classList.add('active'));
             }} else {{
-                // Deactivate "All" chip
-                chips.forEach(c => {{ if (c.dataset.arch === 'all') c.classList.remove('active'); }});
-                if (activeArch === arch) {{
-                    // Toggle off → back to all
-                    activeArch = 'all';
-                    chip.classList.remove('active');
-                    chips.forEach(c => {{ if (c.dataset.arch === 'all') c.classList.add('active'); }});
-                }} else {{
-                    chips.forEach(c => {{ if (c.dataset.arch !== 'all') c.classList.remove('active'); }});
-                    activeArch = arch;
+                if (excludedArchs.has(arch)) {{
+                    // Re-include
+                    excludedArchs.delete(arch);
                     chip.classList.add('active');
+                }} else {{
+                    // Exclude
+                    excludedArchs.add(arch);
+                    chip.classList.remove('active');
                 }}
             }}
+            updateAllChip();
             applyFilters();
         }});
     }});
