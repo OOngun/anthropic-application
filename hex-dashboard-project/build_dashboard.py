@@ -253,11 +253,6 @@ for sid in ALL_SIDS:
         last_active_days=last_active_days,
     ))
 
-# Set deterministic last_active_days
-company_metrics[0]['last_active_days'] = 2   # MedScribe: very active
-company_metrics[1]['last_active_days'] = 5   # Eigen: active
-company_metrics[2]['last_active_days'] = 11  # BuilderKit: somewhat dormant
-
 company_metrics.sort(key=lambda x: x['latest_mrr'], reverse=True)
 
 # ============================================================
@@ -511,16 +506,14 @@ for m in company_metrics:
     sid = m['sid']
     if sid in per_partner_qr: m['avg_qr'] = per_partner_qr[sid]
     if sid in per_partner_gret: m['gross_retention'] = per_partner_gret[sid]
-    # Last active: if generating revenue, they're active today/yesterday
-    # Scale by revenue — high revenue partners are calling the API constantly
-    if m['latest_mrr'] > 5000:
-        m['last_active_days'] = 0  # today
-    elif m['latest_mrr'] > 1000:
-        m['last_active_days'] = 1
+    # Last active: deterministic based on revenue tier
+    # >$1000/mo => 0-2 days, $100-1000 => 1-5 days, churned => 30+
+    if m['latest_mrr'] > 1000:
+        m['last_active_days'] = max(0, min(2, int(2 - m['latest_mrr'] / 20000)))
     elif m['latest_mrr'] > 100:
-        m['last_active_days'] = 3
+        m['last_active_days'] = 1 + int(4 * (1 - (m['latest_mrr'] - 100) / 900))
     elif m['latest_mrr'] > 0:
-        m['last_active_days'] = 7
+        m['last_active_days'] = 10
     else:
         # Churned: find last active month
         u = monthly_usage[monthly_usage['startup_id'] == sid].sort_values('month')
