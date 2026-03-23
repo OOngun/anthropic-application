@@ -1472,7 +1472,46 @@ scoreboard_html = f'''
 # PORTFOLIO CONTENT = Tier 1 + Tier 2 + Growth Scoreboard
 # ============================================================
 
-pulse_content = tier1_html
+# Build top-5 mini-table for Pulse
+top5_rows = ''
+sorted_metrics = sorted(company_metrics, key=lambda m: m['latest_mrr'], reverse=True)[:5]
+for i, m in enumerate(sorted_metrics):
+    sid = m['sid']
+    name = NAMES[sid]
+    rev = m['latest_mrr']
+    devs = m['active_devs']
+    cmgr3_val = m['cmgr3']
+    cmgr_display = f'{cmgr3_val*100:.1f}%' if cmgr3_val is not None else 'n/a'
+    cmgr_color = SUCCESS if cmgr3_val and cmgr3_val > 0.05 else WARNING if cmgr3_val and cmgr3_val > 0 else DANGER
+    top5_rows += f'''<tr class="top5-row" data-sid="{sid}" style="cursor:pointer">
+        <td style="color:{MUTED};font-size:12px;padding:8px 6px">{i+1}</td>
+        <td style="padding:8px 6px;font-weight:600">{name}</td>
+        <td class="num" style="padding:8px 6px">${rev:,.0f}</td>
+        <td class="num" style="padding:8px 6px">{devs}</td>
+        <td class="num" style="padding:8px 6px;color:{cmgr_color}">{cmgr_display}</td>
+    </tr>'''
+
+top5_html = f'''
+<div style="margin-top:28px;border-top:1px solid {GRID};padding-top:20px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px">
+        <div class="panel-title">TOP PARTNERS</div>
+        <a href="#" class="view-all-link" onclick="document.querySelector('[data-tab=partners]').click();return false" style="font-size:12px;color:{ACCENT};text-decoration:none">View all partners &rarr;</a>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:14px">
+        <thead>
+            <tr style="border-bottom:1px solid {GRID}">
+                <th style="text-align:left;padding:6px;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;color:{MUTED};font-weight:600;width:30px">#</th>
+                <th style="text-align:left;padding:6px;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;color:{MUTED};font-weight:600">Company</th>
+                <th style="text-align:right;padding:6px;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;color:{MUTED};font-weight:600">MRR</th>
+                <th style="text-align:right;padding:6px;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;color:{MUTED};font-weight:600">Devs</th>
+                <th style="text-align:right;padding:6px;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;color:{MUTED};font-weight:600">CMGR-3</th>
+            </tr>
+        </thead>
+        <tbody>{top5_rows}</tbody>
+    </table>
+</div>'''
+
+pulse_content = tier1_html + top5_html
 partners_content = f'''{tier2_html}
 {scoreboard_html}'''
 
@@ -1916,7 +1955,7 @@ document.querySelectorAll('.tab').forEach(tab => {{
 }});
 
 // Partner list row click -> Tier 3 detail
-document.querySelectorAll('.perf-row').forEach(row => {{
+document.querySelectorAll('.perf-row, .top5-row').forEach(row => {{
     row.addEventListener('click', () => {{
         const sid = row.dataset.sid;
         if (sid) showPartnerDetail(sid);
