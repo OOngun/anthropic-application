@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Project Status</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:Inter,-apple-system,sans-serif; background:#0f172a; color:#e2e8f0; padding:32px; line-height:1.7; }
+h1 { font-size:22px; font-weight:700; margin-bottom:6px; }
+.subtitle { font-size:14px; color:#64748b; margin-bottom:32px; }
+.section { margin-bottom:32px; }
+.section-title { font-size:14px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:#94a3b8; margin-bottom:14px; padding-bottom:8px; border-bottom:1px solid #1e293b; }
+.item { display:flex; align-items:flex-start; gap:12px; padding:8px 0; font-size:16px; }
+.dot { width:10px; height:10px; border-radius:50%; margin-top:7px; flex-shrink:0; }
+.dot-done { background:#16a34a; }
+.dot-progress { background:#eab308; }
+.dot-todo { background:#3b82f6; }
+.dot-archived { background:#475569; }
+.item-text { flex:1; }
+.item-text.done { color:#64748b; text-decoration:line-through; }
+.item-text.archived { color:#475569; font-style:italic; }
+.tag { font-size:11px; font-weight:600; padding:3px 8px; border-radius:4px; margin-left:8px; vertical-align:middle; }
+.tag-ui { background:rgba(59,130,246,0.15); color:#60a5fa; }
+.tag-data { background:rgba(234,179,8,0.15); color:#eab308; }
+.tag-doc { background:rgba(168,85,247,0.15); color:#c084fc; }
+.tag-fix { background:rgba(239,68,68,0.15); color:#f87171; }
+.branches { margin-top:16px; }
+.branch { font-size:15px; color:#94a3b8; padding:5px 0; font-family:monospace; }
+.branch .active { color:#22c55e; font-weight:600; }
+.priority { font-size:14px; color:#94a3b8; margin-top:20px; padding:16px; background:#1e293b; border-radius:8px; line-height:1.8; }
+.priority strong { color:#e2e8f0; }
+</style>
+</head>
+<body>
+
+<h1>Anthropic EMEA Startup Partnerships</h1>
+<div class="subtitle">Project Status — Dashboard + Analytical Framework</div>
+
+<div class="section">
+<div class="section-title">Done</div>
+<div class="item"><span class="dot dot-done"></span><span class="item-text done">Dashboard spec (DASHBOARD-SPEC.md)</span></div>
+<div class="item"><span class="dot dot-done"></span><span class="item-text done">Strategic framing (credits as CAC play)</span></div>
+<div class="item"><span class="dot dot-done"></span><span class="item-text done">Tribe Capital framework integration</span></div>
+<div class="item"><span class="dot dot-done"></span><span class="item-text done">23 synthetic partners generated (5 archetypes)</span></div>
+<div class="item"><span class="dot dot-done"></span><span class="item-text done">Pulse section (KPI cards + waterfall + GA chart)</span></div>
+<div class="item"><span class="dot dot-done"></span><span class="item-text done">Partner list (color-coded scoreboard)</span></div>
+<div class="item"><span class="dot dot-done"></span><span class="item-text done">Power Law Tracker table</span></div>
+<div class="item"><span class="dot dot-done"></span><span class="item-text done">Per-company detail tabs (basic)</span></div>
+<div class="item"><span class="dot dot-done"></span><span class="item-text done">Developer-level activity data</span></div>
+<div class="item"><span class="dot dot-done"></span><span class="item-text done">5-pass UI/UX improvement loop</span></div>
+<div class="item"><span class="dot dot-done"></span><span class="item-text done">Responsive breakpoints</span></div>
+<div class="item"><span class="dot dot-done"></span><span class="item-text done">Tooltips with formula rendering</span></div>
+<div class="item"><span class="dot dot-done"></span><span class="item-text done">GitHub repo + branches</span></div>
+</div>
+
+<div class="section">
+<div class="section-title">In Progress</div>
+<div class="item"><span class="dot dot-progress"></span><span class="item-text">Analytical framework document <span class="tag tag-doc">DOC</span></span></div>
+</div>
+
+<div class="section">
+<div class="section-title">To Do</div>
+<div class="item"><span class="dot dot-todo"></span><span class="item-text">Fix tab nav: hide company tabs, click-to-drill from partner list <span class="tag tag-ui">UI</span></span></div>
+<div class="item"><span class="dot dot-todo"></span><span class="item-text">Fix GA data integrity (components must sum to total) <span class="tag tag-fix">FIX</span></span></div>
+<div class="item"><span class="dot dot-todo"></span><span class="item-text">LTV heatmap (red-to-blue, cohort sizes per TC style) <span class="tag tag-ui">UI</span></span></div>
+<div class="item"><span class="dot dot-todo"></span><span class="item-text">Per-company cohort retention curves <span class="tag tag-data">DATA</span></span></div>
+<div class="item"><span class="dot dot-todo"></span><span class="item-text">Three case studies (consumer / backend / dev tooling) <span class="tag tag-doc">DOC</span></span></div>
+<div class="item"><span class="dot dot-todo"></span><span class="item-text">Use case tags per partner <span class="tag tag-data">DATA</span></span></div>
+<div class="item"><span class="dot dot-todo"></span><span class="item-text">Sort partner list by revenue (high to low default) <span class="tag tag-fix">FIX</span></span></div>
+<div class="item"><span class="dot dot-todo"></span><span class="item-text">Fix last_active for high-revenue partners <span class="tag tag-fix">FIX</span></span></div>
+<div class="item"><span class="dot dot-todo"></span><span class="item-text">Dev-level gross retention in partner list <span class="tag tag-data">DATA</span></span></div>
+<div class="item"><span class="dot dot-todo"></span><span class="item-text">Remove/shrink credit payback from partner list <span class="tag tag-ui">UI</span></span></div>
+<div class="item"><span class="dot dot-todo"></span><span class="item-text">Chart descriptions below each graph <span class="tag tag-ui">UI</span></span></div>
+<div class="item"><span class="dot dot-todo"></span><span class="item-text">Per-company growth accounting charts (currently empty) <span class="tag tag-fix">FIX</span></span></div>
+</div>
+
+<div class="section">
+<div class="section-title">Archived / Deferred</div>
+<div class="item"><span class="dot dot-archived"></span><span class="item-text archived">Revenue concentration CDF</span></div>
+<div class="item"><span class="dot dot-archived"></span><span class="item-text archived">Partnership milestones</span></div>
+<div class="item"><span class="dot dot-archived"></span><span class="item-text archived">Burn multiple / NRR (no data access)</span></div>
+<div class="item"><span class="dot dot-archived"></span><span class="item-text archived">Partner health score composite</span></div>
+<div class="item"><span class="dot dot-archived"></span><span class="item-text archived">Recommendation engine</span></div>
+<div class="item"><span class="dot dot-archived"></span><span class="item-text archived">Token vs Revenue parallel GA tracks</span></div>
+<div class="item"><span class="dot dot-archived"></span><span class="item-text archived">Volume discount pricing model</span></div>
+<div class="item"><span class="dot dot-archived"></span><span class="item-text archived">Strategic memo ("0 to 1 EMEA program")</span></div>
+<div class="item"><span class="dot dot-archived"></span><span class="item-text archived">Research dossier sections 6-10</span></div>
+</div>
+
+<div class="section branches">
+<div class="section-title">Branches</div>
+<div class="branch">main — stable base</div>
+<div class="branch">feat/tc-restructure-v1-snapshot — preserved</div>
+<div class="branch"><span class="active">feat/three-tier-restructure — active</span></div>
+<div class="branch">feat/2026-03-23-progress — today's snapshot</div>
+</div>
+
+<div class="priority">
+<strong>Next priorities:</strong> 1) Fix tab nav (hide individual tabs) → 2) Write analytical framework document → 3) Three case studies
+</div>
+
+</body>
+</html>

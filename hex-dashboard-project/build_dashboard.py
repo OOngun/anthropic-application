@@ -1472,11 +1472,9 @@ scoreboard_html = f'''
 # PORTFOLIO CONTENT = Tier 1 + Tier 2 + Growth Scoreboard
 # ============================================================
 
-portfolio_content = f'''
-{tier1_html}
-{tier2_html}
-{scoreboard_html}
-'''
+pulse_content = tier1_html
+partners_content = f'''{tier2_html}
+{scoreboard_html}'''
 
 # ============================================================
 # ASSEMBLE HTML
@@ -1514,6 +1512,9 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .tab:hover {{ color:{DIM}; }}
 .tab.active {{ color:{TEXT}; border-bottom-color:{ACCENT}; font-weight:600; }}
 .tab .dot {{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; vertical-align:middle; }}
+.tab-detail {{ font-weight:600; }}
+.tab-detail .detail-back {{ color:{ACCENT}; margin-right:4px; }}
+.tab-detail:hover .detail-back {{ color:{TEXT}; }}
 
 .content {{ padding:28px 32px; }}
 .tab-panel {{ display:none; }}
@@ -1772,15 +1773,21 @@ html {{ scroll-behavior:smooth; }}
 </div>
 
 <div class="tabs">
-    <div class="tab active" data-tab="portfolio">Pulse</div>
-    {''.join(f'<div class="tab" data-tab="{sid.lower()}"><span class="dot" style="background:{COLORS[sid]}"></span>{NAMES[sid]}</div>' for sid in ALL_SIDS)}
+    <div class="tab active" data-tab="pulse">Pulse</div>
+    <div class="tab" data-tab="partners">Partners</div>
+    <div class="tab tab-detail" data-tab="detail" style="display:none"><span class="detail-back">&larr;</span> <span class="detail-name"></span></div>
 </div>
 
 <div class="content">
-    <div class="tab-panel active" id="panel-portfolio">
-        {portfolio_content}
+    <div class="tab-panel active" id="panel-pulse">
+        {pulse_content}
     </div>
-    {''.join(f'<div class="tab-panel" id="panel-{sid.lower()}">{startup_tab_html(sid)}</div>' for sid in ALL_SIDS)}
+    <div class="tab-panel" id="panel-partners">
+        {partners_content}
+    </div>
+    <div class="tab-panel" id="panel-detail">
+        {''.join(f'<div class="detail-view" id="detail-{sid.lower()}" style="display:none">{startup_tab_html(sid)}</div>' for sid in ALL_SIDS)}
+    </div>
 </div>
 
 <script>
@@ -1858,25 +1865,61 @@ document.querySelectorAll('.mode-tabs').forEach(tabGroup => {{
     }});
 }});
 
-// Tab switching
-document.querySelectorAll('.tab').forEach(tab => {{
-    tab.addEventListener('click', () => {{
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-        tab.classList.add('active');
-        const panel = document.getElementById('panel-' + tab.dataset.tab);
+// ======== THREE-TIER TAB NAVIGATION ========
+function showPanel(tabName) {{
+    document.querySelectorAll('.tab').forEach(t => {{
+        if (t.dataset.tab === tabName) t.classList.add('active');
+        else t.classList.remove('active');
+    }});
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    const panel = document.getElementById('panel-' + tabName);
+    if (panel) {{
         panel.classList.add('active');
         setTimeout(() => resizePlotlyCharts(panel), 80);
-        window.scrollTo({{ top: 0, behavior: 'smooth' }});
+    }}
+    window.scrollTo({{ top: 0, behavior: 'smooth' }});
+}}
+
+function showPartnerDetail(sid) {{
+    const detailTab = document.querySelector('.tab-detail');
+    const detailName = detailTab.querySelector('.detail-name');
+    // Hide all detail views, show the selected one
+    document.querySelectorAll('.detail-view').forEach(v => v.style.display = 'none');
+    const view = document.getElementById('detail-' + sid.toLowerCase());
+    if (view) {{
+        view.style.display = 'block';
+        const name = view.querySelector('.hero-name');
+        detailName.textContent = name ? name.textContent : sid;
+    }}
+    detailTab.style.display = '';
+    showPanel('detail');
+    setTimeout(() => {{
+        const panel = document.getElementById('panel-detail');
+        resizePlotlyCharts(panel);
+    }}, 120);
+}}
+
+// Top-level tab clicks
+document.querySelectorAll('.tab').forEach(tab => {{
+    tab.addEventListener('click', (e) => {{
+        const tabName = tab.dataset.tab;
+        if (tabName === 'detail') {{
+            // Back button: go to Partners
+            showPanel('partners');
+            tab.style.display = 'none';
+            return;
+        }}
+        // Hide detail tab when switching to Pulse or Partners
+        document.querySelector('.tab-detail').style.display = 'none';
+        showPanel(tabName);
     }});
 }});
 
-// Table row click -> navigate to company tab
+// Partner list row click -> Tier 3 detail
 document.querySelectorAll('.perf-row').forEach(row => {{
     row.addEventListener('click', () => {{
-        const sid = row.dataset.sid.toLowerCase();
-        const tab = document.querySelector('[data-tab="' + sid + '"]');
-        if (tab) tab.click();
+        const sid = row.dataset.sid;
+        if (sid) showPartnerDetail(sid);
     }});
 }});
 
