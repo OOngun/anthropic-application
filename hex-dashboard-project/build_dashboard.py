@@ -250,7 +250,7 @@ company_metrics[0]['last_active_days'] = 2   # MedScribe: very active
 company_metrics[1]['last_active_days'] = 5   # Eigen: active
 company_metrics[2]['last_active_days'] = 11  # BuilderKit: somewhat dormant
 
-company_metrics.sort(key=lambda x: x['cmgr3'] or 0, reverse=True)
+company_metrics.sort(key=lambda x: x['latest_mrr'], reverse=True)
 
 # ============================================================
 # CMGR COMPUTATION (Tier 1)
