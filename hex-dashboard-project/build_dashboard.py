@@ -274,13 +274,154 @@ cmgr12 = cmgr(portfolio_tokens, 12)
 # TIER 1 DATA: WATERFALL, METRIC CARDS
 # ============================================================
 
-# === COMPUTE GA FROM DEVELOPER-LEVEL ACTIVITY DATA ===
-# Developer-level granularity gives realistic GA decomposition:
-# ~85% retained, 3% new, 20% expansion, 12% churned, 3% contraction
-# Matches Tribe Capital's typical SaaS GA patterns.
+# === REGENERATE DEVELOPER-LEVEL ACTIVITY DATA ===
+# Staggered onboarding: devs join gradually across months, not all at once.
+# Archetype-aware: star/strong accelerate, declining/churned lose devs.
 
-dev_activity = pd.read_csv(f'{OUTPUT_DIR}/developer_activity.csv')
+np.random.seed(2024)
+_archetype_map = dict(zip(startups['startup_id'], startups['archetype']))
+
+_dev_rows = []
+for sid in ALL_SIDS:
+    u = monthly_usage[monthly_usage['startup_id'] == sid].sort_values('month')
+    months = u['month'].tolist()
+    rev_vals = u['revenue_usd'].values
+    dev_counts = u['active_developers'].astype(int).values
+    arch = _archetype_map.get(sid, 'fine')
+    n_months = len(months)
+
+    # Decide total unique developers and onboarding schedule
+    total_devs_ever = max(int(max(dev_counts) * 1.4), 2)
+
+    # Build per-month onboarding count: stagger across months
+    onboard_schedule = np.zeros(n_months, dtype=int)
+
+    if arch in ('star', 'rocket'):
+        # Accelerating: more devs join in later months
+        weights = np.array([(i + 1) ** 1.5 for i in range(n_months)], dtype=float)
+    elif arch == 'strong':
+        # Steady growth with slight acceleration
+        weights = np.array([(i + 1) ** 1.0 for i in range(n_months)], dtype=float)
+    elif arch == 'steady':
+        # Flat-ish onboarding
+        weights = np.ones(n_months, dtype=float)
+        weights[:3] = 1.5  # front-load slightly
+    elif arch in ('declining',):
+        # Most onboarding early, then stops
+        weights = np.array([max(n_months - i, 0) ** 2 for i in range(n_months)], dtype=float)
+        weights[n_months // 2:] = 0  # no onboarding in second half
+    elif arch == 'churned':
+        # All onboarding in first 40% of period
+        cutoff = max(int(n_months * 0.4), 2)
+        weights = np.zeros(n_months, dtype=float)
+        weights[:cutoff] = np.array([max(cutoff - i, 0) for i in range(cutoff)], dtype=float)
+    elif arch == 'minimal':
+        # 1-2 devs total, all early
+        total_devs_ever = min(total_devs_ever, 2)
+        weights = np.zeros(n_months, dtype=float)
+        weights[0] = 1.0
+    else:
+        # fine: steady onboarding
+        weights = np.ones(n_months, dtype=float)
+
+    if weights.sum() > 0:
+        weights = weights / weights.sum()
+    else:
+        weights[0] = 1.0
+
+    # Distribute devs across months
+    for d in range(total_devs_ever):
+        month_idx = np.random.choice(n_months, p=weights)
+        onboard_schedule[month_idx] += 1
+
+    # Ensure at least 1 dev in month 0
+    if onboard_schedule[0] == 0 and total_devs_ever > 0:
+        # Move one from the most populated month
+        max_idx = np.argmax(onboard_schedule)
+        if onboard_schedule[max_idx] > 0:
+            onboard_schedule[max_idx] -= 1
+            onboard_schedule[0] += 1
+
+    # Create dev objects with onboarding month
+    dev_pool = []
+    dev_counter = 0
+    for mi in range(n_months):
+        for _ in range(onboard_schedule[mi]):
+            dev_counter += 1
+            dev_pool.append({'dev_id': f'{sid}_d{dev_counter}', 'start_month_idx': mi})
+
+    # For each month, decide which devs are active and their revenue
+    for mi in range(n_months):
+        target_active = dev_counts[mi]
+        target_rev = rev_vals[mi]
+
+        if target_active == 0 or target_rev <= 0:
+            continue
+
+        # Eligible devs: those who have onboarded by this month
+        eligible = [d for d in dev_pool if d['start_month_idx'] <= mi]
+        if not eligible:
+            continue
+
+        # Retention logic: newer devs and in churned/declining archetypes, higher churn
+        active_devs = []
+        for d in eligible:
+            tenure = mi - d['start_month_idx']
+            if arch == 'churned':
+                # After halfway point, devs start leaving rapidly
+                if mi > n_months * 0.5:
+                    churn_prob = min(0.3 + 0.05 * (mi - n_months * 0.5), 0.95)
+                    if np.random.random() < churn_prob:
+                        continue
+            elif arch == 'declining':
+                if mi > n_months * 0.4:
+                    churn_prob = min(0.1 + 0.02 * (mi - n_months * 0.4), 0.6)
+                    if np.random.random() < churn_prob:
+                        continue
+            else:
+                # Normal churn: ~5% per month for tenured devs
+                if tenure > 0 and np.random.random() < 0.05:
+                    continue
+            active_devs.append(d)
+
+        # Trim or pad to match target_active
+        if len(active_devs) > target_active:
+            # Drop newest devs first
+            active_devs.sort(key=lambda d: d['start_month_idx'])
+            active_devs = active_devs[:target_active]
+        elif len(active_devs) < target_active:
+            # Might have fewer eligible; that's ok, use what we have
+            pass
+
+        if not active_devs:
+            continue
+
+        # Distribute revenue: power-law distribution (some devs generate more)
+        n_active = len(active_devs)
+        # Zipf-like weights: dev 1 gets most revenue, dev n gets least
+        raw_weights = np.array([1.0 / (i + 1) ** 0.7 for i in range(n_active)])
+        raw_weights = raw_weights / raw_weights.sum() * target_rev
+
+        # Shuffle to avoid always giving most to earliest dev
+        np.random.shuffle(active_devs)
+
+        for i, d in enumerate(active_devs):
+            rev = round(max(raw_weights[i] + np.random.normal(0, raw_weights[i] * 0.1), 0.01), 2)
+            _dev_rows.append({
+                'dev_id': d['dev_id'], 'startup_id': sid,
+                'month': months[mi].strftime('%Y-%m-%d'), 'revenue': rev
+            })
+
+import csv
+_dev_csv_path = f'{OUTPUT_DIR}/developer_activity.csv'
+with open(_dev_csv_path, 'w', newline='') as f:
+    w = csv.DictWriter(f, fieldnames=['dev_id', 'startup_id', 'month', 'revenue'])
+    w.writeheader()
+    w.writerows(_dev_rows)
+
+dev_activity = pd.DataFrame(_dev_rows)
 dev_activity['month'] = pd.to_datetime(dev_activity['month'])
+dev_activity['revenue'] = dev_activity['revenue'].astype(float)
 months_sorted = sorted(dev_activity['month'].unique())
 first_dev_month = dev_activity.groupby('dev_id')['month'].min().to_dict()
 
