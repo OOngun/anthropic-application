@@ -754,17 +754,35 @@ for sid in ALL_SIDS:
         f.update_xaxes(title_text='Months since cohort start')
         charts['dev_retention'] = to_div(f)
 
-    # Cohort LTV for this company (simple cumulative line)
-    cd_s = cohort_df[cohort_df['startup_id'] == sid].sort_values('months_since')
-    if len(cd_s) > 0:
-        cum_rev = cd_s['revenue'].cumsum()
+    # Cohort LTV curves (multiple lines, one per onboarding month)
+    _d_dev_ltv = dev_activity[dev_activity['startup_id'] == sid].copy()
+    if len(_d_dev_ltv) > 5:
+        _first_dev_m_ltv = _d_dev_ltv.groupby('dev_id')['month'].min().reset_index()
+        _first_dev_m_ltv.columns = ['dev_id', 'first_month']
+        _d_dev_ltv = _d_dev_ltv.merge(_first_dev_m_ltv, on='dev_id')
+        _d_dev_ltv['age'] = ((_d_dev_ltv['month'] - _d_dev_ltv['first_month']).dt.days / 30.44).round().astype(int)
+        _cohort_sizes_ltv = _d_dev_ltv.groupby('first_month')['dev_id'].nunique().reset_index()
+        _cohort_sizes_ltv.columns = ['first_month', 'cohort_size']
+        _cohort_agg_ltv = _d_dev_ltv.groupby(['first_month', 'age'])['revenue'].sum().reset_index()
+        _cohort_agg_ltv = _cohort_agg_ltv.merge(_cohort_sizes_ltv, on='first_month')
+        _cohort_agg_ltv['cum_rev'] = _cohort_agg_ltv.groupby('first_month')['revenue'].cumsum()
+        _cohort_agg_ltv['cum_ltv_per_dev'] = _cohort_agg_ltv['cum_rev'] / _cohort_agg_ltv['cohort_size']
+        _ltv_cohorts = sorted(_cohort_agg_ltv['first_month'].unique())
+        # Color gradient for cohorts: early = light, late = dark
+        _n_coh = len(_ltv_cohorts)
+        _coh_colors = [f'rgba({int(71 + (180 - 71) * i / max(_n_coh - 1, 1))},{int(45 + (140 - 45) * i / max(_n_coh - 1, 1))},{int(123 + (200 - 123) * i / max(_n_coh - 1, 1))},0.7)' for i in range(_n_coh)]
         f = go.Figure()
-        f.add_trace(go.Scatter(x=cd_s['months_since'], y=cum_rev,
-            mode='lines', line=dict(color=COLORS[sid], width=2.5), showlegend=False,
-            hovertemplate='Month %{x}: $%{y:,.0f}<extra></extra>'))
-        f.update_layout(**layout('Cumulative LTV'))
+        for ci, fm in enumerate(_ltv_cohorts):
+            coh = _cohort_agg_ltv[_cohort_agg_ltv['first_month'] == fm].sort_values('age')
+            if len(coh) < 2:
+                continue
+            f.add_trace(go.Scatter(x=coh['age'], y=coh['cum_ltv_per_dev'],
+                mode='lines', name=fm.strftime('%Y-%m'),
+                line=dict(width=2, color=_coh_colors[ci]),
+                hovertemplate=f'{fm.strftime("%Y-%m")}<br>Age %{{x}}: $%{{y:,.0f}}/dev<extra></extra>'))
+        f.update_layout(**layout('Cumulative LTV per Developer by Cohort'))
         f.update_yaxes(tickprefix='$', tickformat=',')
-        f.update_xaxes(title_text='Months since onboarding')
+        f.update_xaxes(title_text='Months since cohort start')
         charts['ltv_curve'] = to_div(f)
 
     # === LTV HEATMAP (Tribe Capital style: red-to-blue, cohort sizes) ===
@@ -896,28 +914,8 @@ for sid in ALL_SIDS:
         fig_ret_hm.update_yaxes(autorange='reversed', row=1, col=1)
         charts['retention_heatmap'] = to_div(fig_ret_hm, f'ret-hm-{sid}')
 
-    # LTV Heatmap (per-company, single row — show as heatmap with cohort months)
-    ltv_vals = cd_s['revenue'].cumsum().values.tolist() if len(cd_s) > 0 else []
-    n_m = len(ltv_vals)
-    # Text annotations
-    ltv_text = []
-    for v in ltv_vals:
-        if v >= 1000:
-            ltv_text.append(f'{v/1000:.1f}k')
-        else:
-            ltv_text.append(f'{v:.0f}')
-
-    f = go.Figure(data=go.Heatmap(
-        z=[ltv_vals], x=[f'M{i}' for i in range(n_m)], y=[NAMES[sid]],
-        colorscale=[[0, '#d73027'], [0.25, '#f46d43'], [0.5, '#ffffbf'], [0.75, '#4575b4'], [1, '#313695']],
-        hovertemplate='Month %{x}: $%{z:,.0f}<extra></extra>',
-        colorbar=dict(title='LTV ($)', tickprefix='$', tickformat=','),
-        text=[ltv_text], texttemplate='%{text}', textfont=dict(size=10),
-    ))
-    f.update_layout(**layout('Cumulative LTV Heatmap', h=160))
-    charts['ltv_heatmap'] = to_div(f)
-
     # Revenue retention
+    cd_s = cohort_df[cohort_df['startup_id'] == sid].sort_values('months_since')
     if len(cd_s) > 0:
         f = go.Figure()
         f.add_trace(go.Scatter(x=cd_s['months_since'], y=cd_s['rev_retention'],
