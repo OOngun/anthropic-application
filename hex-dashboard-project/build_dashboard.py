@@ -584,7 +584,7 @@ for sid in ALL_SIDS:
         f.update_xaxes(title_text='Months since cohort start')
         charts['dev_retention'] = to_div(f)
 
-    # Cohort LTV for this company
+    # Cohort LTV for this company (simple cumulative line)
     cd_s = cohort_df[cohort_df['startup_id'] == sid].sort_values('months_since')
     if len(cd_s) > 0:
         cum_rev = cd_s['revenue'].cumsum()
@@ -596,6 +596,135 @@ for sid in ALL_SIDS:
         f.update_yaxes(tickprefix='$', tickformat=',')
         f.update_xaxes(title_text='Months since onboarding')
         charts['ltv_curve'] = to_div(f)
+
+    # === LTV HEATMAP (Tribe Capital style: red-to-blue, cohort sizes) ===
+    d_dev = dev_activity[dev_activity['startup_id'] == sid].copy()
+    if len(d_dev) > 5:
+        first_dev_m = d_dev.groupby('dev_id')['month'].min().reset_index()
+        first_dev_m.columns = ['dev_id', 'first_month']
+        d_dev = d_dev.merge(first_dev_m, on='dev_id')
+        d_dev['age'] = ((d_dev['month'] - d_dev['first_month']).dt.days / 30.44).round().astype(int)
+
+        cohort_sizes_local = d_dev.groupby('first_month')['dev_id'].nunique().reset_index()
+        cohort_sizes_local.columns = ['first_month', 'cohort_size']
+
+        # Cumulative LTV per dev per cohort at each age
+        cohort_agg = d_dev.groupby(['first_month', 'age']).agg(
+            active=('dev_id', 'nunique'), rev=('revenue', 'sum')
+        ).reset_index()
+        cohort_agg = cohort_agg.merge(cohort_sizes_local, on='first_month')
+        cohort_agg['cum_rev'] = cohort_agg.groupby('first_month')['rev'].cumsum()
+        cohort_agg['cum_ltv'] = cohort_agg['cum_rev'] / cohort_agg['cohort_size']
+        cohort_agg['retention'] = cohort_agg['active'] / cohort_agg['cohort_size'] * 100
+
+        # Build heatmap matrix for LTV
+        cohorts_sorted = sorted(cohort_agg['first_month'].unique())
+        max_age = int(cohort_agg['age'].max())
+        ltv_matrix = []
+        ret_matrix = []
+        cohort_labels = []
+        cohort_size_vals = []
+
+        for fm in cohorts_sorted:
+            c = cohort_agg[cohort_agg['first_month'] == fm].set_index('age')
+            cs = cohort_sizes_local[cohort_sizes_local['first_month'] == fm]['cohort_size'].iloc[0]
+            ltv_row = []
+            ret_row = []
+            for a in range(max_age + 1):
+                if a in c.index:
+                    ltv_row.append(round(c.loc[a, 'cum_ltv'], 0))
+                    ret_row.append(round(c.loc[a, 'retention'], 1))
+                else:
+                    ltv_row.append(None)
+                    ret_row.append(None)
+            ltv_matrix.append(ltv_row)
+            ret_matrix.append(ret_row)
+            cohort_labels.append(fm.strftime('%Y-%m'))
+            cohort_size_vals.append(cs)
+
+        # LTV Heatmap
+        import plotly.graph_objects as go
+        from plotly.subplots import make_subplots
+
+        fig_ltv_hm = make_subplots(rows=1, cols=2, column_widths=[0.12, 0.88],
+            shared_yaxes=True, horizontal_spacing=0.02)
+
+        # Cohort size bars (left)
+        fig_ltv_hm.add_trace(go.Bar(
+            y=cohort_labels, x=cohort_size_vals, orientation='h',
+            marker_color='#94a3b8', showlegend=False,
+            hovertemplate='%{y}: %{x} devs<extra></extra>'
+        ), row=1, col=1)
+
+        # Text annotations for heatmap cells
+        text_matrix = []
+        for row in ltv_matrix:
+            text_row = []
+            for v in row:
+                if v is None:
+                    text_row.append('')
+                elif v >= 1000:
+                    text_row.append(f'{v/1000:.1f}k')
+                else:
+                    text_row.append(f'{v:.0f}')
+            text_matrix.append(text_row)
+
+        # LTV heatmap (right) — red to blue
+        fig_ltv_hm.add_trace(go.Heatmap(
+            z=ltv_matrix, x=list(range(max_age + 1)), y=cohort_labels,
+            text=text_matrix, texttemplate='%{text}', textfont=dict(size=9),
+            colorscale=[[0, '#DC2626'], [0.25, '#F87171'], [0.5, '#FAFAFA'],
+                        [0.75, '#60A5FA'], [1, '#1D4ED8']],
+            showscale=True, colorbar=dict(title='LTV', tickprefix='$', len=0.8),
+            hovertemplate='Cohort %{y}<br>Period %{x}<br>LTV: $%{z:,.0f}<extra></extra>',
+            zmin=0
+        ), row=1, col=2)
+
+        fig_ltv_hm.update_layout(
+            height=max(300, len(cohorts_sorted) * 28 + 80),
+            margin=dict(t=40, b=40, l=10, r=10),
+            paper_bgcolor='white', plot_bgcolor='white',
+            title=dict(text='LTV by Cohort', font=dict(size=14)),
+            font=dict(family='Inter, sans-serif', size=11)
+        )
+        fig_ltv_hm.update_xaxes(title_text='cohort size', row=1, col=1, showticklabels=False)
+        fig_ltv_hm.update_xaxes(title_text='period', row=1, col=2)
+        fig_ltv_hm.update_yaxes(autorange='reversed', row=1, col=1)
+        charts['ltv_heatmap'] = to_div(fig_ltv_hm, f'ltv-hm-{sid}')
+
+        # Retention Heatmap (same structure, green-to-red)
+        ret_text = []
+        for row in ret_matrix:
+            ret_text.append([f'{v:.0f}%' if v is not None else '' for v in row])
+
+        fig_ret_hm = make_subplots(rows=1, cols=2, column_widths=[0.12, 0.88],
+            shared_yaxes=True, horizontal_spacing=0.02)
+
+        fig_ret_hm.add_trace(go.Bar(
+            y=cohort_labels, x=cohort_size_vals, orientation='h',
+            marker_color='#94a3b8', showlegend=False
+        ), row=1, col=1)
+
+        fig_ret_hm.add_trace(go.Heatmap(
+            z=ret_matrix, x=list(range(max_age + 1)), y=cohort_labels,
+            text=ret_text, texttemplate='%{text}', textfont=dict(size=9),
+            colorscale=[[0, '#DC2626'], [0.5, '#FBBF24'], [1, '#16A34A']],
+            showscale=True, colorbar=dict(title='Ret %', ticksuffix='%', len=0.8),
+            hovertemplate='Cohort %{y}<br>Period %{x}<br>Retention: %{z:.0f}%<extra></extra>',
+            zmin=0, zmax=100
+        ), row=1, col=2)
+
+        fig_ret_hm.update_layout(
+            height=max(300, len(cohorts_sorted) * 28 + 80),
+            margin=dict(t=40, b=40, l=10, r=10),
+            paper_bgcolor='white', plot_bgcolor='white',
+            title=dict(text='Developer Retention by Cohort', font=dict(size=14)),
+            font=dict(family='Inter, sans-serif', size=11)
+        )
+        fig_ret_hm.update_xaxes(title_text='cohort size', row=1, col=1, showticklabels=False)
+        fig_ret_hm.update_xaxes(title_text='period', row=1, col=2)
+        fig_ret_hm.update_yaxes(autorange='reversed', row=1, col=1)
+        charts['retention_heatmap'] = to_div(fig_ret_hm, f'ret-hm-{sid}')
 
     # LTV Heatmap (per-company, single row — show as heatmap with cohort months)
     ltv_vals = cd_s['revenue'].cumsum().values.tolist() if len(cd_s) > 0 else []
@@ -1141,17 +1270,16 @@ def startup_tab_html(sid):
         </div>
         <div class="analysis-body">
             <div class="mode-tabs" data-section="{sid}-cohorts">
-                <div class="mode-tab active" data-mode="ltv">LTV Curve</div>
-                <div class="mode-tab" data-mode="ltv-heat">LTV Heatmap</div>
+                {'<div class="mode-tab active" data-mode="ltv-heat">LTV Heatmap</div>' if 'ltv_heatmap' in ch else '<div class="mode-tab active" data-mode="ltv">LTV Curve</div>'}
+                {'<div class="mode-tab" data-mode="ltv">LTV Curve</div>' if 'ltv_heatmap' in ch else ''}
+                {'<div class="mode-tab" data-mode="ltv-heat">LTV Heatmap</div>' if 'ltv_heatmap' not in ch else ''}
+                {'<div class="mode-tab" data-mode="ret-heat">Retention Heatmap</div>' if 'retention_heatmap' in ch else ''}
                 {'<div class="mode-tab" data-mode="rev-ret">Revenue Retention</div>' if 'rev_retention' in ch else ''}
                 {'<div class="mode-tab" data-mode="gross-ret">Gross Retention</div>' if 'gross_ret' in ch else ''}
             </div>
-            <div class="mode-panel active" data-mode="ltv">
-                <div class="row-1"><div class="card">{ch.get('ltv_curve', '')}</div></div>
-            </div>
-            <div class="mode-panel" data-mode="ltv-heat">
-                <div class="row-1"><div class="card">{ch.get('ltv_heatmap', '')}</div></div>
-            </div>
+            {'<div class="mode-panel active" data-mode="ltv-heat"><div class="row-1"><div class="card">' + ch['ltv_heatmap'] + '</div></div></div>' if 'ltv_heatmap' in ch else '<div class="mode-panel active" data-mode="ltv"><div class="row-1"><div class="card">' + ch.get('ltv_curve', '') + '</div></div></div>'}
+            {'<div class="mode-panel" data-mode="ltv"><div class="row-1"><div class="card">' + ch.get('ltv_curve', '') + '</div></div></div>' if 'ltv_heatmap' in ch else ''}
+            {'<div class="mode-panel" data-mode="ret-heat"><div class="row-1"><div class="card">' + ch['retention_heatmap'] + '</div></div></div>' if 'retention_heatmap' in ch else ''}
             {'<div class="mode-panel" data-mode="rev-ret"><div class="row-1"><div class="card">' + ch['rev_retention'] + '</div></div></div>' if 'rev_retention' in ch else ''}
             {'<div class="mode-panel" data-mode="gross-ret"><div class="row-1"><div class="card">' + ch['gross_ret'] + '</div></div></div>' if 'gross_ret' in ch else ''}
         </div>
