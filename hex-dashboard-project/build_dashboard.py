@@ -143,6 +143,14 @@ GAIN = '#1D9E75'
 LOSS = '#D85A30'
 CMGR_BLUE = '#3B6BE0'
 
+# Canonical GA colors (shared across Pulse and company detail)
+GA_NEW = GAIN           # #1D9E75
+GA_RETAINED = '#94a3b8'
+GA_EXPANSION = '#34d399'
+GA_RESURRECTED = '#6ee7b7'
+GA_CONTRACTION = '#fb923c'
+GA_CHURNED = LOSS       # #D85A30
+
 # ============================================================
 # COMPUTE PER-COMPANY METRICS
 # ============================================================
@@ -707,13 +715,14 @@ for sid in ALL_SIDS:
     f.update_yaxes(ticksuffix='%', range=[0, 100])
     charts['model_mix'] = to_div(f)
 
-    # Growth Accounting (revenue)
+    # Growth Accounting (revenue) — uses canonical GA colors matching Pulse
     f = go.Figure()
-    f.add_trace(go.Bar(x=d_ga['month'], y=d_ga['new_revenue'], name='New', marker_color=SUCCESS))
-    f.add_trace(go.Bar(x=d_ga['month'], y=d_ga['expansion_revenue'], name='Expansion', marker_color=MODEL_COLORS['sonnet']))
-    f.add_trace(go.Bar(x=d_ga['month'], y=d_ga['resurrected_revenue'], name='Resurrected', marker_color='#5EC962'))
-    f.add_trace(go.Bar(x=d_ga['month'], y=-d_ga['churned_revenue'], name='Churned', marker_color=DANGER))
-    f.add_trace(go.Bar(x=d_ga['month'], y=-d_ga['contraction_revenue'], name='Contraction', marker_color=WARNING))
+    f.add_trace(go.Bar(x=d_ga['month'], y=d_ga['retained_revenue'], name='Retained', marker_color=GA_RETAINED, opacity=0.5))
+    f.add_trace(go.Bar(x=d_ga['month'], y=d_ga['new_revenue'], name='New', marker_color=GA_NEW))
+    f.add_trace(go.Bar(x=d_ga['month'], y=d_ga['expansion_revenue'], name='Expansion', marker_color=GA_EXPANSION))
+    f.add_trace(go.Bar(x=d_ga['month'], y=d_ga['resurrected_revenue'], name='Resurrected', marker_color=GA_RESURRECTED))
+    f.add_trace(go.Bar(x=d_ga['month'], y=-d_ga['contraction_revenue'], name='Contraction', marker_color=GA_CONTRACTION))
+    f.add_trace(go.Bar(x=d_ga['month'], y=-d_ga['churned_revenue'], name='Churned', marker_color=GA_CHURNED))
     f.update_layout(**layout('Spend Growth Accounting'), barmode='relative')
     f.update_yaxes(tickprefix='$', tickformat=',')
     charts['growth_acct'] = to_div(f)
@@ -1029,19 +1038,19 @@ def wf_bar(label, pct, avg_pct, color, is_loss=False):
 
 fig_ga_cmgr = go.Figure()
 
-# GA bars — gains above axis, losses below
+# GA bars — gains above axis, losses below (canonical GA colors)
 fig_ga_cmgr.add_trace(go.Bar(x=agg_rev_ga['month'], y=agg_rev_ga['retained_revenue'], name='Retained',
-    marker_color='#94a3b8', opacity=0.5, hovertemplate='Retained: $%{y:,.0f}<extra></extra>'))
+    marker_color=GA_RETAINED, opacity=0.5, hovertemplate='Retained: $%{y:,.0f}<extra></extra>'))
 fig_ga_cmgr.add_trace(go.Bar(x=agg_rev_ga['month'], y=agg_rev_ga['new_revenue'], name='New',
-    marker_color=GAIN, hovertemplate='New: $%{y:,.0f}<extra></extra>'))
+    marker_color=GA_NEW, hovertemplate='New: $%{y:,.0f}<extra></extra>'))
 fig_ga_cmgr.add_trace(go.Bar(x=agg_rev_ga['month'], y=agg_rev_ga['expansion_revenue'], name='Expansion',
-    marker_color='#34d399', hovertemplate='Expansion: $%{y:,.0f}<extra></extra>'))
+    marker_color=GA_EXPANSION, hovertemplate='Expansion: $%{y:,.0f}<extra></extra>'))
 fig_ga_cmgr.add_trace(go.Bar(x=agg_rev_ga['month'], y=agg_rev_ga['resurrected_revenue'], name='Resurrected',
-    marker_color='#6ee7b7', hovertemplate='Resurrected: $%{y:,.0f}<extra></extra>'))
+    marker_color=GA_RESURRECTED, hovertemplate='Resurrected: $%{y:,.0f}<extra></extra>'))
 fig_ga_cmgr.add_trace(go.Bar(x=agg_rev_ga['month'], y=-agg_rev_ga['contraction_revenue'], name='Contraction',
-    marker_color='#fb923c', hovertemplate='Contraction: -$%{y:,.0f}<extra></extra>'))
+    marker_color=GA_CONTRACTION, hovertemplate='Contraction: -$%{y:,.0f}<extra></extra>'))
 fig_ga_cmgr.add_trace(go.Bar(x=agg_rev_ga['month'], y=-agg_rev_ga['churned_revenue'], name='Churned',
-    marker_color=LOSS, hovertemplate='Churned: -$%{y:,.0f}<extra></extra>'))
+    marker_color=GA_CHURNED, hovertemplate='Churned: -$%{y:,.0f}<extra></extra>'))
 
 # CMGR trailing lines on secondary y-axis
 # Compute rolling CMGR at each month
