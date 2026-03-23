@@ -1652,6 +1652,102 @@ partners_content = f'''{tier2_html}
 {scoreboard_html}'''
 
 # ============================================================
+# CASE STUDIES CONTENT
+# ============================================================
+CASE_STUDIES = [
+    {
+        'sid': 'CS01', 'name': 'WriteFlow', 'type': 'Customer-Facing',
+        'type_color': '#8B5CF6',
+        'tagline': 'AI Writing Assistant',
+        'stage': 'Series A', 'hq': 'London, UK',
+        'summary': 'Browser-based writing assistant — users draft emails, blog posts, social copy. Freemium + Pro ($12/mo). Every "Generate" click is an API call. Usage scales with consumer adoption.',
+        'model_mix': 'Haiku 56% · Sonnet 31% · Opus 13%',
+        'expected_ga': 'High churn, high new + resurrected. Volatile Quick Ratio (1.5–2.5×). Consumer behaviour drives seasonality — exam spikes, holiday dips, viral surges.',
+        'what_to_watch': 'Churn rate vs new acquisition rate. If churn exceeds new for 2+ months, the product is losing PMF. Model mix shift toward Sonnet signals premium feature adoption.'
+    },
+    {
+        'sid': 'CS02', 'name': 'FinLedger', 'type': 'Developer Tooling',
+        'type_color': '#0EA5E9',
+        'tagline': 'Internal Engineering Use (Fintech)',
+        'stage': 'Seed', 'hq': 'Berlin, Germany',
+        'summary': 'Accounting automation startup. Their product isn\'t AI — but their 4 engineers use Claude daily for code review, test generation, and docs. API keys = engineers.',
+        'model_mix': 'Sonnet 64% · Haiku 21% · Opus 15%',
+        'expected_ga': 'Very high retention (95%+), minimal churn (only if an engineer leaves). Near-zero new (only on hire). Expansion from adding use cases, not users. QR > 3× but slow-moving.',
+        'what_to_watch': 'Step-function jumps = new use case adopted. Flat line = stable but no deepening. Any churn at all is a signal (small team, losing 1 of 4 devs is 25% churn).'
+    },
+    {
+        'sid': 'CS03', 'name': 'BrieflyAI', 'type': 'B2B Embedded',
+        'type_color': '#F59E0B',
+        'tagline': 'Meeting Summarisation Platform',
+        'stage': 'Series A', 'hq': 'Amsterdam, Netherlands',
+        'summary': 'Records and transcribes meetings, Claude generates structured summaries with action items. Sold per-seat to enterprises. 45 clients, 3K meetings/week.',
+        'model_mix': 'Sonnet 72% · Opus 16% · Haiku 11%',
+        'expected_ga': 'High retained revenue, step-function expansion (new client wins), very low churn (sticky B2B contracts). Super-linear LTV as clients add seats. QR 3–5×.',
+        'what_to_watch': 'Client acquisition cadence — are step-functions getting bigger or smaller? Model mix trending Opus = handling more complex meetings. Any churn cliff = lost enterprise client, investigate immediately.'
+    }
+]
+
+cs_cards_html = ''
+for cs in CASE_STUDIES:
+    sid = cs['sid']
+    ch = startup_charts.get(sid, {})
+    m = next((x for x in company_metrics if x['sid'] == sid), None)
+
+    # Get GA chart if available
+    ga_chart_html = f'<div class="card">{ch["growth_acct"]}</div>' if 'growth_acct' in ch else ''
+
+    # Revenue chart
+    rev_chart_html = f'<div class="card">{ch["revenue"]}</div>' if 'revenue' in ch else ''
+
+    latest_rev = m['latest_mrr'] if m else 0
+    cmgr3 = m['cmgr3'] if m and m['cmgr3'] else 0
+    devs = m['active_devs'] if m else 0
+
+    cs_cards_html += f'''
+    <div class="cs-card" style="border-top:3px solid {cs['type_color']}">
+        <div class="cs-header">
+            <div>
+                <span class="cs-name">{cs['name']}</span>
+                <span class="cs-type-badge" style="background:{cs['type_color']}">{cs['type']}</span>
+            </div>
+            <span class="cs-meta">{cs['stage']} &middot; {cs['hq']}</span>
+        </div>
+        <p class="cs-tagline">{cs['tagline']}</p>
+        <p class="cs-desc">{cs['summary']}</p>
+
+        <div class="cs-kpis">
+            <div class="cs-kpi"><div class="cs-kpi-label">MRR</div><div class="cs-kpi-value">${latest_rev:,.0f}</div></div>
+            <div class="cs-kpi"><div class="cs-kpi-label">CMGR-3</div><div class="cs-kpi-value">{cmgr3*100:.1f}%</div></div>
+            <div class="cs-kpi"><div class="cs-kpi-label">Active Devs</div><div class="cs-kpi-value">{devs}</div></div>
+            <div class="cs-kpi"><div class="cs-kpi-label">Model Mix</div><div class="cs-kpi-value" style="font-size:11px">{cs['model_mix']}</div></div>
+        </div>
+
+        <div class="cs-section">
+            <div class="cs-section-title">Expected GA Profile</div>
+            <p class="cs-section-text">{cs['expected_ga']}</p>
+        </div>
+
+        <div class="cs-section">
+            <div class="cs-section-title">What to Watch</div>
+            <p class="cs-section-text">{cs['what_to_watch']}</p>
+        </div>
+
+        <div class="cs-charts">
+            {ga_chart_html}
+            {rev_chart_html}
+        </div>
+
+        <div class="cs-link" onclick="showDetail('{sid}')">View full analysis &rarr;</div>
+    </div>
+    '''
+
+casestudies_content = f'''
+<div class="section-header" style="margin-top:0">CASE STUDIES</div>
+<p class="pl-subtitle" style="margin-bottom:20px">Three partner archetypes demonstrating how growth accounting profiles differ by use case. Based on the <a href="https://tribecap.co/essays/a-quantitative-approach-to-product-market-fit" style="color:{MUTED};text-decoration:underline" target="_blank">Tribe Capital PMF framework</a>.</p>
+{cs_cards_html}
+'''
+
+# ============================================================
 # ASSEMBLE HTML
 # ============================================================
 
@@ -1881,6 +1977,30 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 
 html {{ scroll-behavior:smooth; }}
 
+/* Case Studies */
+.cs-card {{ background:{CARD}; border-radius:12px; padding:24px; margin-bottom:24px; }}
+.cs-header {{ display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }}
+.cs-name {{ font-size:18px; font-weight:700; color:{TEXT}; margin-right:10px; }}
+.cs-type-badge {{ font-size:10px; font-weight:700; padding:3px 10px; border-radius:10px; color:#fff; letter-spacing:0.03em; vertical-align:middle; }}
+.cs-meta {{ font-size:12px; color:{MUTED}; }}
+.cs-tagline {{ font-size:13px; color:{DIM}; font-style:italic; margin-bottom:8px; }}
+.cs-desc {{ font-size:12px; color:{DIM}; line-height:1.6; margin-bottom:16px; }}
+.cs-kpis {{ display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; margin-bottom:16px; }}
+.cs-kpi {{ background:rgba(0,0,0,0.15); border-radius:8px; padding:10px 14px; }}
+.cs-kpi-label {{ font-size:10px; text-transform:uppercase; letter-spacing:0.04em; color:{MUTED}; font-weight:600; margin-bottom:2px; }}
+.cs-kpi-value {{ font-size:18px; font-weight:700; color:{TEXT}; font-variant-numeric:tabular-nums; }}
+.cs-section {{ margin-bottom:12px; }}
+.cs-section-title {{ font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:{MUTED}; font-weight:700; margin-bottom:4px; }}
+.cs-section-text {{ font-size:12px; color:{DIM}; line-height:1.6; }}
+.cs-charts {{ display:grid; grid-template-columns:1fr 1fr; gap:16px; margin:16px 0; }}
+.cs-link {{ font-size:12px; color:{MUTED}; cursor:pointer; text-align:right; padding-top:8px; border-top:1px solid {GRID}; }}
+.cs-link:hover {{ color:{TEXT}; text-decoration:underline; }}
+
+@media (max-width:900px) {{
+    .cs-kpis {{ grid-template-columns:1fr 1fr; }}
+    .cs-charts {{ grid-template-columns:1fr; }}
+}}
+
 @media (max-width:1100px) {{
     .pulse-panels {{ grid-template-columns:1fr; }}
 }}
@@ -1950,6 +2070,7 @@ html {{ scroll-behavior:smooth; }}
 <div class="tabs">
     <div class="tab active" data-tab="pulse">Pulse</div>
     <div class="tab" data-tab="partners">Partners</div>
+    <div class="tab" data-tab="casestudies">Case Studies</div>
     <div class="tab tab-detail" data-tab="detail" style="display:none"><span class="detail-back">&larr;</span> <span class="detail-name"></span></div>
 </div>
 
@@ -1959,6 +2080,9 @@ html {{ scroll-behavior:smooth; }}
     </div>
     <div class="tab-panel" id="panel-partners">
         {partners_content}
+    </div>
+    <div class="tab-panel" id="panel-casestudies">
+        {casestudies_content}
     </div>
     <div class="tab-panel" id="panel-detail">
         {''.join(f'<div class="detail-view" id="detail-{sid.lower()}" style="display:none">{startup_tab_html(sid)}</div>' for sid in ALL_SIDS)}
