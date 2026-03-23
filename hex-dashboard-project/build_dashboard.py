@@ -1118,12 +1118,7 @@ for m in company_metrics:
         <td><span class="dot-sm" style="background:{COLORS[m['sid']]}"></span>{m['name']} <span class="stage-badge">{m['stage']}</span></td>
         <td class="metric-cell num">{rev_display}</td>
         <td class="metric-cell num">{mau_display}</td>
-        <td class="payback-cell">
-            <div class="payback-bar{bar_extra_class}">
-                <div class="payback-fill" style="width:{payback_pct}%;background:{bar_color}"></div>
-                <span class="payback-label">{bar_label}</span>
-            </div>
-        </td>
+        <td class="metric-cell num" style="color:{bar_color}">{bar_label}</td>
         <td class="metric-cell num {cagr_cls}">{f'{cmgr3_val*100:.1f}%' if m['cmgr3'] is not None else 'n/a'}</td>
         <td class="metric-cell num {qr_cls}">{m['avg_qr']:.1f}x</td>
         <td class="metric-cell num {gret_cls}">{m['gross_retention']:.0f}%</td>
@@ -1156,7 +1151,7 @@ tier2_html = f'''
                     <th class="sortable" data-sort="name">Company <span class="sort-icon">⇅</span></th>
                     <th class="num sortable" data-sort="revenue">Revenue <span class="sort-icon">⇅</span></th>
                     <th class="num sortable" data-sort="mau">MAU <span class="sort-icon">⇅</span></th>
-                    <th class="sortable" data-sort="payback" data-tip="credit-payback">Credit Payback <span class="sort-icon">⇅</span></th>
+                    <th class="num sortable" data-sort="payback" data-tip="credit-payback">ROI <span class="sort-icon">⇅</span></th>
                     <th class="num sortable" data-sort="cmgr" data-tip="cmgr">CMGR-3 <span class="sort-icon">⇅</span></th>
                     <th class="num sortable" data-sort="qr" data-tip="quick-ratio">Quick Ratio <span class="sort-icon">⇅</span></th>
                     <th class="num sortable" data-sort="gret" data-tip="gross-retention">Gross Ret. <span class="sort-icon">⇅</span></th>
