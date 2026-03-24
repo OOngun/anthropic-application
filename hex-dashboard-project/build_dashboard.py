@@ -635,22 +635,35 @@ for sid in ALL_SIDS:
     charts = {}
     d_usage = monthly_usage[monthly_usage['startup_id'] == sid].sort_values('month')
 
-    # Compute per-company GA from monthly_usage (not CSV) so all 23 partners have data
+    # Compute per-company GA from developer_activity.csv (developer-level decomposition)
+    _dev_sid = dev_activity[dev_activity['startup_id'] == sid]
+    _dev_first = _dev_sid.groupby('dev_id')['month'].min().to_dict()
+    _months_list = sorted(d_usage['month'].unique())
     _company_ga_rows = []
-    _rev_vals = d_usage['revenue_usd'].values
-    _months_vals = d_usage['month'].values
-    for _j in range(1, len(_rev_vals)):
-        _p, _c = _rev_vals[_j-1], _rev_vals[_j]
-        _ret = min(_c, _p) if _c > 0 and _p > 0 else 0
-        _exp = (_c - _p) if _c > _p and _p > 0 else 0
-        _contr = (_p - _c) if _p > _c and _c > 0 else 0
-        _new = _c if _c > 0 and _p == 0 and _j == 0 else 0
-        _res = _c if _c > 0 and _p == 0 and _j > 0 else 0
-        _churn = _p if _p > 0 and _c == 0 else 0
+    for _j in range(1, len(_months_list)):
+        _prev_m, _curr_m = _months_list[_j-1], _months_list[_j]
+        _prev = _dev_sid[_dev_sid['month'] == _prev_m].set_index('dev_id')['revenue']
+        _curr = _dev_sid[_dev_sid['month'] == _curr_m].set_index('dev_id')['revenue']
+        _all_ids = set(_prev.index) | set(_curr.index)
+        _new = _exp = _res = _ret = _churn = _contr = 0
+        for _did in _all_ids:
+            _p = _prev.get(_did, 0)
+            _c = _curr.get(_did, 0)
+            _is_new = _dev_first.get(_did) == _curr_m
+            if _c > 0 and _p > 0:
+                _ret += min(_c, _p)
+                if _c > _p: _exp += (_c - _p)
+                elif _c < _p: _contr += (_p - _c)
+            elif _c > 0 and _p == 0:
+                if _is_new: _new += _c
+                else: _res += _c
+            elif _c == 0 and _p > 0:
+                _churn += _p
+        _pt = _prev.sum()
         _qr = (_exp + _new + _res) / (_contr + _churn) if (_contr + _churn) > 0 else 10.0
-        _gret = _ret / _p * 100 if _p > 0 else 0
+        _gret = _ret / _pt * 100 if _pt > 0 else 0
         _company_ga_rows.append({
-            'month': _months_vals[_j],
+            'month': _curr_m,
             'new_revenue': _new, 'expansion_revenue': _exp,
             'resurrected_revenue': _res, 'retained_revenue': _ret,
             'churned_revenue': _churn, 'contraction_revenue': _contr,
