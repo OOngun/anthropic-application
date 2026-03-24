@@ -4,11 +4,21 @@
 
 ---
 
-## What This Is
+## Foreword
 
-This document presents an analytical framework for measuring the health and ROI of Anthropic's startup credit program in EMEA. It adapts Tribe Capital's growth accounting methodology — originally designed for assessing product-market fit in SaaS companies — to the specific context of API consumption partnerships.
+All data in this dashboard is synthetic and for demonstrative purposes.
 
-The accompanying dashboard is a working prototype built with synthetic data. The data is illustrative, not real. The framework is the point.
+In this model, I've taken an approach which focuses on direct API usage, while ignoring enterprise agreements, Pro/Max subscriptions, and other consumption channels. API revenue accounts for approximately 70–75% of Anthropic's total revenue, with over 300,000 business customers driving roughly 80% of the company's income ([Business of Apps](https://www.businessofapps.com/data/claude-statistics/), [Sacra](https://sacra.com/c/anthropic/)). By scoping to direct API partners only, the model stays clean with synthetic data and reflects the primary revenue channel that a startup partnerships role would manage.
+
+We have applied early and growth-stage growth accounting analyses utilised by top-tier VC firms — Tribe Capital, Social Capital, Bessemer, and a16z — to evaluate product-market fit within a partnership portfolio. These frameworks take different approaches and place different importance on metrics depending on the partner's use case and stage, as we highlight in the accompanying case studies.
+
+The dashboard operates on three tiers:
+
+**Pulse** — the ecosystem health check. Four headline metrics, a growth accounting waterfall with selectable time periods and scopes, a combined GA + CMGR chart, and a portfolio revenue share visualisation. This answers "is the portfolio healthy this week?" in under ten seconds.
+
+**Partners** — the navigation layer. Every partner in a sortable, colour-coded scoreboard with a Power Law Tracker ranking partners by projected scale. This answers "who needs my attention?" and routes you to the detail view.
+
+**Company Detail** — the full drill-down. Growth accounting, cohort LTV curves and heatmaps, developer retention, model mix evolution, and credit economics. This answers "why is this partner behaving the way it is, and what should I do about it?"
 
 ---
 
@@ -228,8 +238,76 @@ The framework is the deliverable. The dashboard is evidence that the framework w
 
 ---
 
+## Case Studies
+
+The same framework produces fundamentally different profiles depending on how a startup uses Claude. These three case studies demonstrate why context matters when interpreting growth accounting metrics.
+
+---
+
+### Case Study 1: WriteFlow — Consumer AI Writing Assistant
+
+**Profile:** Series A · London · Consumer SaaS · ~$10K MRR
+**Use Case:** Customer-facing — end-users interact with Claude directly
+**Model Mix:** Haiku 56% · Sonnet 31% · Opus 13%
+
+WriteFlow is a browser-based writing assistant. Users draft emails, blog posts, and social copy. Every "Generate" or "Rewrite" click is an API call. Freemium tier plus Pro at $12/month. 40K monthly active users.
+
+**Growth Accounting Profile:** Textbook consumer — **high churn offset by high new acquisition**. In any given month, 25–40% of active developers (API keys tied to product features) churn. Consumers are fickle. But new keys are constantly created as features launch and viral moments hit.
+
+Critically, **expansion and contraction are near-zero**. Users don't gradually increase or decrease usage of a writing assistant — they either use it or they don't. The GA chart is dominated by two forces: new (green) and churned (red), with retained (grey) as the stable base.
+
+**Quick Ratio:** Fluctuates 1.5–2.5×. In a consumer context, this is acceptable. The bar is lower than B2B because consumer churn is structurally higher.
+
+**What to Watch:** If churn exceeds new for 2+ consecutive months, the product is losing PMF. Model mix shifting toward Sonnet signals premium adoption — stickier and higher-value. Seasonal patterns (exam spikes, holiday dips) are expected; look at YoY trends, not MoM noise.
+
+**Cohort LTV:** Should be sub-linear — earlier cohorts generate more lifetime value, but each additional month adds less as the retention curve flattens. If newer cohorts show higher month-1 LTV, the product is improving. Curves diverging downward = newer users less engaged = PMF red flag.
+
+---
+
+### Case Study 2: FinLedger — Internal Developer Tooling
+
+**Profile:** Seed · Berlin · Fintech · ~$500 MRR
+**Use Case:** Developer tooling — the startup's own engineers use Claude internally
+**Model Mix:** Sonnet 64% · Haiku 21% · Opus 15%
+
+FinLedger builds accounting automation for European SMEs. Their product has nothing to do with AI. But their 4-person engineering team uses Claude daily: reviewing PRs, generating tests, writing docs, debugging. One API key per engineer.
+
+**Growth Accounting Profile:** The opposite of WriteFlow — **flat, stable, boring**. And that's exactly what healthy looks like here.
+
+Retained revenue is 95%+ every month. Near-zero churn — the only way a developer churns is if an engineer quits, which is rare for a 4-person startup. New revenue only appears on hire. Expansion comes from **adding new use cases** — visible as step-function jumps (CI pipeline integration at month 9, documentation generation at month 16).
+
+**Quick Ratio:** Technically very high (>3×) but misleading at this scale. With 4 developers, any single event creates wild swings. QR is not useful here.
+
+**Why cohort analysis doesn't apply:** 4–5 developers with near-zero churn. You can't draw retention curves with 4 data points. The value story is told through step-function expansions — each one is a deepening of integration that increases switching cost.
+
+**What to Watch:** Any churn at all is a red flag (1 of 4 = 25% in one month). Step-function expansion = new use case adopted = deepening lock-in. Flat line for 6+ months with no steps = plateau, consider suggesting new use cases. Model mix trending Opus = more sophisticated reasoning tasks = good.
+
+---
+
+### Case Study 3: BrieflyAI — B2B Meeting Summarisation Platform
+
+**Profile:** Series A · Amsterdam · Enterprise Productivity · ~$18K MRR
+**Use Case:** B2B embedded — Claude powers a product sold to businesses
+**Model Mix:** Sonnet 72% · Opus 16% · Haiku 11%
+
+BrieflyAI records and transcribes meetings, then uses Claude to generate structured summaries with action items. Sold per-seat ($15/seat/month) to mid-market firms with 20–200 employees. 45 enterprise clients, ~3,000 meetings/week.
+
+**Growth Accounting Profile:** Classic B2B — **high retained revenue with step-function expansion events**. Each step = a new enterprise client onboarding. When a company with 50 employees starts using BrieflyAI, that's a sudden block of predictable, recurring API usage.
+
+Retained revenue is 85–95%. Churn is rare — once meeting summaries are embedded in a company's workflow, switching is painful. When churn happens (one client in month 15), it shows as a visible cliff.
+
+Expansion comes from two sources: existing clients adding seats (organic, gradual) and existing clients scheduling more meetings (correlation with business activity). Contraction is minimal — usage is binary per meeting.
+
+**Cohort LTV:** Should be **super-linear** — each month adds more value than the last because: existing clients expand seats, the summary archive becomes more valuable (switching cost), and retention is high so the denominator stays stable. Super-linear LTV curves = strong signal to invest more credits.
+
+**What to Watch:** Client acquisition cadence — are step-functions getting bigger (winning larger clients) or smaller? Any churn cliff = lost enterprise client, investigate immediately. Opus increasing = handling more complex meetings = higher-value. Haiku increasing = cost optimisation under margin pressure = possible pre-churn signal for the partner's own business.
+
+---
+
 ## References
 
 - [A Quantitative Approach to Product-Market Fit — Tribe Capital](https://tribecap.co/essays/a-quantitative-approach-to-product-market-fit)
 - [Growth Accounting & LTV SQL — Social Capital](https://gist.github.com/hsurreal/4062f2639d4bb6fab6fb)
-- [Anthropic API Pricing](https://platform.claude.com/docs/en/about-claude/pricing)
+- [Anthropic Revenue & Usage Statistics — Business of Apps](https://www.businessofapps.com/data/claude-statistics/)
+- [Anthropic Revenue & Valuation — Sacra](https://sacra.com/c/anthropic/)
+- [Anthropic API Pricing](https://docs.anthropic.com/en/docs/about-claude/models)
