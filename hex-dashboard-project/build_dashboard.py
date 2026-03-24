@@ -1412,9 +1412,8 @@ tier1_html = f'''
         </div>
     </div>
 
-    <div class="pulse-insights-row">
+    <div class="pulse-insights-row" style="grid-template-columns:1fr">
         {el1_html}
-        {el2_html}
     </div>
 
     <div class="pulse-panels">
