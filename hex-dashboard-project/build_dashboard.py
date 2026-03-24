@@ -1323,12 +1323,29 @@ el2_html = f'''<div class="pulse-panel">
 _rev_by_partner_month = monthly_usage.groupby(['startup_id', 'month'])['revenue_usd'].sum().reset_index()
 _all_months = sorted(monthly_usage['month'].unique())
 
-# Sort partners by total revenue (biggest at bottom for stability)
-_partner_total_rev = _rev_by_partner_month.groupby('startup_id')['revenue_usd'].sum().sort_values(ascending=True)
-_sorted_sids = _partner_total_rev.index.tolist()
+# Sort partners by total revenue — top 7 shown individually, rest collapsed to "Others"
+TOP_N_AOE = 7
+_partner_total_rev = _rev_by_partner_month.groupby('startup_id')['revenue_usd'].sum().sort_values(ascending=False)
+_top_sids = _partner_total_rev.head(TOP_N_AOE).index.tolist()
+_other_sids = _partner_total_rev.iloc[TOP_N_AOE:].index.tolist()
+
+# Compute "Others" aggregate
+_others_monthly = _rev_by_partner_month[_rev_by_partner_month['startup_id'].isin(_other_sids)].groupby('month')['revenue_usd'].sum().reindex(_all_months, fill_value=0)
 
 fig_rev_share = go.Figure()
-for sid in _sorted_sids:
+
+# Add "Others" first (bottom of stack, grey)
+fig_rev_share.add_trace(go.Scatter(
+    x=_all_months, y=_others_monthly.values,
+    name=f'Others ({len(_other_sids)})',
+    stackgroup='one', groupnorm='percent',
+    line=dict(width=0.5, color='#94a3b8'),
+    fillcolor='rgba(148,163,184,0.4)',
+    hovertemplate=f'Others ({len(_other_sids)}): $%{{y:,.0f}}<extra></extra>',
+))
+
+# Add top partners (biggest at bottom = most stable, reversed so biggest is first added after Others)
+for sid in reversed(_top_sids):
     d = _rev_by_partner_month[_rev_by_partner_month['startup_id'] == sid].set_index('month').reindex(_all_months, fill_value=0)
     fig_rev_share.add_trace(go.Scatter(
         x=d.index, y=d['revenue_usd'],
@@ -1336,32 +1353,27 @@ for sid in _sorted_sids:
         stackgroup='one', groupnorm='percent',
         line=dict(width=0.5, color=COLORS[sid]),
         fillcolor=COLORS[sid],
-        hovertemplate=f'{NAMES[sid]}: $%{{y:,.0f}} (%{{meta:.1f}}%)<extra></extra>',
+        hovertemplate=f'{NAMES[sid]}: $%{{y:,.0f}}<extra></extra>',
     ))
 
-# Compute percentage for hover meta
-_total_by_month = _rev_by_partner_month.groupby('month')['revenue_usd'].sum()
-for trace in fig_rev_share.data:
-    sid = [s for s, n in NAMES.items() if n == trace.name][0]
-    d = _rev_by_partner_month[_rev_by_partner_month['startup_id'] == sid].set_index('month').reindex(_all_months, fill_value=0)
-    pcts = (d['revenue_usd'] / _total_by_month.reindex(_all_months, fill_value=1) * 100).values
-    trace.meta = pcts
-
-# Add text annotations for top 3 partners at last month
+# Add text annotations for top 3 at last month
 _last_month = _all_months[-1]
 _last_month_rev = _rev_by_partner_month[_rev_by_partner_month['month'] == _last_month].sort_values('revenue_usd', ascending=False)
 _top3_last = _last_month_rev.head(3)
-# Calculate cumulative percentage positions for annotations
 _total_last = _last_month_rev['revenue_usd'].sum()
 _annot_list = []
-for _, row in _top3_last.iterrows():
-    pct = row['revenue_usd'] / _total_last * 100 if _total_last > 0 else 0
-    _annot_list.append(dict(
-        x=_last_month, y=pct / 2, yref='y',
-        text=f'<b>{NAMES[row["startup_id"]]}</b>',
-        showarrow=False, font=dict(size=9, color='white'),
-        xanchor='right', xshift=-6,
-    ))
+_cum_pct = (_others_monthly.iloc[-1] / _total_last * 100) if _total_last > 0 else 0
+for sid in reversed(_top_sids):
+    rev = _last_month_rev[_last_month_rev['startup_id'] == sid]['revenue_usd'].values
+    pct = (rev[0] / _total_last * 100) if len(rev) > 0 and _total_last > 0 else 0
+    if sid in _top3_last['startup_id'].values:
+        _annot_list.append(dict(
+            x=_last_month, y=_cum_pct + pct / 2, yref='y',
+            text=f'<b>{NAMES[sid]}</b>',
+            showarrow=False, font=dict(size=9, color='white'),
+            xanchor='right', xshift=-6,
+        ))
+    _cum_pct += pct
 
 rev_share_layout = layout('Portfolio Revenue Share', h=280)
 rev_share_layout['showlegend'] = False
