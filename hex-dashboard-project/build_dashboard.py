@@ -2131,9 +2131,22 @@ for cs in CASE_STUDIES:
     # Revenue chart
     rev_chart_html = f'<div class="card">{ch["revenue"]}</div>' if 'revenue' in ch else ''
 
-    # LTV charts
-    ltv_curve_html = f'<div class="card">{ch["ltv_curve"]}</div>' if 'ltv_curve' in ch else ''
-    ltv_heatmap_html = f'<div class="card">{ch["ltv_heatmap"]}</div>' if 'ltv_heatmap' in ch else ''
+    # LTV charts — CS02 gets a text note instead of charts
+    if sid == 'CS02':
+        ltv_section_html = '''<div class="cs-section">
+    <div class="cs-section-title">Lifetime Value</div>
+    <p class="cs-section-text">With only 4\u20135 developers and near-zero churn, cohort analysis is not meaningful for FinLedger. Their value story is better read through the growth accounting section \u2014 specifically the step-function expansions when they adopt new Claude use cases (CI pipeline at month 9, documentation at month 16).</p>
+</div>'''
+    else:
+        ltv_curve_html = f'<div class="card">{ch["ltv_curve"]}</div>' if 'ltv_curve' in ch else ''
+        ltv_heatmap_html = f'<div class="card">{ch["ltv_heatmap"]}</div>' if 'ltv_heatmap' in ch else ''
+        ltv_section_html = f'''<div class="cs-section">
+                <div class="cs-section-title">LTV Cohort Analysis</div>
+            </div>
+            <div class="cs-charts">
+                {ltv_curve_html}
+                {ltv_heatmap_html}
+            </div>'''
 
     latest_rev = m['latest_mrr'] if m else 0
     cmgr3 = m['cmgr3'] if m and m['cmgr3'] else 0
@@ -2176,13 +2189,7 @@ for cs in CASE_STUDIES:
                 {rev_chart_html}
             </div>
 
-            <div class="cs-section">
-                <div class="cs-section-title">LTV Cohort Analysis</div>
-            </div>
-            <div class="cs-charts">
-                {ltv_curve_html}
-                {ltv_heatmap_html}
-            </div>
+            {ltv_section_html}
 
             <div class="cs-link" onclick="event.stopPropagation(); showDetail('{sid}')">View full analysis &rarr;</div>
         </div>
