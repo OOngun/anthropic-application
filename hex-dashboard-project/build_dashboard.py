@@ -1202,6 +1202,179 @@ elif cmgr3 > cmgr12 and cmgr12 > 0:
 net_churn_display = f'{net_churn:.1f}%'
 net_churn_note = 'Negative = growing' if net_churn < 0 else 'Positive = shrinking'
 
+# ============================================================
+# ELEMENT 1: EXPANSION VS LOSSES + PORTFOLIO COMPOSITION
+# ============================================================
+
+# Dollar amounts from latest GA
+el1_gains_dollars = latest_ga['new_revenue'] + latest_ga['expansion_revenue'] + latest_ga['resurrected_revenue']
+el1_losses_dollars = latest_ga['churned_revenue'] + latest_ga['contraction_revenue']
+el1_coverage = el1_gains_dollars / el1_losses_dollars if el1_losses_dollars > 0 else 10.0
+el1_max_bar = max(el1_gains_dollars, el1_losses_dollars, 1)
+el1_gains_pct = el1_gains_dollars / el1_max_bar * 100
+el1_losses_pct = el1_losses_dollars / el1_max_bar * 100
+el1_coverage_color = SUCCESS if el1_coverage > 1.0 else DANGER
+
+# Portfolio composition: active / dormant / churned counts
+_latest_month = monthly_usage['month'].max()
+_3mo_ago = _latest_month - pd.DateOffset(months=3)
+_active_count = 0
+_dormant_count = 0
+_churned_count = 0
+for sid in ALL_SIDS:
+    u = monthly_usage[monthly_usage['startup_id'] == sid].sort_values('month')
+    latest_rev = u[u['month'] == _latest_month]['revenue_usd'].sum()
+    recent_3mo = u[(u['month'] > _3mo_ago) & (u['month'] < _latest_month)]['revenue_usd'].sum()
+    if latest_rev > 0:
+        _active_count += 1
+    elif recent_3mo > 0:
+        _dormant_count += 1
+    else:
+        _churned_count += 1
+
+el1_html = f'''<div class="pulse-panel">
+    <div class="panel-title">EXPANSION VS LOSSES</div>
+    <div class="el1-bar-wrap">
+        <div class="el1-track">
+            <div class="el1-fill-green" style="width:{el1_gains_pct:.1f}%"></div>
+            <div class="el1-fill-red" style="width:{el1_losses_pct:.1f}%"></div>
+        </div>
+    </div>
+    <div class="el1-summary">Gains: ${el1_gains_dollars:,.0f} &middot; Losses: ${el1_losses_dollars:,.0f} &middot; Coverage: <span style="color:{el1_coverage_color};font-weight:600">{el1_coverage:.1f}x</span></div>
+    <div class="el1-composition"><span class="el1-dot" style="background:{SUCCESS}"></span> {_active_count} active &nbsp; <span class="el1-dot" style="background:{WARNING}"></span> {_dormant_count} dormant &nbsp; <span class="el1-dot" style="background:{DANGER}"></span> {_churned_count} churned</div>
+</div>'''
+
+# ============================================================
+# ELEMENT 2: NOTEWORTHY SIGNALS
+# ============================================================
+
+signals = []
+
+# Signal 1: Highest positive MoM revenue change
+_mom_changes = []
+for sid in ALL_SIDS:
+    u = monthly_usage[monthly_usage['startup_id'] == sid].sort_values('month')
+    if len(u) >= 2:
+        curr_rev = u.iloc[-1]['revenue_usd']
+        prev_rev = u.iloc[-2]['revenue_usd']
+        _mom_changes.append((sid, curr_rev - prev_rev, curr_rev, prev_rev))
+_mom_changes.sort(key=lambda x: x[1], reverse=True)
+if _mom_changes and _mom_changes[0][1] > 0:
+    _s = _mom_changes[0]
+    _pct = (_s[1] / _s[3] * 100) if _s[3] > 0 else 0
+    signals.append((SUCCESS, '&#8593;', NAMES[_s[0]], f'+${_s[1]:,.0f} MoM ({_pct:+.0f}%)'))
+
+# Signal 2: Partner with highest recent dev churn rate
+_dev_churn_rates = []
+for sid in ALL_SIDS:
+    dg = dev_ga[dev_ga['startup_id'] == sid].sort_values('month')
+    if len(dg) >= 2:
+        latest_dg = dg.iloc[-1]
+        if latest_dg['active_devs'] + latest_dg['churned_devs'] > 0:
+            churn_rate = latest_dg['churned_devs'] / (latest_dg['active_devs'] + latest_dg['churned_devs'])
+            _dev_churn_rates.append((sid, churn_rate, int(latest_dg['churned_devs'])))
+_dev_churn_rates.sort(key=lambda x: x[1], reverse=True)
+if _dev_churn_rates and _dev_churn_rates[0][1] > 0:
+    _d = _dev_churn_rates[0]
+    signals.append((DANGER, '&#8595;', NAMES[_d[0]], f'{_d[1]*100:.0f}% dev churn ({_d[2]} devs lost)'))
+
+# Signal 3: Partners whose credits exhaust within 60 days
+_low_credit_partners = []
+for sid in ALL_SIDS:
+    total_credits = credits[credits['startup_id'] == sid]['amount_usd'].sum()
+    total_spent = monthly_usage[monthly_usage['startup_id'] == sid]['revenue_usd'].sum()
+    credit_balance = total_credits - total_spent
+    u = monthly_usage[monthly_usage['startup_id'] == sid].sort_values('month')
+    monthly_burn = u.tail(3)['revenue_usd'].mean() if len(u) >= 3 else u['revenue_usd'].mean()
+    if monthly_burn > 0 and credit_balance / monthly_burn < 2:
+        _low_credit_partners.append(NAMES[sid])
+if _low_credit_partners:
+    signals.append((WARNING, '&#9888;', f'{len(_low_credit_partners)} partner{"s" if len(_low_credit_partners) != 1 else ""}', 'credits exhaust within 60 days'))
+
+# Signal 4: Resurrection — partner that was inactive then became active
+for sid in ALL_SIDS:
+    u = monthly_usage[monthly_usage['startup_id'] == sid].sort_values('month')
+    if len(u) >= 3:
+        if u.iloc[-1]['revenue_usd'] > 0 and u.iloc[-2]['revenue_usd'] == 0 and u.iloc[-3]['revenue_usd'] == 0:
+            signals.append(('#3b82f6', '&#8634;', NAMES[sid], 'resurrected after 2+ months inactive'))
+            break
+
+# Signal 5: Partner with highest CMGR-3
+_cmgr3_partners = [(sid, m['cmgr3']) for m in company_metrics for sid in [m['sid']] if m['cmgr3'] is not None and m['cmgr3'] > 0]
+_cmgr3_partners.sort(key=lambda x: x[1], reverse=True)
+if _cmgr3_partners:
+    _c = _cmgr3_partners[0]
+    signals.append((SUCCESS, '&#11014;', NAMES[_c[0]], f'CMGR-3: {_c[1]*100:.1f}% (fastest growing)'))
+
+signals_rows_html = ''
+for color, icon, name, text in signals[:5]:
+    signals_rows_html += f'<div class="signal-row"><span class="signal-icon" style="color:{color}">{icon}</span><span class="signal-name">{name}</span><span class="signal-text">{text}</span></div>\n'
+
+el2_html = f'''<div class="pulse-panel">
+    <div class="panel-title">&#9889; SIGNALS</div>
+    <div class="signals-list">{signals_rows_html}</div>
+</div>'''
+
+# ============================================================
+# ELEMENT 3: REVENUE SHARE AREA OF EFFECT CHART (Plotly)
+# ============================================================
+
+# Aggregate monthly revenue per partner over full 24 months
+_rev_by_partner_month = monthly_usage.groupby(['startup_id', 'month'])['revenue_usd'].sum().reset_index()
+_all_months = sorted(monthly_usage['month'].unique())
+
+# Sort partners by total revenue (biggest at bottom for stability)
+_partner_total_rev = _rev_by_partner_month.groupby('startup_id')['revenue_usd'].sum().sort_values(ascending=True)
+_sorted_sids = _partner_total_rev.index.tolist()
+
+fig_rev_share = go.Figure()
+for sid in _sorted_sids:
+    d = _rev_by_partner_month[_rev_by_partner_month['startup_id'] == sid].set_index('month').reindex(_all_months, fill_value=0)
+    fig_rev_share.add_trace(go.Scatter(
+        x=d.index, y=d['revenue_usd'],
+        name=NAMES[sid],
+        stackgroup='one', groupnorm='percent',
+        line=dict(width=0.5, color=COLORS[sid]),
+        fillcolor=COLORS[sid],
+        hovertemplate=f'{NAMES[sid]}: $%{{y:,.0f}} (%{{meta:.1f}}%)<extra></extra>',
+    ))
+
+# Compute percentage for hover meta
+_total_by_month = _rev_by_partner_month.groupby('month')['revenue_usd'].sum()
+for trace in fig_rev_share.data:
+    sid = [s for s, n in NAMES.items() if n == trace.name][0]
+    d = _rev_by_partner_month[_rev_by_partner_month['startup_id'] == sid].set_index('month').reindex(_all_months, fill_value=0)
+    pcts = (d['revenue_usd'] / _total_by_month.reindex(_all_months, fill_value=1) * 100).values
+    trace.meta = pcts
+
+# Add text annotations for top 3 partners at last month
+_last_month = _all_months[-1]
+_last_month_rev = _rev_by_partner_month[_rev_by_partner_month['month'] == _last_month].sort_values('revenue_usd', ascending=False)
+_top3_last = _last_month_rev.head(3)
+# Calculate cumulative percentage positions for annotations
+_total_last = _last_month_rev['revenue_usd'].sum()
+_annot_list = []
+for _, row in _top3_last.iterrows():
+    pct = row['revenue_usd'] / _total_last * 100 if _total_last > 0 else 0
+    _annot_list.append(dict(
+        x=_last_month, y=pct / 2, yref='y',
+        text=f'<b>{NAMES[row["startup_id"]]}</b>',
+        showarrow=False, font=dict(size=9, color='white'),
+        xanchor='right', xshift=-6,
+    ))
+
+rev_share_layout = layout('Portfolio Revenue Share', h=280)
+rev_share_layout['showlegend'] = False
+rev_share_layout['yaxis']['ticksuffix'] = '%'
+rev_share_layout['yaxis']['range'] = [0, 100]
+rev_share_layout['margin'] = dict(l=45, r=20, t=40, b=35)
+rev_share_layout['hovermode'] = 'x unified'
+# Annotations for top 3 partners
+rev_share_layout['annotations'] = _annot_list
+fig_rev_share.update_layout(**rev_share_layout)
+
+rev_share_div = to_div(fig_rev_share, 'pulse-rev-share')
+
 tier1_html = f'''
 <div class="pulse-block">
     <div class="pulse-cards">
@@ -1225,6 +1398,11 @@ tier1_html = f'''
             <div class="pc-value">{latest_gross_ret:.0f}%</div>
             <div class="pc-sub">30-day rolling</div>
         </div>
+    </div>
+
+    <div class="pulse-insights-row">
+        {el1_html}
+        {el2_html}
     </div>
 
     <div class="pulse-panels">
@@ -1721,7 +1899,13 @@ top5_html = f'''
     </table>
 </div>'''
 
-pulse_content = tier1_html + tier2_html
+rev_share_section = f'''<div class="pulse-block" style="border-bottom:none;margin-bottom:0;padding-bottom:0">
+    <div class="pulse-panel pulse-panel-chart" style="border:1px solid {GRID};border-radius:12px">
+        {rev_share_div}
+    </div>
+</div>'''
+
+pulse_content = tier1_html + rev_share_section + tier2_html
 partners_content = f'''{tier2_html}
 {scoreboard_html}'''
 
@@ -1951,6 +2135,26 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .pulse-panels {{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }}
 .pulse-panel {{ background:#fff; border:1px solid {GRID}; border-radius:12px; padding:22px 24px; }}
 .pulse-panel-chart {{ padding:14px 10px 6px; overflow:hidden; }}
+
+/* Insights row: 60/40 split for Expansion vs Losses and Signals */
+.pulse-insights-row {{ display:grid; grid-template-columns:3fr 2fr; gap:16px; margin-bottom:20px; }}
+
+/* Element 1: Expansion vs Losses */
+.el1-bar-wrap {{ margin:14px 0 12px; }}
+.el1-track {{ height:18px; background:{BORDER_SUBTLE}; border-radius:3px; display:flex; overflow:hidden; }}
+.el1-fill-green {{ height:100%; background:{SUCCESS}; border-radius:3px 0 0 3px; transition:width 0.4s ease; }}
+.el1-fill-red {{ height:100%; background:{DANGER}; margin-left:auto; border-radius:0 3px 3px 0; transition:width 0.4s ease; }}
+.el1-summary {{ font-size:12px; color:{DIM}; margin-bottom:10px; }}
+.el1-composition {{ font-size:12px; color:{MUTED}; display:flex; align-items:center; gap:4px; padding-top:10px; border-top:1px solid {GRID}; }}
+.el1-dot {{ width:8px; height:8px; border-radius:50%; display:inline-block; flex-shrink:0; }}
+
+/* Element 2: Signals */
+.signals-list {{ display:flex; flex-direction:column; gap:10px; margin-top:12px; }}
+.signal-row {{ display:grid; grid-template-columns:22px auto 1fr; gap:6px; align-items:baseline; font-size:12px; }}
+.signal-icon {{ font-size:14px; font-weight:700; text-align:center; }}
+.signal-name {{ font-weight:600; color:{TEXT}; white-space:nowrap; }}
+.signal-text {{ color:{DIM}; }}
+
 .panel-title {{ font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:{MUTED}; font-weight:700; margin-bottom:6px; }}
 .panel-subtitle {{ font-size:11px; color:{MUTED}; margin-bottom:18px; }}
 
@@ -2099,6 +2303,7 @@ html {{ scroll-behavior:smooth; }}
 
 @media (max-width:1100px) {{
     .pulse-panels {{ grid-template-columns:1fr; }}
+    .pulse-insights-row {{ grid-template-columns:1fr; }}
 }}
 
 @media (max-width:900px) {{
