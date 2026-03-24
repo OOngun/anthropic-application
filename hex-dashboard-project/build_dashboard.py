@@ -616,6 +616,138 @@ avg_churned_pct = ga_pct_history['churned_pct'].mean()
 avg_net_pct = ga_pct_history['net_pct'].mean()
 n_months_avg = len(ga_pct_history)
 
+# ============================================================
+# INTERACTIVE WATERFALL DATA: all scope x period combinations
+# ============================================================
+
+# Map archetype names to scope filter keys (matching the user-facing labels)
+_scope_map = {
+    'all': None,  # no filter
+    'star': ['star', 'rocket'],
+    'strong': ['strong', 'steady'],
+    'fine': ['fine'],
+    'declining': ['declining'],
+    'churned': ['churned', 'minimal'],
+}
+
+def _compute_ga_for_sids(sid_subset):
+    """Recompute aggregate revenue GA for a subset of startup IDs."""
+    sub_dev = dev_activity[dev_activity['startup_id'].isin(sid_subset)]
+    sub_months = sorted(sub_dev['month'].unique())
+    sub_first = sub_dev.groupby('dev_id')['month'].min().to_dict()
+    rows = []
+    for i in range(1, len(sub_months)):
+        pm, cm = sub_months[i-1], sub_months[i]
+        prev = sub_dev[sub_dev['month'] == pm].set_index('dev_id')['revenue']
+        curr = sub_dev[sub_dev['month'] == cm].set_index('dev_id')['revenue']
+        nr = er = rr = ret = cr = ch = 0
+        for did in set(prev.index) | set(curr.index):
+            p, c = prev.get(did, 0), curr.get(did, 0)
+            is_new = (sub_first.get(did) == cm)
+            if c > 0 and p > 0:
+                ret += min(c, p)
+                if c > p: er += (c - p)
+                elif c < p: cr += (p - c)
+            elif c > 0 and p == 0:
+                if is_new: nr += c
+                else: rr += c
+            elif c == 0 and p > 0:
+                ch += p
+        rows.append({'month': cm, 'total': nr + ret + er + rr,
+                     'new': nr, 'expansion': er, 'resurrected': rr,
+                     'retained': ret, 'contraction': cr, 'churned': ch})
+    return pd.DataFrame(rows).sort_values('month') if rows else pd.DataFrame()
+
+def _ga_pct_df(ga_df):
+    """Convert raw GA df to pct-of-prior-period df."""
+    if len(ga_df) < 2:
+        return pd.DataFrame()
+    shifted = ga_df['total'].shift(1)
+    out = pd.DataFrame({'month': ga_df['month']})
+    for col in ['new', 'expansion', 'resurrected', 'contraction', 'churned']:
+        out[col] = ga_df[col] / shifted * 100
+    out['net'] = (ga_df['total'] - ga_df['total'].shift(1)) / shifted * 100
+    return out.dropna()
+
+def _period_avg(pct_df, period):
+    """Average the last N rows based on period key."""
+    if len(pct_df) == 0:
+        return {'new': 0, 'expansion': 0, 'resurrected': 0, 'contraction': 0, 'churned': 0, 'net': 0}
+    if period == '1M':
+        row = pct_df.iloc[-1]
+        return {k: float(row[k]) for k in ['new', 'expansion', 'resurrected', 'contraction', 'churned', 'net']}
+    elif period == '3M':
+        sub = pct_df.tail(3)
+    elif period == '6M':
+        sub = pct_df.tail(6)
+    elif period == '12M':
+        sub = pct_df.tail(12)
+    elif period == 'YTD':
+        latest_year = pct_df['month'].iloc[-1].year
+        sub = pct_df[pct_df['month'].dt.year == latest_year]
+    else:  # 'All'
+        sub = pct_df
+    if len(sub) == 0:
+        return {'new': 0, 'expansion': 0, 'resurrected': 0, 'contraction': 0, 'churned': 0, 'net': 0}
+    return {k: float(sub[k].mean()) for k in ['new', 'expansion', 'resurrected', 'contraction', 'churned', 'net']}
+
+def _trend_arrays(pct_df):
+    """Return last 6 values for each component (for sparklines)."""
+    tail = pct_df.tail(6)
+    return {k: [round(float(v), 2) for v in tail[k].values] for k in ['new', 'expansion', 'resurrected', 'contraction', 'churned', 'net']}
+
+# Rename ga_pct_history columns to match the standard names used by _ga_pct_df
+_ga_pct_all = ga_pct_history.rename(columns={
+    'new_pct': 'new', 'expansion_pct': 'expansion', 'resurrected_pct': 'resurrected',
+    'contraction_pct': 'contraction', 'churned_pct': 'churned', 'net_pct': 'net'
+})
+
+# Pre-compute GA for each scope
+_scope_ga = {}
+_scope_pct = {}
+for scope_key, arch_list in _scope_map.items():
+    if arch_list is None:
+        _scope_ga[scope_key] = agg_rev_ga.copy()
+        _scope_pct[scope_key] = _ga_pct_all.copy()
+    else:
+        sids = [s for s in ALL_SIDS if _archetype_map.get(s, 'fine') in arch_list]
+        if not sids:
+            _scope_ga[scope_key] = pd.DataFrame()
+            _scope_pct[scope_key] = pd.DataFrame()
+        else:
+            raw = _compute_ga_for_sids(sids)
+            _scope_ga[scope_key] = raw
+            _scope_pct[scope_key] = _ga_pct_df(raw)
+
+# Build the full JSON blob: { "all|1M": {new, expansion, ...}, ... }
+_wf_json = {}
+_periods = ['1M', '3M', '6M', '12M', 'YTD', 'All']
+for scope_key in _scope_map:
+    pct_df = _scope_pct[scope_key]
+    trends = _trend_arrays(pct_df) if len(pct_df) >= 2 else {k: [] for k in ['new', 'expansion', 'resurrected', 'contraction', 'churned', 'net']}
+    # Compute full-history avg for the "avg" column in table view
+    full_avg = _period_avg(pct_df, 'All')
+    for period in _periods:
+        key = f"{scope_key}|{period}"
+        vals = _period_avg(pct_df, period)
+        _wf_json[key] = {
+            'new': round(vals['new'], 2),
+            'expansion': round(vals['expansion'], 2),
+            'resurrected': round(vals['resurrected'], 2),
+            'contraction': round(vals['contraction'], 2),
+            'churned': round(vals['churned'], 2),
+            'net': round(vals['net'], 2),
+            'avg_new': round(full_avg['new'], 2),
+            'avg_expansion': round(full_avg['expansion'], 2),
+            'avg_resurrected': round(full_avg['resurrected'], 2),
+            'avg_contraction': round(full_avg['contraction'], 2),
+            'avg_churned': round(full_avg['churned'], 2),
+            'avg_net': round(full_avg['net'], 2),
+            'trends': trends,
+        }
+
+_wf_json_str = json.dumps(_wf_json)
+
 # Net API Churn = (Churned + Contraction - Resurrected - Expansion) / Prior Revenue
 net_churn = (latest_ga['churned_revenue'] + latest_ga['contraction_revenue'] - latest_ga['resurrected_revenue'] - latest_ga['expansion_revenue']) / prior_total * 100 if prior_total > 0 else 0
 
@@ -1101,32 +1233,6 @@ for sid in ALL_SIDS:
 # TIER 1: ECOSYSTEM PULSE (pure HTML/CSS)
 # ============================================================
 
-# Waterfall bar max for scaling
-wf_max = max(abs(wf_new_pct), abs(wf_expansion_pct), abs(wf_resurrected_pct), abs(wf_contraction_pct), abs(wf_churned_pct), abs(wf_net_pct), 1)
-
-def wf_bar(label, pct, avg_pct, color, is_loss=False):
-    width = abs(pct) / wf_max * 100
-    avg_width = abs(avg_pct) / wf_max * 100
-    sign = '-' if is_loss else '+'
-    # Delta: for gains, higher is better; for losses, lower is better
-    if is_loss:
-        delta = avg_pct - pct  # positive = improving (less loss)
-    else:
-        delta = pct - avg_pct  # positive = improving (more gain)
-    delta_color = SUCCESS if delta > 0.5 else DANGER if delta < -0.5 else MUTED
-    delta_arrow = '↑' if delta > 0.5 else '↓' if delta < -0.5 else '→'
-    return f'''<div class="waterfall-row">
-        <span class="wf-label">{label}</span>
-        <div class="waterfall-bar">
-            <div class="wf-track">
-                <div class="wf-fill" style="width:{width:.1f}%;background:{color}"></div>
-                <div class="wf-avg-marker" style="left:{avg_width:.1f}%" title="Avg: {sign}{abs(avg_pct):.1f}%"></div>
-            </div>
-        </div>
-        <span class="wf-value" style="color:{color}">{sign}{abs(pct):.1f}%</span>
-        <span class="wf-delta" style="color:{delta_color}" title="vs {n_months_avg}-month avg ({sign}{abs(avg_pct):.1f}%)">{delta_arrow}</span>
-    </div>'''
-
 # ============================================================
 # COMBINED GA + CMGR CHART (Plotly — replaces static CMGR bars)
 # ============================================================
@@ -1280,77 +1386,6 @@ el1_html = f'''<div class="pulse-panel">
 </div>'''
 
 # ============================================================
-# ELEMENT 2: NOTEWORTHY SIGNALS
-# ============================================================
-
-signals = []
-
-# Signal 1: Highest positive MoM revenue change
-_mom_changes = []
-for sid in ALL_SIDS:
-    u = monthly_usage[monthly_usage['startup_id'] == sid].sort_values('month')
-    if len(u) >= 2:
-        curr_rev = u.iloc[-1]['revenue_usd']
-        prev_rev = u.iloc[-2]['revenue_usd']
-        _mom_changes.append((sid, curr_rev - prev_rev, curr_rev, prev_rev))
-_mom_changes.sort(key=lambda x: x[1], reverse=True)
-if _mom_changes and _mom_changes[0][1] > 0:
-    _s = _mom_changes[0]
-    _pct = (_s[1] / _s[3] * 100) if _s[3] > 0 else 0
-    signals.append((SUCCESS, '&#8593;', NAMES[_s[0]], f'+${_s[1]:,.0f} MoM ({_pct:+.0f}%)'))
-
-# Signal 2: Partner with highest recent dev churn rate
-_dev_churn_rates = []
-for sid in ALL_SIDS:
-    dg = dev_ga[dev_ga['startup_id'] == sid].sort_values('month')
-    if len(dg) >= 2:
-        latest_dg = dg.iloc[-1]
-        if latest_dg['active_devs'] + latest_dg['churned_devs'] > 0:
-            churn_rate = latest_dg['churned_devs'] / (latest_dg['active_devs'] + latest_dg['churned_devs'])
-            _dev_churn_rates.append((sid, churn_rate, int(latest_dg['churned_devs'])))
-_dev_churn_rates.sort(key=lambda x: x[1], reverse=True)
-if _dev_churn_rates and _dev_churn_rates[0][1] > 0:
-    _d = _dev_churn_rates[0]
-    signals.append((DANGER, '&#8595;', NAMES[_d[0]], f'{_d[1]*100:.0f}% dev churn ({_d[2]} devs lost)'))
-
-# Signal 3: Partners whose credits exhaust within 60 days
-_low_credit_partners = []
-for sid in ALL_SIDS:
-    total_credits = credits[credits['startup_id'] == sid]['amount_usd'].sum()
-    total_spent = monthly_usage[monthly_usage['startup_id'] == sid]['revenue_usd'].sum()
-    credit_balance = total_credits - total_spent
-    u = monthly_usage[monthly_usage['startup_id'] == sid].sort_values('month')
-    monthly_burn = u.tail(3)['revenue_usd'].mean() if len(u) >= 3 else u['revenue_usd'].mean()
-    if monthly_burn > 0 and credit_balance / monthly_burn < 2:
-        _low_credit_partners.append(NAMES[sid])
-if _low_credit_partners:
-    signals.append((WARNING, '&#9888;', f'{len(_low_credit_partners)} partner{"s" if len(_low_credit_partners) != 1 else ""}', 'credits exhaust within 60 days'))
-
-# Signal 4: Resurrection — partner that was inactive then became active
-for sid in ALL_SIDS:
-    u = monthly_usage[monthly_usage['startup_id'] == sid].sort_values('month')
-    if len(u) >= 3:
-        if u.iloc[-1]['revenue_usd'] > 0 and u.iloc[-2]['revenue_usd'] == 0 and u.iloc[-3]['revenue_usd'] == 0:
-            signals.append(('#3b82f6', '&#8634;', NAMES[sid], 'resurrected after 2+ months inactive'))
-            break
-
-# Signal 5: Partner with highest CMGR-3
-_cmgr3_partners = [(sid, m['cmgr3']) for m in company_metrics for sid in [m['sid']] if m['cmgr3'] is not None and m['cmgr3'] > 0]
-_cmgr3_partners.sort(key=lambda x: x[1], reverse=True)
-if _cmgr3_partners:
-    _c = _cmgr3_partners[0]
-    signals.append((SUCCESS, '&#11014;', NAMES[_c[0]], f'CMGR-3: {_c[1]*100:.1f}% (fastest growing)'))
-
-signals_rows_html = ''
-for color, icon, name, text in signals[:5]:
-    signals_rows_html += f'<div class="signal-row"><span class="signal-icon" style="color:{color}">{icon}</span><span class="signal-name">{name}</span><span class="signal-text">{text}</span></div>\n'
-
-el2_html = f'''<div class="pulse-panel">
-    <div class="panel-title">&#9889; SIGNALS</div>
-    <div class="signals-list">{signals_rows_html}</div>
-</div>'''
-
-# ============================================================
 # ELEMENT 3: REVENUE SHARE AREA OF EFFECT CHART (Plotly)
 # ============================================================
 
@@ -1367,13 +1402,17 @@ _other_sids = _partner_total_rev.iloc[TOP_N_AOE:].index.tolist()
 # Compute "Others" aggregate
 _others_monthly = _rev_by_partner_month[_rev_by_partner_month['startup_id'].isin(_other_sids)].groupby('month')['revenue_usd'].sum().reindex(_all_months, fill_value=0)
 
+# Pre-compute monthly totals for manual percentage calculation
+_monthly_total = _rev_by_partner_month.groupby('month')['revenue_usd'].sum().reindex(_all_months, fill_value=0)
+_others_pct = (_others_monthly / _monthly_total * 100).fillna(0).values
+
 fig_rev_share = go.Figure()
 
-# Add "Others" first (bottom of stack, grey)
+# Add "Others" first (bottom of stack, grey) — using pre-computed percentages
 fig_rev_share.add_trace(go.Scatter(
-    x=_all_months, y=_others_monthly.values,
+    x=_all_months, y=_others_pct,
     name=f'Others ({len(_other_sids)})',
-    stackgroup='one', groupnorm='percent',
+    stackgroup='one',
     line=dict(width=0.5, color='#94a3b8'),
     fillcolor='rgba(148,163,184,0.4)',
     hovertemplate=f'Others ({len(_other_sids)}): %{{y:.1f}}%<extra></extra>',
@@ -1382,10 +1421,11 @@ fig_rev_share.add_trace(go.Scatter(
 # Add top partners (biggest at bottom = most stable, reversed so biggest is first added after Others)
 for sid in reversed(_top_sids):
     d = _rev_by_partner_month[_rev_by_partner_month['startup_id'] == sid].set_index('month').reindex(_all_months, fill_value=0)
+    _pct_vals = (d['revenue_usd'] / _monthly_total * 100).fillna(0).values
     fig_rev_share.add_trace(go.Scatter(
-        x=d.index, y=d['revenue_usd'],
+        x=_all_months, y=_pct_vals,
         name=NAMES[sid],
-        stackgroup='one', groupnorm='percent',
+        stackgroup='one',
         line=dict(width=0.5, color=COLORS[sid]),
         fillcolor=COLORS[sid],
         hovertemplate=f'{NAMES[sid]}: %{{y:.1f}}%<extra></extra>',
@@ -1469,37 +1509,34 @@ tier1_html = f'''
     <div class="pulse-panels">
         <div class="pulse-panel">
             <div class="panel-title">GROWTH ACCOUNTING WATERFALL</div>
-            <div class="panel-subtitle">{pd.Timestamp(latest_ga['month']).strftime('%b %Y')} vs {pd.Timestamp(prior_ga['month']).strftime('%b %Y')} &middot; Prior revenue: ${prior_total:,.0f} &middot; ▸ = {n_months_avg}-month avg</div>
-            <div class="waterfall-rows">
-                {wf_bar('New', wf_new_pct, avg_new_pct, GAIN)}
-                {wf_bar('Expansion', wf_expansion_pct, avg_expansion_pct, GAIN)}
-                {wf_bar('Resurrected', wf_resurrected_pct, avg_resurrected_pct, GAIN)}
-                <div class="wf-divider"></div>
-                {wf_bar('Contraction', wf_contraction_pct, avg_contraction_pct, LOSS, True)}
-                {wf_bar('Churned', wf_churned_pct, avg_churned_pct, LOSS, True)}
-                <div class="wf-divider"></div>
-                <div class="waterfall-row wf-net">
-                    <span class="wf-label">Net Growth</span>
-                    <div class="waterfall-bar">
-                        <div class="wf-track">
-                            <div class="wf-fill" style="width:{abs(wf_net_pct)/wf_max*100:.1f}%;background:{GAIN if wf_net_pct >= 0 else LOSS}"></div>
-                            <div class="wf-avg-marker" style="left:{abs(avg_net_pct)/wf_max*100:.1f}%" title="Avg: {avg_net_pct:+.1f}%"></div>
-                        </div>
-                    </div>
-                    <span class="wf-value" style="font-weight:600">{'+' if wf_net_pct >= 0 else ''}{wf_net_pct:.1f}%</span>
-                    <span class="wf-delta" style="color:{SUCCESS if wf_net_pct > avg_net_pct + 0.5 else DANGER if wf_net_pct < avg_net_pct - 0.5 else MUTED}">{'↑' if wf_net_pct > avg_net_pct + 0.5 else '↓' if wf_net_pct < avg_net_pct - 0.5 else '→'}</span>
+            <div class="wf-options">
+                <div class="wf-option-group">
+                    <span class="wf-option-label">Period</span>
+                    <button class="wf-pill active" data-period="1M">1M</button>
+                    <button class="wf-pill" data-period="3M">3M</button>
+                    <button class="wf-pill" data-period="6M">6M</button>
+                    <button class="wf-pill" data-period="12M">12M</button>
+                    <button class="wf-pill" data-period="YTD">YTD</button>
+                    <button class="wf-pill" data-period="All">All</button>
+                </div>
+                <div class="wf-option-group">
+                    <span class="wf-option-label">View</span>
+                    <button class="wf-pill active" data-view="bars">Bars</button>
+                    <button class="wf-pill" data-view="table">Table</button>
+                    <button class="wf-pill" data-view="trend">Trend</button>
+                </div>
+                <div class="wf-option-group">
+                    <span class="wf-option-label">Scope</span>
+                    <button class="wf-pill active" data-scope="all">All</button>
+                    <button class="wf-pill" data-scope="star">Star</button>
+                    <button class="wf-pill" data-scope="strong">Strong</button>
+                    <button class="wf-pill" data-scope="fine">Fine</button>
+                    <button class="wf-pill" data-scope="declining">Declining</button>
+                    <button class="wf-pill" data-scope="churned">Churned</button>
                 </div>
             </div>
-            <div class="wf-summary">
-                ${latest_ga['total_revenue']:,.0f} current &middot; {'↑' if wf_net_pct >= 0 else '↓'} ${abs(latest_ga['total_revenue'] - prior_total):,.0f} ({'+' if wf_net_pct >= 0 else ''}{wf_net_pct:.1f}%) &middot; Avg net: {avg_net_pct:+.1f}%/mo
-            </div>
-            <div class="wf-legend">
-                <span class="wf-legend-label">KEY</span>
-                <span class="wf-legend-item"><span class="wf-dot" style="background:{GAIN}"></span>Gains</span>
-                <span class="wf-legend-item"><span class="wf-dot" style="background:{LOSS}"></span>Losses</span>
-                <span class="wf-legend-item"><span class="wf-avg-dot"></span>Period avg</span>
-                <span class="wf-legend-item"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:transparent;border:1.5px solid {MUTED}"></span>↑↓ vs avg</span>
-            </div>
+            <div id="wf-content"></div>
+            <script>window.__waterfall_data = {_wf_json_str};</script>
         </div>
 
         <div class="pulse-panel pulse-panel-chart">
@@ -2197,8 +2234,8 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .pulse-panel {{ background:#fff; border:1px solid {GRID}; border-radius:12px; padding:22px 24px; }}
 .pulse-panel-chart {{ padding:14px 10px 6px; overflow:hidden; }}
 
-/* Insights row: 60/40 split for Expansion vs Losses and Signals */
-.pulse-insights-row {{ display:grid; grid-template-columns:3fr 2fr; gap:16px; margin-bottom:20px; }}
+/* Insights row */
+.pulse-insights-row {{ display:grid; grid-template-columns:1fr; gap:16px; margin-bottom:20px; }}
 
 /* Element 1: Expansion vs Losses */
 .el1-bar-wrap {{ margin:14px 0 12px; }}
@@ -2208,13 +2245,6 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .el1-summary {{ font-size:12px; color:{DIM}; margin-bottom:10px; }}
 .el1-composition {{ font-size:12px; color:{MUTED}; display:flex; align-items:center; gap:4px; padding-top:10px; border-top:1px solid {GRID}; }}
 .el1-dot {{ width:8px; height:8px; border-radius:50%; display:inline-block; flex-shrink:0; }}
-
-/* Element 2: Signals */
-.signals-list {{ display:flex; flex-direction:column; gap:10px; margin-top:12px; }}
-.signal-row {{ display:grid; grid-template-columns:22px auto 1fr; gap:6px; align-items:baseline; font-size:12px; }}
-.signal-icon {{ font-size:14px; font-weight:700; text-align:center; }}
-.signal-name {{ font-weight:600; color:{TEXT}; white-space:nowrap; }}
-.signal-text {{ color:{DIM}; }}
 
 .panel-title {{ font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:{MUTED}; font-weight:700; margin-bottom:6px; }}
 .panel-subtitle {{ font-size:11px; color:{MUTED}; margin-bottom:18px; }}
@@ -2238,6 +2268,30 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .wf-legend-item {{ font-size:11px; color:{MUTED}; display:flex; align-items:center; gap:4px; }}
 .wf-dot {{ width:8px; height:8px; border-radius:50%; }}
 .wf-avg-dot {{ width:2px; height:12px; background:{TEXT}; opacity:0.35; border-radius:1px; }}
+
+/* Interactive waterfall options */
+.wf-options {{ display:flex; flex-wrap:wrap; gap:12px; margin-bottom:16px; align-items:center; }}
+.wf-option-group {{ display:flex; align-items:center; gap:4px; flex-wrap:wrap; }}
+.wf-option-label {{ font-size:9px; font-weight:700; color:{DIM}; text-transform:uppercase; letter-spacing:0.06em; margin-right:2px; }}
+.wf-pill {{ padding:3px 9px; font-size:11px; font-weight:500; border:1px solid {GRID}; border-radius:12px; background:transparent; color:{MUTED}; cursor:pointer; transition:all 0.15s ease; font-family:inherit; line-height:1.3; }}
+.wf-pill:hover {{ border-color:#c4c0cc; color:{DIM}; }}
+.wf-pill.active {{ background:{ACCENT}; color:#fff; border-color:{ACCENT}; }}
+
+/* Waterfall table view */
+.wf-table {{ width:100%; border-collapse:collapse; font-size:12px; }}
+.wf-table th {{ text-align:right; padding:6px 10px; font-size:10px; text-transform:uppercase; letter-spacing:0.04em; color:{MUTED}; font-weight:600; border-bottom:1px solid {GRID}; }}
+.wf-table th:first-child {{ text-align:left; }}
+.wf-table td {{ padding:6px 10px; text-align:right; color:{DIM}; border-bottom:1px solid {BORDER_SUBTLE}; }}
+.wf-table td:first-child {{ text-align:left; font-weight:500; color:{TEXT}; }}
+.wf-table tr.wf-table-net td {{ font-weight:600; border-top:2px solid {GRID}; }}
+.wf-table .wf-table-sep td {{ padding:0; height:1px; border:none; background:{BORDER_SUBTLE}; }}
+
+/* Waterfall trend view */
+.wf-trend-row {{ display:grid; grid-template-columns:100px 70px 1fr 60px; align-items:center; gap:8px; padding:5px 0; }}
+.wf-trend-label {{ font-size:12px; color:{DIM}; text-align:right; }}
+.wf-trend-spark {{ text-align:center; }}
+.wf-trend-bar {{ }}
+.wf-trend-val {{ font-size:12px; font-weight:500; text-align:right; }}
 
 /* Hover tooltips */
 [data-tooltip] {{ cursor:help; }}
@@ -2394,6 +2448,10 @@ html {{ scroll-behavior:smooth; }}
     .wf-delta {{ font-size:12px; }}
     .pulse-panel {{ padding:14px 12px; overflow-x:auto; }}
     .pulse-panel-chart {{ padding:8px 2px 4px; }}
+    .wf-options {{ gap:8px; }}
+    .wf-option-group {{ gap:3px; }}
+    .wf-pill {{ padding:2px 7px; font-size:10px; }}
+    .wf-trend-row {{ grid-template-columns:72px 60px 1fr 52px; }}
     .pl-subtitle {{ font-size:11px; }}
     .chart-desc {{ font-size:10px; }}
     .perf-table td {{ padding:8px 10px; font-size:12px; }}
@@ -2724,6 +2782,212 @@ document.querySelectorAll('.partner-list').forEach(wrap => {{
     wrap.addEventListener('scroll', checkScroll);
     window.addEventListener('resize', checkScroll);
 }});
+
+// ======== INTERACTIVE WATERFALL ========
+(function() {{
+    const WF = window.__waterfall_data;
+    if (!WF) return;
+    const GAIN = '{GAIN}';
+    const LOSS = '{LOSS}';
+    const SUCCESS_C = '{SUCCESS}';
+    const DANGER_C = '{DANGER}';
+    const MUTED_C = '{MUTED}';
+    const TEXT_C = '{TEXT}';
+    const DIM_C = '{DIM}';
+    const CARD_C = '{CARD}';
+    const GRID_C = '{GRID}';
+    const BORDER_C = '{BORDER_SUBTLE}';
+
+    let curPeriod = '1M', curView = 'bars', curScope = 'all';
+
+    const container = document.getElementById('wf-content');
+    if (!container) return;
+
+    // Pill click handlers
+    document.querySelectorAll('.wf-pill[data-period]').forEach(btn => {{
+        btn.addEventListener('click', () => {{
+            document.querySelectorAll('.wf-pill[data-period]').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            curPeriod = btn.dataset.period;
+            render();
+        }});
+    }});
+    document.querySelectorAll('.wf-pill[data-view]').forEach(btn => {{
+        btn.addEventListener('click', () => {{
+            document.querySelectorAll('.wf-pill[data-view]').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            curView = btn.dataset.view;
+            render();
+        }});
+    }});
+    document.querySelectorAll('.wf-pill[data-scope]').forEach(btn => {{
+        btn.addEventListener('click', () => {{
+            document.querySelectorAll('.wf-pill[data-scope]').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            curScope = btn.dataset.scope;
+            render();
+        }});
+    }});
+
+    function sign(v, isLoss) {{ return isLoss ? '-' : '+'; }}
+    function fmt(v) {{ return Math.abs(v).toFixed(1); }}
+
+    function sparkline(data, color) {{
+        if (!data || data.length < 2) return '';
+        const w = 60, h = 16;
+        const vals = data.map(v => Math.abs(v));
+        const mx = Math.max(...vals, 0.01);
+        const pts = data.map((v, i) => {{
+            const x = i * w / (data.length - 1);
+            const y = h / 2 - (v / mx) * (h / 2 - 1);
+            return x.toFixed(1) + ',' + y.toFixed(1);
+        }}).join(' ');
+        return '<svg width="' + w + '" height="' + h + '" style="vertical-align:middle"><polyline points="' + pts + '" fill="none" stroke="' + color + '" stroke-width="1.5"/></svg>';
+    }}
+
+    function deltaArrow(current, avg, isLoss) {{
+        let delta;
+        if (isLoss) {{
+            delta = avg - current; // less loss = improving
+        }} else {{
+            delta = current - avg; // more gain = improving
+        }}
+        if (delta > 0.5) return ['↑', SUCCESS_C];
+        if (delta < -0.5) return ['↓', DANGER_C];
+        return ['→', MUTED_C];
+    }}
+
+    function renderBars(d) {{
+        const components = [
+            ['New', d.new, d.avg_new, GAIN, false],
+            ['Expansion', d.expansion, d.avg_expansion, GAIN, false],
+            ['Resurrected', d.resurrected, d.avg_resurrected, GAIN, false],
+            ['_sep'],
+            ['Contraction', d.contraction, d.avg_contraction, LOSS, true],
+            ['Churned', d.churned, d.avg_churned, LOSS, true],
+            ['_sep'],
+            ['Net Growth', d.net, d.avg_net, null, false],
+        ];
+        const maxVal = Math.max(
+            Math.abs(d.new), Math.abs(d.expansion), Math.abs(d.resurrected),
+            Math.abs(d.contraction), Math.abs(d.churned), Math.abs(d.net), 0.1
+        );
+        let html = '<div class="waterfall-rows">';
+        for (const c of components) {{
+            if (c[0] === '_sep') {{
+                html += '<div class="wf-divider"></div>';
+                continue;
+            }}
+            const [label, val, avg, color, isLoss] = c;
+            const isNet = label === 'Net Growth';
+            const barColor = isNet ? (val >= 0 ? GAIN : LOSS) : color;
+            const w = Math.abs(val) / maxVal * 100;
+            const aw = Math.abs(avg) / maxVal * 100;
+            const s = isLoss ? '-' : '+';
+            const [arrow, arrowColor] = deltaArrow(val, avg, isLoss);
+            const netSign = isNet ? (val >= 0 ? '+' : '') : s;
+            html += '<div class="waterfall-row' + (isNet ? ' wf-net' : '') + '">';
+            html += '<span class="wf-label">' + label + '</span>';
+            html += '<div class="waterfall-bar"><div class="wf-track">';
+            html += '<div class="wf-fill" style="width:' + w.toFixed(1) + '%;background:' + barColor + '"></div>';
+            html += '<div class="wf-avg-marker" style="left:' + aw.toFixed(1) + '%" title="Avg: ' + s + fmt(avg) + '%"></div>';
+            html += '</div></div>';
+            html += '<span class="wf-value" style="color:' + barColor + (isNet ? ';font-weight:600' : '') + '">' + netSign + fmt(val) + '%</span>';
+            html += '<span class="wf-delta" style="color:' + arrowColor + '">' + arrow + '</span>';
+            html += '</div>';
+        }}
+        html += '</div>';
+        html += '<div class="wf-legend">';
+        html += '<span class="wf-legend-label">KEY</span>';
+        html += '<span class="wf-legend-item"><span class="wf-dot" style="background:' + GAIN + '"></span>Gains</span>';
+        html += '<span class="wf-legend-item"><span class="wf-dot" style="background:' + LOSS + '"></span>Losses</span>';
+        html += '<span class="wf-legend-item"><span class="wf-avg-dot"></span>Period avg</span>';
+        html += '<span class="wf-legend-item"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:transparent;border:1.5px solid ' + MUTED_C + '"></span>↑↓ vs avg</span>';
+        html += '</div>';
+        return html;
+    }}
+
+    function renderTable(d) {{
+        const rows = [
+            ['New', d.new, d.avg_new, false],
+            ['Expansion', d.expansion, d.avg_expansion, false],
+            ['Resurrected', d.resurrected, d.avg_resurrected, false],
+            ['_sep'],
+            ['Contraction', d.contraction, d.avg_contraction, true],
+            ['Churned', d.churned, d.avg_churned, true],
+            ['_sep'],
+            ['Net Growth', d.net, d.avg_net, false],
+        ];
+        let html = '<table class="wf-table"><thead><tr><th style="text-align:left">Component</th><th>Current</th><th>Avg</th><th>Δ</th></tr></thead><tbody>';
+        for (const r of rows) {{
+            if (r[0] === '_sep') {{
+                html += '<tr class="wf-table-sep"><td colspan="4"></td></tr>';
+                continue;
+            }}
+            const [label, val, avg, isLoss] = r;
+            const isNet = label === 'Net Growth';
+            const s = isLoss ? '-' : '+';
+            const netSign = isNet ? (val >= 0 ? '+' : '') : s;
+            const avgSign = isNet ? (avg >= 0 ? '+' : '') : s;
+            const [arrow, arrowColor] = deltaArrow(val, avg, isLoss);
+            const color = isNet ? (val >= 0 ? GAIN : LOSS) : (isLoss ? LOSS : GAIN);
+            html += '<tr' + (isNet ? ' class="wf-table-net"' : '') + '>';
+            html += '<td>' + label + '</td>';
+            html += '<td style="color:' + color + '">' + netSign + fmt(val) + '%</td>';
+            html += '<td style="color:' + MUTED_C + '">' + avgSign + fmt(avg) + '%</td>';
+            html += '<td style="color:' + arrowColor + '">' + arrow + '</td>';
+            html += '</tr>';
+        }}
+        html += '</tbody></table>';
+        return html;
+    }}
+
+    function renderTrend(d) {{
+        const trends = d.trends || {{}};
+        const rows = [
+            ['New', 'new', GAIN, false],
+            ['Expansion', 'expansion', GAIN, false],
+            ['Resurrected', 'resurrected', GAIN, false],
+            ['Contraction', 'contraction', LOSS, true],
+            ['Churned', 'churned', LOSS, true],
+            ['Net Growth', 'net', null, false],
+        ];
+        const maxVal = Math.max(
+            Math.abs(d.new), Math.abs(d.expansion), Math.abs(d.resurrected),
+            Math.abs(d.contraction), Math.abs(d.churned), Math.abs(d.net), 0.1
+        );
+        let html = '<div style="display:flex;flex-direction:column;gap:4px">';
+        for (const [label, key, color, isLoss] of rows) {{
+            const val = d[key];
+            const barColor = key === 'net' ? (val >= 0 ? GAIN : LOSS) : color;
+            const s = isLoss ? '-' : (key === 'net' ? (val >= 0 ? '+' : '') : '+');
+            const trendData = trends[key] || [];
+            const w = Math.abs(val) / maxVal * 100;
+            html += '<div class="wf-trend-row">';
+            html += '<span class="wf-trend-label"' + (key === 'net' ? ' style="font-weight:600;color:' + TEXT_C + '"' : '') + '>' + label + '</span>';
+            html += '<span class="wf-trend-spark">' + sparkline(trendData, barColor) + '</span>';
+            html += '<div class="wf-trend-bar"><div class="wf-track"><div class="wf-fill" style="width:' + w.toFixed(1) + '%;background:' + barColor + '"></div></div></div>';
+            html += '<span class="wf-trend-val" style="color:' + barColor + '">' + s + fmt(val) + '%</span>';
+            html += '</div>';
+        }}
+        html += '</div>';
+        return html;
+    }}
+
+    function render() {{
+        const key = curScope + '|' + curPeriod;
+        const d = WF[key];
+        if (!d) {{
+            container.innerHTML = '<div style="color:' + MUTED_C + ';font-size:12px;padding:20px 0">No data for this combination.</div>';
+            return;
+        }}
+        if (curView === 'bars') container.innerHTML = renderBars(d);
+        else if (curView === 'table') container.innerHTML = renderTable(d);
+        else container.innerHTML = renderTrend(d);
+    }}
+
+    render();
+}})();
 </script>
 
 <!-- Hidden tooltip definitions with rich HTML formulas -->
