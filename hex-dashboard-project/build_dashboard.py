@@ -1401,13 +1401,28 @@ for sid in reversed(_top_sids):
         ))
     _cum_pct += pct
 
+# Update trace names to include latest % share for the legend
+for trace in fig_rev_share.data:
+    _trace_name = trace.name
+    if _trace_name.startswith('Others'):
+        _pct = (_others_monthly.iloc[-1] / _total_last * 100) if _total_last > 0 else 0
+        trace.name = f'Others ({len(_other_sids)}): {_pct:.0f}%'
+    else:
+        _sid_match = [s for s in _top_sids if NAMES.get(s) == _trace_name]
+        if _sid_match:
+            _rev_val = _last_month_rev[_last_month_rev['startup_id'] == _sid_match[0]]['revenue_usd'].values
+            _pct = (_rev_val[0] / _total_last * 100) if len(_rev_val) > 0 and _total_last > 0 else 0
+            trace.name = f'{_trace_name}: {_pct:.0f}%'
+
 rev_share_layout = layout('Portfolio Revenue Share', h=280)
-rev_share_layout['showlegend'] = False
+rev_share_layout['showlegend'] = True
+rev_share_layout['legend'] = dict(
+    bgcolor='rgba(0,0,0,0)', orientation='v', yanchor='middle', y=0.5,
+    xanchor='left', x=1.02, font=dict(size=10), traceorder='reversed')
 rev_share_layout['yaxis']['ticksuffix'] = '%'
 rev_share_layout['yaxis']['range'] = [0, 100]
-rev_share_layout['margin'] = dict(l=45, r=20, t=40, b=35)
+rev_share_layout['margin'] = dict(l=45, r=160, t=40, b=35)
 rev_share_layout['hovermode'] = 'x unified'
-# Annotations for top 3 partners
 rev_share_layout['annotations'] = _annot_list
 fig_rev_share.update_layout(**rev_share_layout)
 
