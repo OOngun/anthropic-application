@@ -280,12 +280,89 @@ cmgr12 = cmgr(portfolio_tokens, 12)
 # === REGENERATE DEVELOPER-LEVEL ACTIVITY DATA ===
 # Staggered onboarding: devs join gradually across months, not all at once.
 # Archetype-aware: star/strong accelerate, declining/churned lose devs.
+# Case study partners (CS01/CS02/CS03) use special cohort-aware generation.
 
 np.random.seed(2024)
 _archetype_map = dict(zip(startups['startup_id'], startups['archetype']))
 
 _dev_rows = []
+
+# --- Case study partner generation (cohort-aware) ---
+def _gen_cs_devs(sid, cohort_plan, churn_range, rev_power=0.5):
+    """Generate dev rows for a case study partner.
+    cohort_plan: list of (month_idx, n_devs) for onboarding events
+    churn_range: (lo, hi) monthly churn probability per dev
+    rev_power: exponent for power-law revenue distribution
+    """
+    _rng = np.random.RandomState(hash(sid) % (2**31))
+    u = monthly_usage[monthly_usage['startup_id'] == sid].sort_values('month')
+    months = u['month'].tolist()
+    rev_vals = u['revenue_usd'].values
+    n_months = len(months)
+    rows = []
+    all_devs = {}
+    dev_counter = 0
+    active_pool = []
+
+    # Build onboard schedule from plan
+    onboard_at = {mi: n for mi, n in cohort_plan}
+
+    for mi in range(n_months):
+        target_rev = rev_vals[mi]
+        # Churn existing devs
+        surviving = []
+        for did in active_pool:
+            cr = _rng.uniform(churn_range[0], churn_range[1])
+            if _rng.random() > cr:
+                surviving.append(did)
+        active_pool = surviving
+        # Onboard
+        n_new = onboard_at.get(mi, 0)
+        for _ in range(n_new):
+            dev_counter += 1
+            did = f'{sid}_d{dev_counter}'
+            all_devs[did] = mi
+            active_pool.append(did)
+        if not active_pool or target_rev <= 0:
+            continue
+        n_active = len(active_pool)
+        w = np.array([1.0 / (i + 1) ** rev_power for i in range(n_active)])
+        _rng.shuffle(w)
+        w = w / w.sum() * target_rev
+        for i, did in enumerate(active_pool):
+            rv = round(max(w[i] * _rng.uniform(0.92, 1.08), 0.50), 2)
+            rows.append({'dev_id': did, 'startup_id': sid,
+                         'month': months[mi].strftime('%Y-%m-%d'), 'revenue': rv})
+    # Rescale each month to match target revenue exactly
+    import pandas as _pd
+    df = _pd.DataFrame(rows)
+    for mi in range(n_months):
+        m = months[mi].strftime('%Y-%m-%d')
+        target = rev_vals[mi]
+        mask = df['month'] == m
+        actual = df.loc[mask, 'revenue'].sum()
+        if actual > 0:
+            df.loc[mask, 'revenue'] = (df.loc[mask, 'revenue'] / actual * target).round(2)
+    return df.to_dict('records')
+
+# CS01 WriteFlow: consumer app, 40-60 total unique devs, high turnover (28-40% churn)
+_cs01_cohorts = [(0,6),(1,4),(2,6),(3,4),(4,2),(5,2),(6,4),(7,3),(8,1),(9,1),
+                 (10,1),(11,1),(12,2),(13,1),(14,2),(15,2),(16,1),(18,1),(20,1),(21,1),(22,1),(23,1)]
+_dev_rows.extend(_gen_cs_devs('CS01', _cs01_cohorts, (0.28, 0.40), 0.5))
+
+# CS02 FinLedger: internal dev tooling, 8-12 devs, very low churn (2%)
+_cs02_cohorts = [(0,4),(5,1),(10,1),(15,1),(20,1)]
+_dev_rows.extend(_gen_cs_devs('CS02', _cs02_cohorts, (0.01, 0.03), 0.3))
+
+# CS03 BrieflyAI: B2B platform, 15-25 devs, step-function onboarding, moderate churn (8-12%)
+_cs03_cohorts = [(0,5),(5,3),(10,4),(12,1),(16,4),(21,4),(23,1)]
+_dev_rows.extend(_gen_cs_devs('CS03', _cs03_cohorts, (0.08, 0.12), 0.4))
+
+# --- Standard partner generation ---
 for sid in ALL_SIDS:
+    if sid in ('CS01', 'CS02', 'CS03'):
+        continue  # already generated above
+
     u = monthly_usage[monthly_usage['startup_id'] == sid].sort_values('month')
     months = u['month'].tolist()
     rev_vals = u['revenue_usd'].values
@@ -300,31 +377,24 @@ for sid in ALL_SIDS:
     onboard_schedule = np.zeros(n_months, dtype=int)
 
     if arch in ('star', 'rocket'):
-        # Accelerating: more devs join in later months
         weights = np.array([(i + 1) ** 1.5 for i in range(n_months)], dtype=float)
     elif arch == 'strong':
-        # Steady growth with slight acceleration
         weights = np.array([(i + 1) ** 1.0 for i in range(n_months)], dtype=float)
     elif arch == 'steady':
-        # Flat-ish onboarding
         weights = np.ones(n_months, dtype=float)
-        weights[:3] = 1.5  # front-load slightly
+        weights[:3] = 1.5
     elif arch in ('declining',):
-        # Most onboarding early, then stops
         weights = np.array([max(n_months - i, 0) ** 2 for i in range(n_months)], dtype=float)
-        weights[n_months // 2:] = 0  # no onboarding in second half
+        weights[n_months // 2:] = 0
     elif arch == 'churned':
-        # All onboarding in first 40% of period
         cutoff = max(int(n_months * 0.4), 2)
         weights = np.zeros(n_months, dtype=float)
         weights[:cutoff] = np.array([max(cutoff - i, 0) for i in range(cutoff)], dtype=float)
     elif arch == 'minimal':
-        # 1-2 devs total, all early
         total_devs_ever = min(total_devs_ever, 2)
         weights = np.zeros(n_months, dtype=float)
         weights[0] = 1.0
     else:
-        # fine: steady onboarding
         weights = np.ones(n_months, dtype=float)
 
     if weights.sum() > 0:
@@ -332,20 +402,16 @@ for sid in ALL_SIDS:
     else:
         weights[0] = 1.0
 
-    # Distribute devs across months
     for d in range(total_devs_ever):
         month_idx = np.random.choice(n_months, p=weights)
         onboard_schedule[month_idx] += 1
 
-    # Ensure at least 1 dev in month 0
     if onboard_schedule[0] == 0 and total_devs_ever > 0:
-        # Move one from the most populated month
         max_idx = np.argmax(onboard_schedule)
         if onboard_schedule[max_idx] > 0:
             onboard_schedule[max_idx] -= 1
             onboard_schedule[0] += 1
 
-    # Create dev objects with onboarding month
     dev_pool = []
     dev_counter = 0
     for mi in range(n_months):
@@ -353,7 +419,6 @@ for sid in ALL_SIDS:
             dev_counter += 1
             dev_pool.append({'dev_id': f'{sid}_d{dev_counter}', 'start_month_idx': mi})
 
-    # For each month, decide which devs are active and their revenue
     for mi in range(n_months):
         target_active = dev_counts[mi]
         target_rev = rev_vals[mi]
@@ -361,17 +426,14 @@ for sid in ALL_SIDS:
         if target_active == 0 or target_rev <= 0:
             continue
 
-        # Eligible devs: those who have onboarded by this month
         eligible = [d for d in dev_pool if d['start_month_idx'] <= mi]
         if not eligible:
             continue
 
-        # Retention logic: newer devs and in churned/declining archetypes, higher churn
         active_devs = []
         for d in eligible:
             tenure = mi - d['start_month_idx']
             if arch == 'churned':
-                # After halfway point, devs start leaving rapidly
                 if mi > n_months * 0.5:
                     churn_prob = min(0.3 + 0.05 * (mi - n_months * 0.5), 0.95)
                     if np.random.random() < churn_prob:
@@ -382,30 +444,21 @@ for sid in ALL_SIDS:
                     if np.random.random() < churn_prob:
                         continue
             else:
-                # Normal churn: ~5% per month for tenured devs
                 if tenure > 0 and np.random.random() < 0.05:
                     continue
             active_devs.append(d)
 
-        # Trim or pad to match target_active
         if len(active_devs) > target_active:
-            # Drop newest devs first
             active_devs.sort(key=lambda d: d['start_month_idx'])
             active_devs = active_devs[:target_active]
-        elif len(active_devs) < target_active:
-            # Might have fewer eligible; that's ok, use what we have
-            pass
 
         if not active_devs:
             continue
 
-        # Distribute revenue: power-law distribution (some devs generate more)
         n_active = len(active_devs)
-        # Zipf-like weights: dev 1 gets most revenue, dev n gets least
         raw_weights = np.array([1.0 / (i + 1) ** 0.7 for i in range(n_active)])
         raw_weights = raw_weights / raw_weights.sum() * target_rev
 
-        # Shuffle to avoid always giving most to earliest dev
         np.random.shuffle(active_devs)
 
         for i, d in enumerate(active_devs):
@@ -795,6 +848,14 @@ for sid in ALL_SIDS:
                 mode='lines', name=fm.strftime('%Y-%m'),
                 line=dict(width=2, color=_coh_colors[ci]),
                 hovertemplate=f'{fm.strftime("%Y-%m")}<br>Age %{{x}}: $%{{y:,.0f}}/dev<extra></extra>'))
+        # Dashed black average line across all cohorts
+        _avg_ltv = _cohort_agg_ltv.groupby('age')['cum_ltv_per_dev'].mean().reset_index()
+        _avg_ltv = _avg_ltv.sort_values('age')
+        if len(_avg_ltv) > 1:
+            f.add_trace(go.Scatter(x=_avg_ltv['age'], y=_avg_ltv['cum_ltv_per_dev'],
+                mode='lines', name='Average',
+                line=dict(width=2.5, color='black', dash='dash'),
+                hovertemplate='Average<br>Age %{x}: $%{y:,.0f}/dev<extra></extra>'))
         f.update_layout(**layout('Cumulative LTV per Developer by Cohort'))
         f.update_yaxes(tickprefix='$', tickformat=',')
         f.update_xaxes(title_text='Months since cohort start')
@@ -859,7 +920,7 @@ for sid in ALL_SIDS:
             hovertemplate='%{y}: %{x} devs<extra></extra>'
         ), row=1, col=1)
 
-        # Text annotations for heatmap cells
+        # Text annotations for heatmap cells (e.g. "$0.5k", "$2.1k")
         text_matrix = []
         for row in ltv_matrix:
             text_row = []
@@ -867,9 +928,9 @@ for sid in ALL_SIDS:
                 if v is None:
                     text_row.append('')
                 elif v >= 1000:
-                    text_row.append(f'{v/1000:.1f}k')
+                    text_row.append(f'${v/1000:.1f}k')
                 else:
-                    text_row.append(f'{v:.0f}')
+                    text_row.append(f'${v:.0f}')
             text_matrix.append(text_row)
 
         # LTV heatmap (right) — red to blue
@@ -1712,6 +1773,10 @@ for cs in CASE_STUDIES:
     # Revenue chart
     rev_chart_html = f'<div class="card">{ch["revenue"]}</div>' if 'revenue' in ch else ''
 
+    # LTV charts
+    ltv_curve_html = f'<div class="card">{ch["ltv_curve"]}</div>' if 'ltv_curve' in ch else ''
+    ltv_heatmap_html = f'<div class="card">{ch["ltv_heatmap"]}</div>' if 'ltv_heatmap' in ch else ''
+
     latest_rev = m['latest_mrr'] if m else 0
     cmgr3 = m['cmgr3'] if m and m['cmgr3'] else 0
     devs = m['active_devs'] if m else 0
@@ -1751,6 +1816,14 @@ for cs in CASE_STUDIES:
             <div class="cs-charts">
                 {ga_chart_html}
                 {rev_chart_html}
+            </div>
+
+            <div class="cs-section">
+                <div class="cs-section-title">LTV Cohort Analysis</div>
+            </div>
+            <div class="cs-charts">
+                {ltv_curve_html}
+                {ltv_heatmap_html}
             </div>
 
             <div class="cs-link" onclick="event.stopPropagation(); showDetail('{sid}')">View full analysis &rarr;</div>
