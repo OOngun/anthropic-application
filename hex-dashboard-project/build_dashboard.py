@@ -1132,32 +1132,46 @@ def wf_bar(label, pct, avg_pct, color, is_loss=False):
 # ============================================================
 # Revenue Growth Accounting stacked bars + CMGR trailing lines on secondary axis
 
-fig_ga_cmgr = go.Figure()
-
-# GA bars — gains above axis, losses below (canonical GA colors)
-fig_ga_cmgr.add_trace(go.Bar(x=agg_rev_ga['month'], y=agg_rev_ga['retained_revenue'], name='Retained',
+# === CHART 1: Growth Accounting bars (standalone) ===
+fig_ga = go.Figure()
+fig_ga.add_trace(go.Bar(x=agg_rev_ga['month'], y=agg_rev_ga['retained_revenue'], name='Retained',
     marker_color=GA_RETAINED, opacity=0.5, hovertemplate='Retained: $%{y:,.0f}<extra></extra>'))
-fig_ga_cmgr.add_trace(go.Bar(x=agg_rev_ga['month'], y=agg_rev_ga['new_revenue'], name='New',
+fig_ga.add_trace(go.Bar(x=agg_rev_ga['month'], y=agg_rev_ga['new_revenue'], name='New',
     marker_color=GA_NEW, hovertemplate='New: $%{y:,.0f}<extra></extra>'))
-fig_ga_cmgr.add_trace(go.Bar(x=agg_rev_ga['month'], y=agg_rev_ga['expansion_revenue'], name='Expansion',
+fig_ga.add_trace(go.Bar(x=agg_rev_ga['month'], y=agg_rev_ga['expansion_revenue'], name='Expansion',
     marker_color=GA_EXPANSION, hovertemplate='Expansion: $%{y:,.0f}<extra></extra>'))
-fig_ga_cmgr.add_trace(go.Bar(x=agg_rev_ga['month'], y=agg_rev_ga['resurrected_revenue'], name='Resurrected',
+fig_ga.add_trace(go.Bar(x=agg_rev_ga['month'], y=agg_rev_ga['resurrected_revenue'], name='Resurrected',
     marker_color=GA_RESURRECTED, hovertemplate='Resurrected: $%{y:,.0f}<extra></extra>'))
-fig_ga_cmgr.add_trace(go.Bar(x=agg_rev_ga['month'], y=-agg_rev_ga['contraction_revenue'], name='Contraction',
+fig_ga.add_trace(go.Bar(x=agg_rev_ga['month'], y=-agg_rev_ga['contraction_revenue'], name='Contraction',
     marker_color=GA_CONTRACTION, hovertemplate='Contraction: -$%{y:,.0f}<extra></extra>'))
-fig_ga_cmgr.add_trace(go.Bar(x=agg_rev_ga['month'], y=-agg_rev_ga['churned_revenue'], name='Churned',
+fig_ga.add_trace(go.Bar(x=agg_rev_ga['month'], y=-agg_rev_ga['churned_revenue'], name='Churned',
     marker_color=GA_CHURNED, hovertemplate='Churned: -$%{y:,.0f}<extra></extra>'))
+fig_ga.add_hline(y=0, line=dict(color=DANGER, width=2, dash='solid'), opacity=0.6)
 
-# CMGR trailing lines on secondary y-axis
-# Compute rolling CMGR at each month
+ga_layout = layout('Growth Accounting', h=320)
+ga_layout['barmode'] = 'relative'
+ga_layout['yaxis']['tickprefix'] = '$'
+ga_layout['yaxis']['tickformat'] = ','
+ga_layout['yaxis']['title'] = 'Revenue'
+ga_layout['yaxis']['zeroline'] = True
+ga_layout['yaxis']['zerolinecolor'] = DANGER
+ga_layout['yaxis']['zerolinewidth'] = 2
+ga_layout['legend'] = dict(
+    bgcolor='rgba(0,0,0,0)', orientation='h', yanchor='top', y=-0.18,
+    xanchor='center', x=0.5, font=dict(size=10), traceorder='normal')
+ga_layout['margin'] = dict(t=40, b=80, l=60, r=20)
+fig_ga.update_layout(**ga_layout)
+ga_div = to_div(fig_ga, 'pulse-ga')
+
+# === CHART 2: CMGR trailing lines (standalone) ===
 months_list = portfolio_tokens.index.tolist()
 cmgr3_series, cmgr6_series, cmgr12_series = [], [], []
 cmgr_months = []
 for i in range(len(months_list)):
     m = months_list[i]
     sub = portfolio_tokens.iloc[:i+1]
-    c3 = cmgr(sub, 3) if len(sub) > 6 else None   # skip first 6 months
-    c6 = cmgr(sub, 6) if len(sub) > 9 else None   # skip first 9 months
+    c3 = cmgr(sub, 3) if len(sub) > 6 else None
+    c6 = cmgr(sub, 6) if len(sub) > 9 else None
     c12 = cmgr(sub, 12) if len(sub) > 12 else None
     cmgr_months.append(m)
     cmgr3_series.append(c3)
@@ -1166,6 +1180,7 @@ for i in range(len(months_list)):
 
 cmgr_df = pd.DataFrame({'month': cmgr_months, 'cmgr3': cmgr3_series, 'cmgr6': cmgr6_series, 'cmgr12': cmgr12_series})
 
+fig_cmgr = go.Figure()
 for col, name, color, dash in [
     ('cmgr3', 'CMGR-3', '#3B6BE0', 'solid'),
     ('cmgr6', 'CMGR-6', '#6366f1', 'dash'),
@@ -1173,52 +1188,34 @@ for col, name, color, dash in [
 ]:
     valid = cmgr_df.dropna(subset=[col])
     if len(valid) > 0:
-        fig_ga_cmgr.add_trace(go.Scatter(
+        fig_cmgr.add_trace(go.Scatter(
             x=valid['month'], y=valid[col] * 100, name=name,
             mode='lines+markers', line=dict(color=color, width=3, dash=dash),
             marker=dict(size=5),
-            yaxis='y2',
             hovertemplate=f'{name}: %{{y:.1f}}%<extra></extra>'))
 
-# Add prominent zero line
-fig_ga_cmgr.add_hline(y=0, line=dict(color=DANGER, width=2, dash='solid'), opacity=0.6)
-
-ga_cmgr_layout = layout('Growth Accounting + CMGR', h=400)
-ga_cmgr_layout['barmode'] = 'relative'
-ga_cmgr_layout['yaxis']['tickprefix'] = '$'
-ga_cmgr_layout['yaxis']['tickformat'] = ','
-ga_cmgr_layout['yaxis']['title'] = 'Revenue'
-ga_cmgr_layout['yaxis']['zeroline'] = True
-ga_cmgr_layout['yaxis']['zerolinecolor'] = DANGER
-ga_cmgr_layout['yaxis']['zerolinewidth'] = 2
-# Compute sensible y2 range from actual CMGR values
-all_cmgr_vals = [v for v in cmgr3_series + cmgr6_series + cmgr12_series if v is not None]
-cmgr_min_pct = min(all_cmgr_vals) * 100 if all_cmgr_vals else 0
-cmgr_max_pct = max(all_cmgr_vals) * 100 if all_cmgr_vals else 100
-cmgr_padding = max((cmgr_max_pct - cmgr_min_pct) * 0.15, 5)
-
-ga_cmgr_layout['yaxis2'] = dict(
-    overlaying='y', side='right', showgrid=False, zeroline=True,
-    zerolinecolor='rgba(59,107,224,0.2)',
-    title='CMGR %', ticksuffix='%',
-    range=[cmgr_min_pct - cmgr_padding, cmgr_max_pct + cmgr_padding],
-    titlefont=dict(color='#3B6BE0', size=11),
-    tickfont=dict(color='#3B6BE0', size=10))
-ga_cmgr_layout['legend'] = dict(
-    bgcolor='rgba(0,0,0,0)', orientation='h', yanchor='top', y=-0.18,
-    xanchor='center', x=0.5, font=dict(size=10),
-    traceorder='normal')
-ga_cmgr_layout['margin'] = dict(t=40, b=90, l=60, r=60)
-# Cap y2 axis to remove early outlier distortion
+fig_cmgr.add_hline(y=0, line=dict(color='rgba(0,0,0,0.2)', width=1))
+cmgr_layout = layout('Compound Monthly Growth Rate (Trailing)', h=200)
+cmgr_layout['yaxis']['ticksuffix'] = '%'
+cmgr_layout['yaxis']['title'] = 'CMGR %'
+cmgr_layout['yaxis']['titlefont'] = dict(color='#3B6BE0', size=11)
+cmgr_layout['yaxis']['tickfont'] = dict(color='#3B6BE0', size=10)
+cmgr_layout['legend'] = dict(
+    bgcolor='rgba(0,0,0,0)', orientation='h', yanchor='top', y=-0.25,
+    xanchor='center', x=0.5, font=dict(size=10))
+cmgr_layout['margin'] = dict(t=30, b=50, l=60, r=20)
+# Cap axis to remove early outlier distortion
 stable_cmgr = [v for v in cmgr3_series + cmgr6_series + cmgr12_series if v is not None and abs(v) < 1.0]
 if stable_cmgr:
-    y2_max = max(stable_cmgr) * 100
-    y2_min = min(min(stable_cmgr) * 100, 0)
-    y2_pad = max((y2_max - y2_min) * 0.15, 3)
-    ga_cmgr_layout['yaxis2']['range'] = [y2_min - y2_pad, y2_max + y2_pad]
-fig_ga_cmgr.update_layout(**ga_cmgr_layout)
+    y_max = max(stable_cmgr) * 100
+    y_min = min(min(stable_cmgr) * 100, 0)
+    y_pad = max((y_max - y_min) * 0.15, 3)
+    cmgr_layout['yaxis']['range'] = [y_min - y_pad, y_max + y_pad]
+fig_cmgr.update_layout(**cmgr_layout)
+cmgr_div = to_div(fig_cmgr, 'pulse-cmgr')
 
-ga_cmgr_div = to_div(fig_ga_cmgr, 'pulse-ga-cmgr')
+# Combined div for backward compatibility
+ga_cmgr_div = ga_div
 
 # Deceleration note for inline display
 cmgr_note_html = ''
@@ -1482,11 +1479,17 @@ tier1_html = f'''
         </div>
 
         <div class="pulse-panel pulse-panel-chart">
-            <div class="panel-title">GROWTH ACCOUNTING + CMGR</div>
-            <div class="panel-subtitle">Revenue breakdown with compound monthly growth rate (click legend to toggle CMGR lines)</div>
-            {ga_cmgr_div}
-            {cmgr_note_html}
+            <div class="panel-title">GROWTH ACCOUNTING</div>
+            <div class="panel-subtitle">Revenue breakdown: retained + new + expansion + resurrected above axis; contraction + churned below</div>
+            {ga_div}
         </div>
+    </div>
+
+    <div class="pulse-panel pulse-panel-chart" style="margin-top:16px">
+        <div class="panel-title">COMPOUND MONTHLY GROWTH RATE</div>
+        <div class="panel-subtitle">Trailing 3, 6, and 12-month CMGR. If CMGR-3 &lt; CMGR-12, growth is decelerating.</div>
+        {cmgr_div}
+        {cmgr_note_html}
     </div>
 </div>
 '''
