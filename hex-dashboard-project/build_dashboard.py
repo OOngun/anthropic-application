@@ -1341,7 +1341,7 @@ fig_rev_share.add_trace(go.Scatter(
     stackgroup='one', groupnorm='percent',
     line=dict(width=0.5, color='#94a3b8'),
     fillcolor='rgba(148,163,184,0.4)',
-    hovertemplate=f'Others ({len(_other_sids)}): $%{{y:,.0f}}<extra></extra>',
+    hovertemplate=f'Others ({len(_other_sids)}): %{{y:.1f}}%<extra></extra>',
 ))
 
 # Add top partners (biggest at bottom = most stable, reversed so biggest is first added after Others)
@@ -1353,7 +1353,7 @@ for sid in reversed(_top_sids):
         stackgroup='one', groupnorm='percent',
         line=dict(width=0.5, color=COLORS[sid]),
         fillcolor=COLORS[sid],
-        hovertemplate=f'{NAMES[sid]}: $%{{y:,.0f}}<extra></extra>',
+        hovertemplate=f'{NAMES[sid]}: %{{y:.1f}}%<extra></extra>',
     ))
 
 # Add text annotations for top 3 at last month
