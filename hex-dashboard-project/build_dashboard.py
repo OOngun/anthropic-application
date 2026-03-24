@@ -1705,39 +1705,43 @@ for cs in CASE_STUDIES:
 
     cs_cards_html += f'''
     <div class="cs-card" style="border-top:3px solid {cs['type_color']}">
-        <div class="cs-header">
-            <div>
+        <div class="cs-header-clickable" onclick="toggleCaseStudy(this)">
+            <div class="cs-header-left">
+                <span class="cs-chevron">&#x25BC;</span>
                 <span class="cs-name">{cs['name']}</span>
                 <span class="cs-type-badge" style="background:{cs['type_color']}">{cs['type']}</span>
+                <span class="cs-tagline-inline">{cs['tagline']}</span>
             </div>
             <span class="cs-meta">{cs['stage']} &middot; {cs['hq']}</span>
         </div>
-        <p class="cs-tagline">{cs['tagline']}</p>
-        <p class="cs-desc">{cs['summary']}</p>
 
-        <div class="cs-kpis">
-            <div class="cs-kpi"><div class="cs-kpi-label">MRR</div><div class="cs-kpi-value">${latest_rev:,.0f}</div></div>
-            <div class="cs-kpi"><div class="cs-kpi-label">CMGR-3</div><div class="cs-kpi-value">{cmgr3*100:.1f}%</div></div>
-            <div class="cs-kpi"><div class="cs-kpi-label">Active Devs</div><div class="cs-kpi-value">{devs}</div></div>
-            <div class="cs-kpi"><div class="cs-kpi-label">Model Mix</div><div class="cs-kpi-value" style="font-size:11px">{cs['model_mix']}</div></div>
+        <div class="cs-body">
+            <p class="cs-desc">{cs['summary']}</p>
+
+            <div class="cs-kpis">
+                <div class="cs-kpi"><div class="cs-kpi-label">MRR</div><div class="cs-kpi-value">${latest_rev:,.0f}</div></div>
+                <div class="cs-kpi"><div class="cs-kpi-label">CMGR-3</div><div class="cs-kpi-value">{cmgr3*100:.1f}%</div></div>
+                <div class="cs-kpi"><div class="cs-kpi-label">Active Devs</div><div class="cs-kpi-value">{devs}</div></div>
+                <div class="cs-kpi"><div class="cs-kpi-label">Model Mix</div><div class="cs-kpi-value" style="font-size:11px">{cs['model_mix']}</div></div>
+            </div>
+
+            <div class="cs-section">
+                <div class="cs-section-title">Expected GA Profile</div>
+                <p class="cs-section-text">{cs['expected_ga']}</p>
+            </div>
+
+            <div class="cs-section">
+                <div class="cs-section-title">What to Watch</div>
+                <p class="cs-section-text">{cs['what_to_watch']}</p>
+            </div>
+
+            <div class="cs-charts">
+                {ga_chart_html}
+                {rev_chart_html}
+            </div>
+
+            <div class="cs-link" onclick="event.stopPropagation(); showDetail('{sid}')">View full analysis &rarr;</div>
         </div>
-
-        <div class="cs-section">
-            <div class="cs-section-title">Expected GA Profile</div>
-            <p class="cs-section-text">{cs['expected_ga']}</p>
-        </div>
-
-        <div class="cs-section">
-            <div class="cs-section-title">What to Watch</div>
-            <p class="cs-section-text">{cs['what_to_watch']}</p>
-        </div>
-
-        <div class="cs-charts">
-            {ga_chart_html}
-            {rev_chart_html}
-        </div>
-
-        <div class="cs-link" onclick="showDetail('{sid}')">View full analysis &rarr;</div>
     </div>
     '''
 
@@ -1978,12 +1982,18 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 html {{ scroll-behavior:smooth; }}
 
 /* Case Studies */
-.cs-card {{ background:{CARD}; border-radius:12px; padding:24px; margin-bottom:24px; }}
-.cs-header {{ display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }}
-.cs-name {{ font-size:18px; font-weight:700; color:{TEXT}; margin-right:10px; }}
-.cs-type-badge {{ font-size:10px; font-weight:700; padding:3px 10px; border-radius:10px; color:#fff; letter-spacing:0.03em; vertical-align:middle; }}
-.cs-meta {{ font-size:12px; color:{MUTED}; }}
-.cs-tagline {{ font-size:13px; color:{DIM}; font-style:italic; margin-bottom:8px; }}
+.cs-card {{ background:{CARD}; border-radius:12px; padding:0; margin-bottom:16px; overflow:hidden; }}
+.cs-header-clickable {{ display:flex; justify-content:space-between; align-items:center; padding:16px 24px; cursor:pointer; user-select:none; transition:background 0.15s; }}
+.cs-header-clickable:hover {{ background:rgba(0,0,0,0.08); }}
+.cs-header-left {{ display:flex; align-items:center; gap:10px; }}
+.cs-chevron {{ font-size:12px; color:{MUTED}; transition:transform 0.25s cubic-bezier(0.22,1,0.36,1); display:inline-block; }}
+.cs-card.collapsed .cs-chevron {{ transform:rotate(-90deg); }}
+.cs-name {{ font-size:16px; font-weight:700; color:{TEXT}; }}
+.cs-type-badge {{ font-size:10px; font-weight:700; padding:3px 10px; border-radius:10px; color:#fff; letter-spacing:0.03em; }}
+.cs-tagline-inline {{ font-size:12px; color:{DIM}; font-style:italic; }}
+.cs-meta {{ font-size:12px; color:{MUTED}; flex-shrink:0; }}
+.cs-body {{ padding:0 24px 24px; max-height:3000px; overflow:hidden; transition:max-height 0.4s cubic-bezier(0.22,1,0.36,1), padding 0.3s, opacity 0.25s; opacity:1; }}
+.cs-card.collapsed .cs-body {{ max-height:0; padding:0 24px; opacity:0; }}
 .cs-desc {{ font-size:12px; color:{DIM}; line-height:1.6; margin-bottom:16px; }}
 .cs-kpis {{ display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; margin-bottom:16px; }}
 .cs-kpi {{ background:rgba(0,0,0,0.15); border-radius:8px; padding:10px 14px; }}
@@ -2144,6 +2154,15 @@ function toggleSection(header) {{
     section.classList.toggle('collapsed');
     if (!section.classList.contains('collapsed')) {{
         setTimeout(() => resizePlotlyCharts(section), 120);
+    }}
+}}
+
+// Case study collapse/expand
+function toggleCaseStudy(header) {{
+    const card = header.closest('.cs-card');
+    card.classList.toggle('collapsed');
+    if (!card.classList.contains('collapsed')) {{
+        setTimeout(() => resizePlotlyCharts(card), 120);
     }}
 }}
 
