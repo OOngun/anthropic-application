@@ -957,42 +957,85 @@ for sid in ALL_SIDS:
     # Cohort LTV curves (multiple lines, one per onboarding month)
     _d_dev_ltv = dev_activity[dev_activity['startup_id'] == sid].copy()
     if len(_d_dev_ltv) > 5:
+        import plotly.express as px
+        import numpy as np
         _first_dev_m_ltv = _d_dev_ltv.groupby('dev_id')['month'].min().reset_index()
         _first_dev_m_ltv.columns = ['dev_id', 'first_month']
         _d_dev_ltv = _d_dev_ltv.merge(_first_dev_m_ltv, on='dev_id')
         _d_dev_ltv['age'] = ((_d_dev_ltv['month'] - _d_dev_ltv['first_month']).dt.days / 30.44).round().astype(int)
-        _cohort_sizes_ltv = _d_dev_ltv.groupby('first_month')['dev_id'].nunique().reset_index()
-        _cohort_sizes_ltv.columns = ['first_month', 'cohort_size']
-        _cohort_agg_ltv = _d_dev_ltv.groupby(['first_month', 'age'])['revenue'].sum().reset_index()
-        _cohort_agg_ltv = _cohort_agg_ltv.merge(_cohort_sizes_ltv, on='first_month')
-        _cohort_agg_ltv['cum_rev'] = _cohort_agg_ltv.groupby('first_month')['revenue'].cumsum()
+
+        # --- Cohort grouping: group into quarters if too many small cohorts ---
+        _raw_cohort_sizes = _d_dev_ltv.groupby('first_month')['dev_id'].nunique().reset_index()
+        _raw_cohort_sizes.columns = ['first_month', 'cohort_size']
+        _small_cohorts = _raw_cohort_sizes[_raw_cohort_sizes['cohort_size'] < 2]
+        _needs_quarterly = len(_small_cohorts) > len(_raw_cohort_sizes) * 0.4
+
+        if _needs_quarterly:
+            _d_dev_ltv['first_quarter'] = _d_dev_ltv['first_month'].apply(
+                lambda d: pd.Timestamp(d.year, ((d.month - 1) // 3) * 3 + 1, 1))
+            _d_dev_ltv['cohort_key'] = _d_dev_ltv['first_quarter']
+            _d_dev_ltv['age'] = ((_d_dev_ltv['month'] - _d_dev_ltv['first_quarter']).dt.days / 30.44).round().astype(int)
+            _d_dev_ltv.loc[_d_dev_ltv['age'] < 0, 'age'] = 0
+        else:
+            _d_dev_ltv['cohort_key'] = _d_dev_ltv['first_month']
+
+        _cohort_sizes_ltv = _d_dev_ltv.groupby('cohort_key')['dev_id'].nunique().reset_index()
+        _cohort_sizes_ltv.columns = ['cohort_key', 'cohort_size']
+        # Filter out cohorts with fewer than 2 devs
+        _cohort_sizes_ltv = _cohort_sizes_ltv[_cohort_sizes_ltv['cohort_size'] >= 2]
+        _d_dev_ltv = _d_dev_ltv[_d_dev_ltv['cohort_key'].isin(_cohort_sizes_ltv['cohort_key'])]
+
+        _cohort_agg_ltv = _d_dev_ltv.groupby(['cohort_key', 'age'])['revenue'].sum().reset_index()
+        _cohort_agg_ltv = _cohort_agg_ltv.sort_values(['cohort_key', 'age'])
+        _cohort_agg_ltv = _cohort_agg_ltv.merge(_cohort_sizes_ltv, on='cohort_key')
+        _cohort_agg_ltv['cum_rev'] = _cohort_agg_ltv.groupby('cohort_key')['revenue'].cumsum()
         _cohort_agg_ltv['cum_ltv_per_dev'] = _cohort_agg_ltv['cum_rev'] / _cohort_agg_ltv['cohort_size']
-        _ltv_cohorts = sorted(_cohort_agg_ltv['first_month'].unique())
+
+        _ltv_cohorts = sorted(_cohort_agg_ltv['cohort_key'].unique())
         # Filter out cohorts with fewer than 3 data points
-        _ltv_cohorts = [fm for fm in _ltv_cohorts if len(_cohort_agg_ltv[_cohort_agg_ltv['first_month'] == fm]) >= 3]
-        # Distinct color scale using plotly qualitative palette
-        import plotly.express as px
+        _ltv_cohorts = [ck for ck in _ltv_cohorts if len(_cohort_agg_ltv[_cohort_agg_ltv['cohort_key'] == ck]) >= 3]
+
+        # Limit to ~10 largest cohorts for cleaner legend
+        if len(_ltv_cohorts) > 12:
+            _ck_sizes = _cohort_sizes_ltv[_cohort_sizes_ltv['cohort_key'].isin(_ltv_cohorts)].sort_values('cohort_size', ascending=False)
+            _top_cohorts = set(_ck_sizes.head(10)['cohort_key'])
+        else:
+            _top_cohorts = set(_ltv_cohorts)
+
         _n_coh = len(_ltv_cohorts)
         _qual_colors = px.colors.qualitative.D3 + px.colors.qualitative.Set2 + px.colors.qualitative.Vivid
         _coh_colors = [_qual_colors[i % len(_qual_colors)] for i in range(_n_coh)]
+
         f = go.Figure()
-        for ci, fm in enumerate(_ltv_cohorts):
-            coh = _cohort_agg_ltv[_cohort_agg_ltv['first_month'] == fm].sort_values('age')
+        _fmt_label = lambda ck: f"Q{((ck.month-1)//3)+1} {ck.year}" if _needs_quarterly else ck.strftime('%Y-%m')
+        for ci, ck in enumerate(_ltv_cohorts):
+            coh = _cohort_agg_ltv[_cohort_agg_ltv['cohort_key'] == ck].sort_values('age')
+            # Ensure cumulative LTV is monotonically non-decreasing
+            coh = coh.copy()
+            coh['cum_ltv_per_dev'] = coh['cum_ltv_per_dev'].cummax()
+            _label = _fmt_label(ck)
+            _in_top = ck in _top_cohorts
             f.add_trace(go.Scatter(x=coh['age'], y=coh['cum_ltv_per_dev'],
-                mode='lines', name=fm.strftime('%Y-%m'),
+                mode='lines', name=_label,
                 line=dict(width=2, color=_coh_colors[ci]),
-                hovertemplate=f'{fm.strftime("%Y-%m")}<br>Period %{{x}}: $%{{y:,.0f}}/dev<extra></extra>'))
-        # Dashed black average line across all cohorts (prominent)
-        _avg_ltv = _cohort_agg_ltv.groupby('age')['cum_ltv_per_dev'].mean().reset_index()
-        _avg_ltv = _avg_ltv.sort_values('age')
+                legendgroup=_label,
+                showlegend=_in_top,
+                hovertemplate=f'{_label}<br>Period %{{x}}: $%{{y:,.0f}}/dev<extra></extra>'))
+
+        # Dashed black average line (thick, prominent)
+        _avg_ltv = _cohort_agg_ltv.groupby('age')['cum_ltv_per_dev'].mean().reset_index().sort_values('age')
+        _avg_ltv['cum_ltv_per_dev'] = _avg_ltv['cum_ltv_per_dev'].cummax()
         if len(_avg_ltv) > 1:
             f.add_trace(go.Scatter(x=_avg_ltv['age'], y=_avg_ltv['cum_ltv_per_dev'],
                 mode='lines', name='Average',
                 line=dict(width=3, color='black', dash='dash'),
                 hovertemplate='Average<br>Period %{x}: $%{y:,.0f}/dev<extra></extra>'))
-        f.update_layout(**layout('Cumulative LTV per Developer by Cohort'))
-        f.update_layout(legend=dict(bgcolor='rgba(0,0,0,0)', orientation='v', yanchor='top', y=1, xanchor='left', x=1.02, font=dict(size=10)))
-        # Y-axis: "$Xk" format
+
+        f.update_layout(**layout('Cumulative LTV per Developer by Cohort', h=350))
+        f.update_layout(legend=dict(bgcolor='rgba(0,0,0,0)', orientation='v',
+            yanchor='top', y=1, xanchor='left', x=1.02, font=dict(size=10),
+            tracegroupgap=2))
+        f.update_layout(margin=dict(l=55, r=140, t=40, b=40))
         _max_ltv_val = _cohort_agg_ltv['cum_ltv_per_dev'].max() if len(_cohort_agg_ltv) > 0 else 1000
         if _max_ltv_val >= 1000:
             f.update_yaxes(tickprefix='$', tickformat='.1s')
@@ -1004,55 +1047,74 @@ for sid in ALL_SIDS:
     # === LTV HEATMAP (Tribe Capital style: red-to-blue, cohort sizes) ===
     d_dev = dev_activity[dev_activity['startup_id'] == sid].copy()
     if len(d_dev) > 5:
+        import numpy as np
+        from plotly.subplots import make_subplots
+
         first_dev_m = d_dev.groupby('dev_id')['month'].min().reset_index()
         first_dev_m.columns = ['dev_id', 'first_month']
         d_dev = d_dev.merge(first_dev_m, on='dev_id')
         d_dev['age'] = ((d_dev['month'] - d_dev['first_month']).dt.days / 30.44).round().astype(int)
 
-        cohort_sizes_local = d_dev.groupby('first_month')['dev_id'].nunique().reset_index()
-        cohort_sizes_local.columns = ['first_month', 'cohort_size']
+        # --- Cohort grouping: same quarterly logic as LTV curves ---
+        _hm_raw_sizes = d_dev.groupby('first_month')['dev_id'].nunique().reset_index()
+        _hm_raw_sizes.columns = ['first_month', 'cohort_size']
+        _hm_small = _hm_raw_sizes[_hm_raw_sizes['cohort_size'] < 2]
+        _hm_quarterly = len(_hm_small) > len(_hm_raw_sizes) * 0.4
 
-        # Cumulative LTV per dev per cohort at each age
-        cohort_agg = d_dev.groupby(['first_month', 'age']).agg(
+        if _hm_quarterly:
+            d_dev['first_quarter'] = d_dev['first_month'].apply(
+                lambda d_: pd.Timestamp(d_.year, ((d_.month - 1) // 3) * 3 + 1, 1))
+            d_dev['cohort_key'] = d_dev['first_quarter']
+            d_dev['age'] = ((d_dev['month'] - d_dev['first_quarter']).dt.days / 30.44).round().astype(int)
+            d_dev.loc[d_dev['age'] < 0, 'age'] = 0
+        else:
+            d_dev['cohort_key'] = d_dev['first_month']
+
+        cohort_sizes_local = d_dev.groupby('cohort_key')['dev_id'].nunique().reset_index()
+        cohort_sizes_local.columns = ['cohort_key', 'cohort_size']
+        # Filter out cohorts with fewer than 2 devs
+        cohort_sizes_local = cohort_sizes_local[cohort_sizes_local['cohort_size'] >= 2]
+        d_dev = d_dev[d_dev['cohort_key'].isin(cohort_sizes_local['cohort_key'])]
+
+        cohort_agg = d_dev.groupby(['cohort_key', 'age']).agg(
             active=('dev_id', 'nunique'), rev=('revenue', 'sum')
         ).reset_index()
-        cohort_agg = cohort_agg.merge(cohort_sizes_local, on='first_month')
-        cohort_agg['cum_rev'] = cohort_agg.groupby('first_month')['rev'].cumsum()
+        cohort_agg = cohort_agg.sort_values(['cohort_key', 'age'])
+        cohort_agg = cohort_agg.merge(cohort_sizes_local, on='cohort_key')
+        cohort_agg['cum_rev'] = cohort_agg.groupby('cohort_key')['rev'].cumsum()
         cohort_agg['cum_ltv'] = cohort_agg['cum_rev'] / cohort_agg['cohort_size']
+        # Ensure cumulative LTV is monotonically non-decreasing
+        cohort_agg['cum_ltv'] = cohort_agg.groupby('cohort_key')['cum_ltv'].cummax()
         cohort_agg['retention'] = cohort_agg['active'] / cohort_agg['cohort_size'] * 100
 
-        # Build heatmap matrix for LTV
-        cohorts_sorted = sorted(cohort_agg['first_month'].unique())
-        # Filter out cohorts with fewer than 3 data points
-        cohorts_sorted = [fm for fm in cohorts_sorted if len(cohort_agg[cohort_agg['first_month'] == fm]) >= 3]
+        cohorts_sorted = sorted(cohort_agg['cohort_key'].unique())
+        cohorts_sorted = [ck for ck in cohorts_sorted if len(cohort_agg[cohort_agg['cohort_key'] == ck]) >= 3]
         max_age = int(cohort_agg['age'].max()) if len(cohort_agg) > 0 else 0
         ltv_matrix = []
         ret_matrix = []
         cohort_labels = []
         cohort_size_vals = []
 
-        for fm in cohorts_sorted:
-            c = cohort_agg[cohort_agg['first_month'] == fm].set_index('age')
-            cs = cohort_sizes_local[cohort_sizes_local['first_month'] == fm]['cohort_size'].iloc[0]
+        _hm_fmt = lambda ck: f"Q{((ck.month-1)//3)+1} {ck.year}" if _hm_quarterly else ck.strftime('%Y-%m')
+
+        for ck in cohorts_sorted:
+            c = cohort_agg[cohort_agg['cohort_key'] == ck].set_index('age')
+            cs = cohort_sizes_local[cohort_sizes_local['cohort_key'] == ck]['cohort_size'].iloc[0]
             ltv_row = []
             ret_row = []
             for a in range(max_age + 1):
                 if a in c.index:
-                    ltv_row.append(round(c.loc[a, 'cum_ltv'], 0))
-                    ret_row.append(round(c.loc[a, 'retention'], 1))
+                    ltv_row.append(round(float(c.loc[a, 'cum_ltv']), 0))
+                    ret_row.append(round(float(c.loc[a, 'retention']), 1))
                 else:
                     ltv_row.append(None)
                     ret_row.append(None)
             ltv_matrix.append(ltv_row)
             ret_matrix.append(ret_row)
-            cohort_labels.append(fm.strftime('%Y-%m'))
+            cohort_labels.append(_hm_fmt(ck))
             cohort_size_vals.append(cs)
 
         if len(cohorts_sorted) > 0:
-            # LTV Heatmap
-            import plotly.graph_objects as go
-            from plotly.subplots import make_subplots
-
             fig_ltv_hm = make_subplots(rows=1, cols=2, column_widths=[0.15, 0.85],
                 shared_yaxes=True, horizontal_spacing=0.02)
 
@@ -1060,6 +1122,8 @@ for sid in ALL_SIDS:
             fig_ltv_hm.add_trace(go.Bar(
                 y=cohort_labels, x=cohort_size_vals, orientation='h',
                 marker_color='#9CA3AF', showlegend=False,
+                text=[str(v) for v in cohort_size_vals], textposition='auto',
+                textfont=dict(size=9),
                 hovertemplate='%{y}: %{x} devs<extra></extra>'
             ), row=1, col=1)
 
@@ -1078,11 +1142,20 @@ for sid in ALL_SIDS:
                         text_row.append(f'${v:.0f}')
                 text_matrix.append(text_row)
 
-            # Cap color scale at 90th percentile for better contrast
+            # Cap color scale at 90th percentile rounded to a nice number
             _all_ltv_vals = [v for row in ltv_matrix for v in row if v is not None]
             if _all_ltv_vals:
-                import numpy as np
-                _ltv_cap = float(np.percentile(_all_ltv_vals, 90))
+                _ltv_p90 = float(np.percentile(_all_ltv_vals, 90))
+                # Round up to a nice number
+                if _ltv_p90 >= 10000:
+                    _ltv_cap = float(np.ceil(_ltv_p90 / 5000) * 5000)
+                elif _ltv_p90 >= 1000:
+                    _ltv_cap = float(np.ceil(_ltv_p90 / 1000) * 1000)
+                elif _ltv_p90 >= 100:
+                    _ltv_cap = float(np.ceil(_ltv_p90 / 500) * 500)
+                else:
+                    _ltv_cap = float(np.ceil(_ltv_p90 / 100) * 100)
+                _ltv_cap = max(_ltv_cap, 100)
                 _ltv_cap_label = f'${_ltv_cap/1000:.0f}k' if _ltv_cap >= 1000 else f'${_ltv_cap:.0f}'
             else:
                 _ltv_cap = 1000
@@ -1097,18 +1170,21 @@ for sid in ALL_SIDS:
                             [0.65, '#93C5FD'], [0.85, '#3B82F6'], [1, '#1D4ED8']],
                 showscale=True,
                 colorbar=dict(title=dict(text='LTV ($)', side='right'), tickprefix='$',
-                              tickformat='.2s', len=0.85, thickness=15),
+                              tickformat=',.0f', len=0.85, thickness=15),
                 hovertemplate='Cohort %{y}<br>Period %{x}<br>LTV: $%{z:,.0f}<extra></extra>',
                 zmin=0, zmax=_ltv_cap,
-                connectgaps=False
+                connectgaps=False,
+                xgap=1, ygap=1
             ), row=1, col=2)
 
+            _hm_height = max(400, len(cohorts_sorted) * 32 + 100)
             fig_ltv_hm.update_layout(
-                height=max(320, len(cohorts_sorted) * 30 + 90),
+                height=_hm_height,
                 margin=dict(t=50, b=45, l=10, r=10),
                 paper_bgcolor='white', plot_bgcolor='white',
-                title=dict(text=f'LTV by Cohort (color scale capped at {_ltv_cap_label})', font=dict(size=14)),
-                font=dict(family='Inter, sans-serif', size=11)
+                title=dict(text=f'LTV by Cohort (color scale capped at {_ltv_cap_label})',
+                           font=dict(size=14, family='IBM Plex Sans')),
+                font=dict(family='IBM Plex Sans, Inter, sans-serif', size=11)
             )
             fig_ltv_hm.update_xaxes(title_text='cohort size', row=1, col=1, showticklabels=False, side='bottom')
             fig_ltv_hm.update_xaxes(title_text='period', row=1, col=2)
