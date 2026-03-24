@@ -836,29 +836,37 @@ for sid in ALL_SIDS:
         _cohort_agg_ltv['cum_rev'] = _cohort_agg_ltv.groupby('first_month')['revenue'].cumsum()
         _cohort_agg_ltv['cum_ltv_per_dev'] = _cohort_agg_ltv['cum_rev'] / _cohort_agg_ltv['cohort_size']
         _ltv_cohorts = sorted(_cohort_agg_ltv['first_month'].unique())
-        # Color gradient for cohorts: early = light, late = dark
+        # Filter out cohorts with fewer than 3 data points
+        _ltv_cohorts = [fm for fm in _ltv_cohorts if len(_cohort_agg_ltv[_cohort_agg_ltv['first_month'] == fm]) >= 3]
+        # Distinct color scale using plotly qualitative palette
+        import plotly.express as px
         _n_coh = len(_ltv_cohorts)
-        _coh_colors = [f'rgba({int(71 + (180 - 71) * i / max(_n_coh - 1, 1))},{int(45 + (140 - 45) * i / max(_n_coh - 1, 1))},{int(123 + (200 - 123) * i / max(_n_coh - 1, 1))},0.7)' for i in range(_n_coh)]
+        _qual_colors = px.colors.qualitative.D3 + px.colors.qualitative.Set2 + px.colors.qualitative.Vivid
+        _coh_colors = [_qual_colors[i % len(_qual_colors)] for i in range(_n_coh)]
         f = go.Figure()
         for ci, fm in enumerate(_ltv_cohorts):
             coh = _cohort_agg_ltv[_cohort_agg_ltv['first_month'] == fm].sort_values('age')
-            if len(coh) < 2:
-                continue
             f.add_trace(go.Scatter(x=coh['age'], y=coh['cum_ltv_per_dev'],
                 mode='lines', name=fm.strftime('%Y-%m'),
                 line=dict(width=2, color=_coh_colors[ci]),
-                hovertemplate=f'{fm.strftime("%Y-%m")}<br>Age %{{x}}: $%{{y:,.0f}}/dev<extra></extra>'))
-        # Dashed black average line across all cohorts
+                hovertemplate=f'{fm.strftime("%Y-%m")}<br>Period %{{x}}: $%{{y:,.0f}}/dev<extra></extra>'))
+        # Dashed black average line across all cohorts (prominent)
         _avg_ltv = _cohort_agg_ltv.groupby('age')['cum_ltv_per_dev'].mean().reset_index()
         _avg_ltv = _avg_ltv.sort_values('age')
         if len(_avg_ltv) > 1:
             f.add_trace(go.Scatter(x=_avg_ltv['age'], y=_avg_ltv['cum_ltv_per_dev'],
                 mode='lines', name='Average',
-                line=dict(width=2.5, color='black', dash='dash'),
-                hovertemplate='Average<br>Age %{x}: $%{y:,.0f}/dev<extra></extra>'))
+                line=dict(width=3, color='black', dash='dash'),
+                hovertemplate='Average<br>Period %{x}: $%{y:,.0f}/dev<extra></extra>'))
         f.update_layout(**layout('Cumulative LTV per Developer by Cohort'))
-        f.update_yaxes(tickprefix='$', tickformat=',')
-        f.update_xaxes(title_text='Months since cohort start')
+        f.update_layout(legend=dict(bgcolor='rgba(0,0,0,0)', orientation='v', yanchor='top', y=1, xanchor='left', x=1.02, font=dict(size=10)))
+        # Y-axis: "$Xk" format
+        _max_ltv_val = _cohort_agg_ltv['cum_ltv_per_dev'].max() if len(_cohort_agg_ltv) > 0 else 1000
+        if _max_ltv_val >= 1000:
+            f.update_yaxes(tickprefix='$', tickformat='.1s')
+        else:
+            f.update_yaxes(tickprefix='$', tickformat=',.0f')
+        f.update_xaxes(title_text='period')
         charts['ltv_curve'] = to_div(f)
 
     # === LTV HEATMAP (Tribe Capital style: red-to-blue, cohort sizes) ===
@@ -883,7 +891,9 @@ for sid in ALL_SIDS:
 
         # Build heatmap matrix for LTV
         cohorts_sorted = sorted(cohort_agg['first_month'].unique())
-        max_age = int(cohort_agg['age'].max())
+        # Filter out cohorts with fewer than 3 data points
+        cohorts_sorted = [fm for fm in cohorts_sorted if len(cohort_agg[cohort_agg['first_month'] == fm]) >= 3]
+        max_age = int(cohort_agg['age'].max()) if len(cohort_agg) > 0 else 0
         ltv_matrix = []
         ret_matrix = []
         cohort_labels = []
@@ -906,89 +916,108 @@ for sid in ALL_SIDS:
             cohort_labels.append(fm.strftime('%Y-%m'))
             cohort_size_vals.append(cs)
 
-        # LTV Heatmap
-        import plotly.graph_objects as go
-        from plotly.subplots import make_subplots
+        if len(cohorts_sorted) > 0:
+            # LTV Heatmap
+            import plotly.graph_objects as go
+            from plotly.subplots import make_subplots
 
-        fig_ltv_hm = make_subplots(rows=1, cols=2, column_widths=[0.12, 0.88],
-            shared_yaxes=True, horizontal_spacing=0.02)
+            fig_ltv_hm = make_subplots(rows=1, cols=2, column_widths=[0.15, 0.85],
+                shared_yaxes=True, horizontal_spacing=0.02)
 
-        # Cohort size bars (left)
-        fig_ltv_hm.add_trace(go.Bar(
-            y=cohort_labels, x=cohort_size_vals, orientation='h',
-            marker_color='#94a3b8', showlegend=False,
-            hovertemplate='%{y}: %{x} devs<extra></extra>'
-        ), row=1, col=1)
+            # Grey cohort size bars (left)
+            fig_ltv_hm.add_trace(go.Bar(
+                y=cohort_labels, x=cohort_size_vals, orientation='h',
+                marker_color='#9CA3AF', showlegend=False,
+                hovertemplate='%{y}: %{x} devs<extra></extra>'
+            ), row=1, col=1)
 
-        # Text annotations for heatmap cells (e.g. "$0.5k", "$2.1k")
-        text_matrix = []
-        for row in ltv_matrix:
-            text_row = []
-            for v in row:
-                if v is None:
-                    text_row.append('')
-                elif v >= 1000:
-                    text_row.append(f'${v/1000:.1f}k')
-                else:
-                    text_row.append(f'${v:.0f}')
-            text_matrix.append(text_row)
+            # Text annotations for heatmap cells — "$0.5k", "$2.1k" style
+            text_matrix = []
+            for row in ltv_matrix:
+                text_row = []
+                for v in row:
+                    if v is None:
+                        text_row.append('')
+                    elif v >= 1000:
+                        text_row.append(f'${v/1000:.1f}k')
+                    elif v >= 100:
+                        text_row.append(f'${v/1000:.1f}k')
+                    else:
+                        text_row.append(f'${v:.0f}')
+                text_matrix.append(text_row)
 
-        # LTV heatmap (right) — red to blue
-        fig_ltv_hm.add_trace(go.Heatmap(
-            z=ltv_matrix, x=list(range(max_age + 1)), y=cohort_labels,
-            text=text_matrix, texttemplate='%{text}', textfont=dict(size=9),
-            colorscale=[[0, '#DC2626'], [0.25, '#F87171'], [0.5, '#FAFAFA'],
-                        [0.75, '#60A5FA'], [1, '#1D4ED8']],
-            showscale=True, colorbar=dict(title='LTV', tickprefix='$', len=0.8),
-            hovertemplate='Cohort %{y}<br>Period %{x}<br>LTV: $%{z:,.0f}<extra></extra>',
-            zmin=0
-        ), row=1, col=2)
+            # Cap color scale at 90th percentile for better contrast
+            _all_ltv_vals = [v for row in ltv_matrix for v in row if v is not None]
+            if _all_ltv_vals:
+                import numpy as np
+                _ltv_cap = float(np.percentile(_all_ltv_vals, 90))
+                _ltv_cap_label = f'${_ltv_cap/1000:.0f}k' if _ltv_cap >= 1000 else f'${_ltv_cap:.0f}'
+            else:
+                _ltv_cap = 1000
+                _ltv_cap_label = '$1k'
 
-        fig_ltv_hm.update_layout(
-            height=max(300, len(cohorts_sorted) * 28 + 80),
-            margin=dict(t=40, b=40, l=10, r=10),
-            paper_bgcolor='white', plot_bgcolor='white',
-            title=dict(text='LTV by Cohort', font=dict(size=14)),
-            font=dict(family='Inter, sans-serif', size=11)
-        )
-        fig_ltv_hm.update_xaxes(title_text='cohort size', row=1, col=1, showticklabels=False)
-        fig_ltv_hm.update_xaxes(title_text='period', row=1, col=2)
-        fig_ltv_hm.update_yaxes(autorange='reversed', row=1, col=1)
-        charts['ltv_heatmap'] = to_div(fig_ltv_hm, f'ltv-hm-{sid}')
+            # LTV heatmap (right) — RED (low) -> WHITE (mid) -> BLUE (high)
+            fig_ltv_hm.add_trace(go.Heatmap(
+                z=ltv_matrix, x=list(range(max_age + 1)), y=cohort_labels,
+                text=text_matrix, texttemplate='%{text}', textfont=dict(size=10),
+                colorscale=[[0, '#DC2626'], [0.15, '#EF4444'], [0.35, '#FCA5A5'],
+                            [0.5, '#FFFFFF'],
+                            [0.65, '#93C5FD'], [0.85, '#3B82F6'], [1, '#1D4ED8']],
+                showscale=True,
+                colorbar=dict(title=dict(text='LTV ($)', side='right'), tickprefix='$',
+                              tickformat='.2s', len=0.85, thickness=15),
+                hovertemplate='Cohort %{y}<br>Period %{x}<br>LTV: $%{z:,.0f}<extra></extra>',
+                zmin=0, zmax=_ltv_cap,
+                connectgaps=False
+            ), row=1, col=2)
+
+            fig_ltv_hm.update_layout(
+                height=max(320, len(cohorts_sorted) * 30 + 90),
+                margin=dict(t=50, b=45, l=10, r=10),
+                paper_bgcolor='white', plot_bgcolor='white',
+                title=dict(text=f'LTV by Cohort (color scale capped at {_ltv_cap_label})', font=dict(size=14)),
+                font=dict(family='Inter, sans-serif', size=11)
+            )
+            fig_ltv_hm.update_xaxes(title_text='cohort size', row=1, col=1, showticklabels=False, side='bottom')
+            fig_ltv_hm.update_xaxes(title_text='period', row=1, col=2)
+            fig_ltv_hm.update_yaxes(autorange='reversed', row=1, col=1)
+            charts['ltv_heatmap'] = to_div(fig_ltv_hm, f'ltv-hm-{sid}')
 
         # Retention Heatmap (same structure, green-to-red)
-        ret_text = []
-        for row in ret_matrix:
-            ret_text.append([f'{v:.0f}%' if v is not None else '' for v in row])
+        if len(cohorts_sorted) > 0:
+            ret_text = []
+            for row in ret_matrix:
+                ret_text.append([f'{v:.0f}%' if v is not None else '' for v in row])
 
-        fig_ret_hm = make_subplots(rows=1, cols=2, column_widths=[0.12, 0.88],
-            shared_yaxes=True, horizontal_spacing=0.02)
+            fig_ret_hm = make_subplots(rows=1, cols=2, column_widths=[0.15, 0.85],
+                shared_yaxes=True, horizontal_spacing=0.02)
 
-        fig_ret_hm.add_trace(go.Bar(
-            y=cohort_labels, x=cohort_size_vals, orientation='h',
-            marker_color='#94a3b8', showlegend=False
-        ), row=1, col=1)
+            fig_ret_hm.add_trace(go.Bar(
+                y=cohort_labels, x=cohort_size_vals, orientation='h',
+                marker_color='#9CA3AF', showlegend=False
+            ), row=1, col=1)
 
-        fig_ret_hm.add_trace(go.Heatmap(
-            z=ret_matrix, x=list(range(max_age + 1)), y=cohort_labels,
-            text=ret_text, texttemplate='%{text}', textfont=dict(size=9),
-            colorscale=[[0, '#DC2626'], [0.5, '#FBBF24'], [1, '#16A34A']],
-            showscale=True, colorbar=dict(title='Ret %', ticksuffix='%', len=0.8),
-            hovertemplate='Cohort %{y}<br>Period %{x}<br>Retention: %{z:.0f}%<extra></extra>',
-            zmin=0, zmax=100
-        ), row=1, col=2)
+            fig_ret_hm.add_trace(go.Heatmap(
+                z=ret_matrix, x=list(range(max_age + 1)), y=cohort_labels,
+                text=ret_text, texttemplate='%{text}', textfont=dict(size=10),
+                colorscale=[[0, '#DC2626'], [0.5, '#FBBF24'], [1, '#16A34A']],
+                showscale=True, colorbar=dict(title='Ret %', ticksuffix='%', len=0.85, thickness=15),
+                hovertemplate='Cohort %{y}<br>Period %{x}<br>Retention: %{z:.0f}%<extra></extra>',
+                zmin=0, zmax=100,
+                connectgaps=False
+            ), row=1, col=2)
 
-        fig_ret_hm.update_layout(
-            height=max(300, len(cohorts_sorted) * 28 + 80),
-            margin=dict(t=40, b=40, l=10, r=10),
-            paper_bgcolor='white', plot_bgcolor='white',
-            title=dict(text='Developer Retention by Cohort', font=dict(size=14)),
-            font=dict(family='Inter, sans-serif', size=11)
-        )
-        fig_ret_hm.update_xaxes(title_text='cohort size', row=1, col=1, showticklabels=False)
-        fig_ret_hm.update_xaxes(title_text='period', row=1, col=2)
-        fig_ret_hm.update_yaxes(autorange='reversed', row=1, col=1)
-        charts['retention_heatmap'] = to_div(fig_ret_hm, f'ret-hm-{sid}')
+            fig_ret_hm.update_layout(
+                height=max(320, len(cohorts_sorted) * 30 + 90),
+                margin=dict(t=50, b=45, l=10, r=10),
+                paper_bgcolor='white', plot_bgcolor='white',
+                title=dict(text='Developer Retention by Cohort', font=dict(size=14)),
+                font=dict(family='Inter, sans-serif', size=11)
+            )
+            fig_ret_hm.update_xaxes(title_text='cohort size', row=1, col=1, showticklabels=False)
+            fig_ret_hm.update_xaxes(title_text='period', row=1, col=2)
+            fig_ret_hm.update_yaxes(autorange='reversed', row=1, col=1)
+            charts['retention_heatmap'] = to_div(fig_ret_hm, f'ret-hm-{sid}')
 
     # Revenue retention
     cd_s = cohort_df[cohort_df['startup_id'] == sid].sort_values('months_since')
