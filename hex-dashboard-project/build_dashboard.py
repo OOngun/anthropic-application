@@ -3381,7 +3381,10 @@ document.querySelectorAll('.partner-list').forEach(wrap => {{
         ];
         const maxVal = Math.max(
             Math.abs(d.new), Math.abs(d.expansion), Math.abs(d.resurrected),
-            Math.abs(d.contraction), Math.abs(d.churned), Math.abs(d.net), 0.1
+            Math.abs(d.contraction), Math.abs(d.churned), Math.abs(d.net),
+            Math.abs(d.avg_new || 0), Math.abs(d.avg_expansion || 0), Math.abs(d.avg_resurrected || 0),
+            Math.abs(d.avg_contraction || 0), Math.abs(d.avg_churned || 0), Math.abs(d.avg_net || 0),
+            0.1
         );
         let html = '<div class="waterfall-rows">';
         for (const c of components) {{
@@ -3465,7 +3468,10 @@ document.querySelectorAll('.partner-list').forEach(wrap => {{
         ];
         const maxVal = Math.max(
             Math.abs(d.new), Math.abs(d.expansion), Math.abs(d.resurrected),
-            Math.abs(d.contraction), Math.abs(d.churned), Math.abs(d.net), 0.1
+            Math.abs(d.contraction), Math.abs(d.churned), Math.abs(d.net),
+            Math.abs(d.avg_new || 0), Math.abs(d.avg_expansion || 0), Math.abs(d.avg_resurrected || 0),
+            Math.abs(d.avg_contraction || 0), Math.abs(d.avg_churned || 0), Math.abs(d.avg_net || 0),
+            0.1
         );
         let html = '<div style="display:flex;flex-direction:column;gap:4px">';
         for (const [label, key, color, isLoss] of rows) {{
