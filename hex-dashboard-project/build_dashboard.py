@@ -1887,12 +1887,18 @@ tier1_html = f'''
             <div class="panel-title">GROWTH ACCOUNTING + CMGR</div>
             <div class="panel-subtitle">Revenue breakdown with compound monthly growth rate. Click a bar to see which partners drove that component.</div>
             {ga_cmgr_div}
-            <div id="ga-drilldown" class="ga-drilldown" style="display:none">
+            <div class="ga-breakdown-trigger">
+                <button class="ga-breakdown-btn" onclick="document.getElementById('ga-breakdown').style.display=document.getElementById('ga-breakdown').style.display==='none'?'block':'none'">View monthly breakdown by partner &rarr;</button>
+            </div>
+            <div id="ga-breakdown" class="ga-breakdown" style="display:none">
                 <div class="ga-dd-header">
-                    <span class="ga-dd-title" id="ga-dd-title"></span>
-                    <span class="ga-dd-close" onclick="document.getElementById('ga-drilldown').style.display='none'">&times;</span>
+                    <div style="display:flex;align-items:center;gap:12px">
+                        <span class="ga-dd-title">Growth Accounting by Partner</span>
+                        <select id="ga-month-select" class="ga-month-select"></select>
+                    </div>
+                    <span class="ga-dd-close" onclick="document.getElementById('ga-breakdown').style.display='none'">&times;</span>
                 </div>
-                <div id="ga-dd-body" class="ga-dd-body"></div>
+                <div id="ga-breakdown-body" class="ga-dd-body"></div>
             </div>
             {cmgr_note_html}
         </div>
@@ -2584,8 +2590,12 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .slider-preset:hover {{ border-color:{MUTED}; color:{TEXT}; }}
 .slider-preset.active {{ background:rgba(59,130,246,0.1); border-color:{ACCENT}; color:{ACCENT}; font-weight:600; }}
 
-/* ========== GA DRILLDOWN ========== */
-.ga-drilldown {{ background:{CARD}; border:1px solid {GRID}; border-radius:8px; margin-top:12px; padding:12px 16px; animation:fadeIn 0.2s ease; }}
+/* ========== GA BREAKDOWN ========== */
+.ga-breakdown-trigger {{ text-align:center; margin-top:10px; }}
+.ga-breakdown-btn {{ background:transparent; border:1px solid {GRID}; border-radius:6px; padding:6px 16px; font-size:11px; font-family:inherit; color:{MUTED}; cursor:pointer; transition:all 0.15s; }}
+.ga-breakdown-btn:hover {{ border-color:{ACCENT}; color:{ACCENT}; }}
+.ga-breakdown {{ background:{CARD}; border:1px solid {GRID}; border-radius:8px; margin-top:12px; padding:14px 18px; animation:fadeIn 0.2s ease; }}
+.ga-month-select {{ padding:4px 8px; font-size:11px; font-family:inherit; border:1px solid {GRID}; border-radius:4px; background:{BG}; color:{TEXT}; cursor:pointer; }}
 .ga-dd-header {{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }}
 .ga-dd-title {{ font-size:12px; font-weight:600; color:{TEXT}; }}
 .ga-dd-close {{ font-size:18px; color:{MUTED}; cursor:pointer; line-height:1; padding:0 4px; }}
@@ -3382,77 +3392,93 @@ document.querySelectorAll('.partner-list').forEach(wrap => {{
     window.__wf_getCurScope = function() {{ return curScope; }};
 }})();
 
-// ======== GA CHART CLICK DRILLDOWN ========
-setTimeout(function() {{
+// ======== GA MONTHLY BREAKDOWN TABLE ========
 (function() {{
-    var gaEl = document.getElementById('pulse-ga-cmgr');
     var ddData = window.__ga_drilldown;
-    if (!gaEl || !ddData) {{ console.warn('GA drilldown: chart or data not found'); return; }}
+    if (!ddData) return;
+    var select = document.getElementById('ga-month-select');
+    var body = document.getElementById('ga-breakdown-body');
+    if (!select || !body) return;
 
-    var componentMap = {{
-        'Retained': 'retained_revenue',
-        'New': 'new_revenue',
-        'Expansion': 'expansion_revenue',
-        'Resurrected': 'resurrected_revenue',
-        'Contraction': 'contraction_revenue',
-        'Churned': 'churned_revenue'
-    }};
-
-    var colorMap = {{
-        'new_revenue': '{GA_NEW}',
-        'expansion_revenue': '{GA_EXPANSION}',
-        'resurrected_revenue': '{GA_RESURRECTED}',
-        'contraction_revenue': '{GA_CONTRACTION}',
-        'churned_revenue': '{GA_CHURNED}',
-        'retained_revenue': '{GA_RETAINED}'
-    }};
-
-    gaEl.on('plotly_click', function(data) {{
-        var pt = data.points[0];
-        if (!pt) return;
-        var traceName = pt.data.name;
-        var compKey = componentMap[traceName];
-        if (!compKey) return;
-
-        // Get the month from the x value
-        var monthStr = pt.x;
-        // Find matching month in drilldown data (try exact match and date parsing)
-        var monthData = null;
-        for (var key in ddData) {{
-            if (key === monthStr || key.substring(0, 7) === monthStr.substring(0, 7)) {{
-                monthData = ddData[key];
-                break;
-            }}
-        }}
-        if (!monthData || !monthData[compKey]) return;
-
-        var partners = monthData[compKey];
-        var dd = document.getElementById('ga-drilldown');
-        var title = document.getElementById('ga-dd-title');
-        var body = document.getElementById('ga-dd-body');
-
-        var monthLabel = monthStr.substring(0, 7);
-        var color = colorMap[compKey] || '{TEXT}';
-        title.innerHTML = '<span style="color:' + color + '">' + traceName + '</span> — ' + monthLabel;
-
-        if (partners.length === 0) {{
-            body.innerHTML = '<div class="ga-dd-empty">No partners in this component for ' + monthLabel + '</div>';
-        }} else {{
-            var total = partners.reduce(function(s, p) {{ return s + p.amount; }}, 0);
-            var html = '<table class="ga-dd-table"><thead><tr><th>Partner</th><th style="text-align:right">Amount</th><th style="text-align:right">% of Total</th></tr></thead><tbody>';
-            partners.forEach(function(p) {{
-                var pct = (p.amount / total * 100).toFixed(0);
-                html += '<tr onclick="showDetail(\'' + p.sid + '\')" title="Click to view ' + p.name + '"><td>' + p.name + '</td><td style="text-align:right">$' + p.amount.toLocaleString('en-US', {{maximumFractionDigits:0}}) + '</td><td style="text-align:right">' + pct + '%</td></tr>';
-            }});
-            html += '</tbody></table>';
-            body.innerHTML = html;
-        }}
-
-        dd.style.display = 'block';
-        dd.scrollIntoView({{ behavior: 'smooth', block: 'nearest' }});
+    var months = Object.keys(ddData).sort().reverse();
+    months.forEach(function(m) {{
+        var opt = document.createElement('option');
+        opt.value = m;
+        opt.textContent = m.substring(0, 7);
+        select.appendChild(opt);
     }});
+
+    var COLORS = {{
+        new_revenue: '{GA_NEW}',
+        expansion_revenue: '{GA_EXPANSION}',
+        resurrected_revenue: '{GA_RESURRECTED}',
+        contraction_revenue: '{GA_CONTRACTION}',
+        churned_revenue: '{GA_CHURNED}',
+        retained_revenue: '{GA_RETAINED}'
+    }};
+
+    function renderTable(monthKey) {{
+        var mData = ddData[monthKey];
+        if (!mData) {{ body.innerHTML = '<div class="ga-dd-empty">No data</div>'; return; }}
+
+        // Build per-partner rows from all components
+        var partners = {{}};
+        ['new_revenue','expansion_revenue','resurrected_revenue','contraction_revenue','churned_revenue'].forEach(function(comp) {{
+            (mData[comp] || []).forEach(function(p) {{
+                if (!partners[p.sid]) partners[p.sid] = {{ name: p.name, sid: p.sid, new_revenue:0, expansion_revenue:0, resurrected_revenue:0, contraction_revenue:0, churned_revenue:0 }};
+                partners[p.sid][comp] = p.amount;
+            }});
+        }});
+
+        var rows = Object.values(partners);
+        // Compute net for each partner
+        rows.forEach(function(r) {{
+            r.net = r.new_revenue + r.expansion_revenue + r.resurrected_revenue - r.contraction_revenue - r.churned_revenue;
+        }});
+        // Sort by absolute net descending
+        rows.sort(function(a, b) {{ return Math.abs(b.net) - Math.abs(a.net); }});
+
+        if (rows.length === 0) {{
+            body.innerHTML = '<div class="ga-dd-empty">No movement this month</div>';
+            return;
+        }}
+
+        var html = '<table class="ga-dd-table"><thead><tr>';
+        html += '<th>Partner</th>';
+        html += '<th style="text-align:right;color:' + COLORS.new_revenue + '">New</th>';
+        html += '<th style="text-align:right;color:' + COLORS.expansion_revenue + '">Expansion</th>';
+        html += '<th style="text-align:right;color:' + COLORS.resurrected_revenue + '">Resurrected</th>';
+        html += '<th style="text-align:right;color:' + COLORS.contraction_revenue + '">Contraction</th>';
+        html += '<th style="text-align:right;color:' + COLORS.churned_revenue + '">Churned</th>';
+        html += '<th style="text-align:right">Net</th>';
+        html += '</tr></thead><tbody>';
+
+        rows.forEach(function(r) {{
+            function fmt(v, neg) {{
+                if (v === 0) return '<span style="color:{DIM}">—</span>';
+                var s = '$' + Math.abs(v).toLocaleString('en-US', {{maximumFractionDigits:0}});
+                return neg ? '<span style="color:{DANGER}">-' + s + '</span>' : '<span style="color:{SUCCESS}">' + s + '</span>';
+            }}
+            var netColor = r.net >= 0 ? '{SUCCESS}' : '{DANGER}';
+            var netSign = r.net >= 0 ? '+' : '-';
+            html += '<tr onclick="showDetail(\'' + r.sid + '\')" style="cursor:pointer" title="View ' + r.name + '">';
+            html += '<td style="font-weight:500">' + r.name + '</td>';
+            html += '<td style="text-align:right">' + fmt(r.new_revenue, false) + '</td>';
+            html += '<td style="text-align:right">' + fmt(r.expansion_revenue, false) + '</td>';
+            html += '<td style="text-align:right">' + fmt(r.resurrected_revenue, false) + '</td>';
+            html += '<td style="text-align:right">' + fmt(r.contraction_revenue, true) + '</td>';
+            html += '<td style="text-align:right">' + fmt(r.churned_revenue, true) + '</td>';
+            html += '<td style="text-align:right;font-weight:600;color:' + netColor + '">' + netSign + '$' + Math.abs(r.net).toLocaleString('en-US', {{maximumFractionDigits:0}}) + '</td>';
+            html += '</tr>';
+        }});
+
+        html += '</tbody></table>';
+        body.innerHTML = html;
+    }}
+
+    select.addEventListener('change', function() {{ renderTable(select.value); }});
+    if (months.length > 0) renderTable(months[0]);
 }})();
-}}, 1000);  // wait for Plotly to finish rendering
 
 // ======== PARTNER RANGE SLIDER ========
 (function() {{
