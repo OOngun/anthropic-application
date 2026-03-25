@@ -762,6 +762,154 @@ portfolio_qr = gains / losses if losses > 0 else 10.0
 latest_gross_ret = agg_rev_ga['gross_ret'].dropna().iloc[-1] if agg_rev_ga['gross_ret'].dropna().any() else 0
 
 # ============================================================
+# SLIDER: PRE-COMPUTE PULSE DATA FOR EVERY PARTNER COUNT
+# ============================================================
+
+# Rank partners by total revenue (highest first)
+_partner_rev_rank = monthly_usage.groupby('startup_id')['revenue_usd'].sum().sort_values(ascending=False)
+_ranked_sids = _partner_rev_rank.index.tolist()
+
+# n_active = partners with revenue > 0 in latest month
+_latest_m = monthly_usage['month'].max()
+_latest_rev_by_sid = monthly_usage[monthly_usage['month'] == _latest_m].groupby('startup_id')['revenue_usd'].sum()
+_active_sids = [sid for sid in _ranked_sids if _latest_rev_by_sid.get(sid, 0) > 0]
+n_active = len(_active_sids)
+n_total = len(ALL_SIDS)
+
+# Reorder active SIDs by total revenue rank (they're already ranked from _ranked_sids)
+_active_ranked = [sid for sid in _ranked_sids if sid in _active_sids]
+
+# For each N from 1..n_active, compute KPIs, waterfall data, GA chart data, CMGR series, and revenue share data
+_pulse_by_n = {}
+_all_months_sorted = sorted(monthly_usage['month'].unique())
+
+for N in range(1, n_active + 1):
+    top_n_sids = _active_ranked[:N]
+    top_n_set = set(top_n_sids)
+
+    # --- KPIs ---
+    # Recompute GA for this subset using dev_activity
+    sub_ga_df = _compute_ga_for_sids(top_n_sids)
+    if len(sub_ga_df) >= 2:
+        sub_latest = sub_ga_df.iloc[-1]
+        sub_prior_total = sub_ga_df.iloc[-2]['total']
+        sub_gains = sub_latest['new'] + sub_latest['expansion'] + sub_latest['resurrected']
+        sub_losses = sub_latest['churned'] + sub_latest['contraction']
+        sub_qr = round(sub_gains / sub_losses, 1) if sub_losses > 0 else 10.0
+        sub_ndr = round((sub_prior_total + sub_latest['expansion'] + sub_latest['resurrected'] - sub_latest['churned'] - sub_latest['contraction']) / sub_prior_total * 100, 0) if sub_prior_total > 0 else 0
+        sub_net_churn = round((sub_latest['churned'] + sub_latest['contraction'] - sub_latest['resurrected'] - sub_latest['expansion']) / sub_prior_total * 100, 1) if sub_prior_total > 0 else 0
+        sub_gross_ret_series = sub_ga_df['retained'] / sub_ga_df['total'].shift(1) * 100
+        sub_gross_ret = round(sub_gross_ret_series.dropna().iloc[-1], 0) if sub_gross_ret_series.dropna().any() else 0
+    else:
+        sub_qr, sub_ndr, sub_net_churn, sub_gross_ret = 0, 0, 0, 0
+
+    # Active partners in this subset
+    sub_active = sum(1 for sid in top_n_sids if _latest_rev_by_sid.get(sid, 0) > 0)
+
+    # --- Waterfall data (all scope x period) ---
+    sub_pct_df = _ga_pct_df(sub_ga_df)
+    sub_wf = {}
+    for period in _periods:
+        vals = _period_avg(sub_pct_df, period)
+        full_avg = _period_avg(sub_pct_df, 'All')
+        trends = _trend_arrays(sub_pct_df) if len(sub_pct_df) >= 2 else {k: [] for k in ['new', 'expansion', 'resurrected', 'contraction', 'churned', 'net']}
+        sub_wf[period] = {
+            'new': round(vals['new'], 2), 'expansion': round(vals['expansion'], 2),
+            'resurrected': round(vals['resurrected'], 2), 'contraction': round(vals['contraction'], 2),
+            'churned': round(vals['churned'], 2), 'net': round(vals['net'], 2),
+            'avg_new': round(full_avg['new'], 2), 'avg_expansion': round(full_avg['expansion'], 2),
+            'avg_resurrected': round(full_avg['resurrected'], 2), 'avg_contraction': round(full_avg['contraction'], 2),
+            'avg_churned': round(full_avg['churned'], 2), 'avg_net': round(full_avg['net'], 2),
+            'trends': trends,
+        }
+
+    # --- Expansion vs Losses (el1 data) ---
+    if len(sub_ga_df) >= 1:
+        _sub_latest_ga = sub_ga_df.iloc[-1]
+        el1_gains = _sub_latest_ga['new'] + _sub_latest_ga['expansion'] + _sub_latest_ga['resurrected']
+        el1_losses = _sub_latest_ga['churned'] + _sub_latest_ga['contraction']
+        el1_coverage = round(el1_gains / el1_losses, 1) if el1_losses > 0 else 10.0
+    else:
+        el1_gains, el1_losses, el1_coverage = 0, 0, 0
+
+    # --- GA+CMGR chart data (time series) ---
+    ga_chart = {'months': [], 'retained': [], 'new': [], 'expansion': [],
+                'resurrected': [], 'contraction': [], 'churned': []}
+    if len(sub_ga_df) > 0:
+        ga_chart['months'] = [m.strftime('%Y-%m-%d') for m in sub_ga_df['month']]
+        ga_chart['retained'] = [round(float(v), 2) for v in sub_ga_df['retained'].values]
+        ga_chart['new'] = [round(float(v), 2) for v in sub_ga_df['new'].values]
+        ga_chart['expansion'] = [round(float(v), 2) for v in sub_ga_df['expansion'].values]
+        ga_chart['resurrected'] = [round(float(v), 2) for v in sub_ga_df['resurrected'].values]
+        ga_chart['contraction'] = [round(float(v), 2) for v in sub_ga_df['contraction'].values]
+        ga_chart['churned'] = [round(float(v), 2) for v in sub_ga_df['churned'].values]
+
+    # CMGR lines for this subset
+    sub_rev_series = monthly_usage[monthly_usage['startup_id'].isin(top_n_set)].groupby('month')['revenue_usd'].sum().sort_index()
+    # Also compute portfolio_tokens for this subset
+    sub_tok_series = monthly_usage[monthly_usage['startup_id'].isin(top_n_set)].groupby('month')['total_tokens'].sum().sort_index()
+    cmgr_chart = {'months': [], 'cmgr3': [], 'cmgr6': [], 'cmgr12': []}
+    sub_months_list = sub_tok_series.index.tolist()
+    for i_m in range(len(sub_months_list)):
+        sub_slice = sub_tok_series.iloc[:i_m+1]
+        c3 = cmgr(sub_slice, 3) if len(sub_slice) > 6 else None
+        c6 = cmgr(sub_slice, 6) if len(sub_slice) > 9 else None
+        c12 = cmgr(sub_slice, 12) if len(sub_slice) > 12 else None
+        cmgr_chart['months'].append(sub_months_list[i_m].strftime('%Y-%m-%d'))
+        cmgr_chart['cmgr3'].append(round(c3 * 100, 2) if c3 is not None else None)
+        cmgr_chart['cmgr6'].append(round(c6 * 100, 2) if c6 is not None else None)
+        cmgr_chart['cmgr12'].append(round(c12 * 100, 2) if c12 is not None else None)
+
+    # --- Revenue share (AoE) chart data ---
+    _sub_rev_by_pm = monthly_usage[monthly_usage['startup_id'].isin(top_n_set)].groupby(['startup_id', 'month'])['revenue_usd'].sum().reset_index()
+    _sub_monthly_total = _sub_rev_by_pm.groupby('month')['revenue_usd'].sum().reindex(_all_months_sorted, fill_value=0)
+
+    # Top 7 (or fewer) shown individually, rest as "Others"
+    _sub_partner_total = _sub_rev_by_pm.groupby('startup_id')['revenue_usd'].sum().sort_values(ascending=False)
+    _sub_top_n_aoe = min(7, N)
+    _sub_top_sids_aoe = _sub_partner_total.head(_sub_top_n_aoe).index.tolist()
+    _sub_other_sids_aoe = _sub_partner_total.iloc[_sub_top_n_aoe:].index.tolist()
+
+    aoe_chart = {'months': [m.strftime('%Y-%m-%d') for m in _all_months_sorted], 'traces': []}
+
+    # Others
+    if _sub_other_sids_aoe:
+        _sub_others_monthly = _sub_rev_by_pm[_sub_rev_by_pm['startup_id'].isin(_sub_other_sids_aoe)].groupby('month')['revenue_usd'].sum().reindex(_all_months_sorted, fill_value=0)
+        _sub_others_pct = (_sub_others_monthly / _sub_monthly_total * 100).fillna(0).values.tolist()
+        aoe_chart['traces'].append({
+            'name': f'Others ({len(_sub_other_sids_aoe)})',
+            'y': [round(v, 2) for v in _sub_others_pct],
+            'color': '#94a3b8', 'fillcolor': 'rgba(148,163,184,0.4)'
+        })
+
+    # Individual top partners (reversed so biggest at bottom)
+    for sid in reversed(_sub_top_sids_aoe):
+        d_vals = _sub_rev_by_pm[_sub_rev_by_pm['startup_id'] == sid].set_index('month').reindex(_all_months_sorted, fill_value=0)
+        _pct_v = (d_vals['revenue_usd'] / _sub_monthly_total * 100).fillna(0).values.tolist()
+        aoe_chart['traces'].append({
+            'name': NAMES.get(sid, sid),
+            'y': [round(v, 2) for v in _pct_v],
+            'color': COLORS.get(sid, '#666'), 'fillcolor': COLORS.get(sid, '#666')
+        })
+
+    _pulse_by_n[str(N)] = {
+        'active': sub_active,
+        'qr': float(sub_qr),
+        'ndr': float(sub_ndr),
+        'net_churn': float(sub_net_churn),
+        'gross_ret': float(sub_gross_ret),
+        'el1_gains': round(float(el1_gains), 0),
+        'el1_losses': round(float(el1_losses), 0),
+        'el1_coverage': float(el1_coverage),
+        'wf': sub_wf,
+        'ga_chart': ga_chart,
+        'cmgr_chart': cmgr_chart,
+        'aoe_chart': aoe_chart,
+    }
+
+_pulse_by_n_json = json.dumps(_pulse_by_n)
+
+# ============================================================
 # AGGREGATE DEV GA
 # ============================================================
 
@@ -1448,7 +1596,7 @@ for sid in ALL_SIDS:
     else:
         _churned_count += 1
 
-el1_html = f'''<div class="pulse-panel">
+el1_html = f'''<div class="pulse-panel" id="el1-panel">
     <div class="panel-title">EXPANSION VS LOSSES</div>
     <div class="el1-bar-wrap">
         <div class="el1-track">
@@ -1553,16 +1701,30 @@ fig_rev_share.update_layout(**rev_share_layout)
 rev_share_div = to_div(fig_rev_share, 'pulse-rev-share')
 
 tier1_html = f'''
-<div class="pulse-block">
+<div class="pulse-slider">
+    <div class="slider-label">Partners included</div>
+    <div class="slider-container">
+        <input type="range" id="partner-range" min="1" max="{n_active}" value="{n_active}" step="1">
+        <div class="slider-ticks">
+            <span class="tick" data-val="3" style="left:{3/n_active*100:.1f}%">Top 3</span>
+            <span class="tick" data-val="5" style="left:{5/n_active*100:.1f}%">Top 5</span>
+            <span class="tick" data-val="10" style="left:{min(10,n_active)/n_active*100:.1f}%">Top 10</span>
+            <span class="tick" data-val="{n_active}" style="left:100%">All Active</span>
+        </div>
+    </div>
+    <div class="slider-value" id="slider-value-label">All <span id="slider-count">{n_active}</span> of {n_total}</div>
+</div>
+<script>window.__pulse_by_n = {_pulse_by_n_json}; window.__n_active = {n_active}; window.__n_total = {n_total};</script>
+<div class="pulse-block" id="pulse-block-main">
     <div class="pulse-cards">
         <div class="pulse-card" data-tip="active-partners">
             <div class="pc-label">ACTIVE PARTNERS</div>
-            <div class="pc-value">{active_partners}</div>
+            <div class="pc-value" id="kpi-active">{active_partners}</div>
             <div class="pc-sub">API activity in last 30d</div>
         </div>
         <div class="pulse-card" data-tip="quick-ratio">
             <div class="pc-label">QUICK RATIO</div>
-            <div class="pc-value" style="color:{'#16A34A' if portfolio_qr >= 4 else '#CA8A04' if portfolio_qr >= 1 else '#DC2626'}">{portfolio_qr:.1f}x</div>
+            <div class="pc-value" id="kpi-qr" style="color:{'#16A34A' if portfolio_qr >= 4 else '#CA8A04' if portfolio_qr >= 1 else '#DC2626'}">{portfolio_qr:.1f}x</div>
             <div class="pc-sub">(new+res+exp) / (churn+contr)</div>
             <div class="ndr-bench">
                 <div class="ndr-bench-track">
@@ -1571,7 +1733,7 @@ tier1_html = f'''
                     <div class="ndr-bench-zone" style="left:40%;width:20%;background:#ca8a04" title="Moderate (2-3x)"></div>
                     <div class="ndr-bench-zone" style="left:60%;width:20%;background:#15803d" title="Healthy (3-4x)"></div>
                     <div class="ndr-bench-zone" style="left:80%;width:20%;background:#166534" title="Strong (>4x)"></div>
-                    <div class="ndr-bench-marker" style="left:{max(0, min(100, portfolio_qr / 6 * 100)):.1f}%" title="Portfolio: {portfolio_qr:.1f}x"></div>
+                    <div class="ndr-bench-marker" id="bench-qr-marker" style="left:{max(0, min(100, portfolio_qr / 6 * 100)):.1f}%" title="Portfolio: {portfolio_qr:.1f}x"></div>
                 </div>
                 <div class="ndr-bench-labels">
                     <span>0x</span>
@@ -1586,15 +1748,15 @@ tier1_html = f'''
         </div>
         <div class="pulse-card" data-tip="ndr">
             <div class="pc-label">NET DOLLAR RETENTION</div>
-            <div class="pc-value" style="color:{'#16A34A' if ndr >= 100 else '#DC2626'}">{ndr:.0f}%</div>
-            <div class="pc-sub">{'Expanding' if ndr >= 100 else 'Contracting'} &middot; existing partners</div>
+            <div class="pc-value" id="kpi-ndr" style="color:{'#16A34A' if ndr >= 100 else '#DC2626'}">{ndr:.0f}%</div>
+            <div class="pc-sub" id="kpi-ndr-sub">{'Expanding' if ndr >= 100 else 'Contracting'} &middot; existing partners</div>
             <div class="ndr-bench">
                 <div class="ndr-bench-track">
                     <div class="ndr-bench-zone" style="left:0%;width:25%;background:#1e3a5f" title="Below 25th pctl"></div>
                     <div class="ndr-bench-zone" style="left:25%;width:25%;background:#2563eb" title="25th-50th pctl"></div>
                     <div class="ndr-bench-zone" style="left:50%;width:25%;background:#60a5fa" title="50th-75th pctl"></div>
                     <div class="ndr-bench-zone" style="left:75%;width:25%;background:#93c5fd" title="75th-90th pctl"></div>
-                    <div class="ndr-bench-marker" style="left:{max(0, min(100, (ndr - 80) / (180 - 80) * 100)):.1f}%" title="Portfolio: {ndr:.0f}%"></div>
+                    <div class="ndr-bench-marker" id="bench-ndr-marker" style="left:{max(0, min(100, (ndr - 80) / (180 - 80) * 100)):.1f}%" title="Portfolio: {ndr:.0f}%"></div>
                 </div>
                 <div class="ndr-bench-labels">
                     <span>80%</span>
@@ -1608,7 +1770,7 @@ tier1_html = f'''
         </div>
         <div class="pulse-card" data-tip="gross-retention">
             <div class="pc-label">GROSS RETENTION</div>
-            <div class="pc-value" style="color:{'#16A34A' if latest_gross_ret >= 80 else '#CA8A04' if latest_gross_ret >= 60 else '#DC2626'}">{latest_gross_ret:.0f}%</div>
+            <div class="pc-value" id="kpi-gret" style="color:{'#16A34A' if latest_gross_ret >= 80 else '#CA8A04' if latest_gross_ret >= 60 else '#DC2626'}">{latest_gross_ret:.0f}%</div>
             <div class="pc-sub">30-day rolling</div>
             <div class="ndr-bench">
                 <div class="ndr-bench-track">
@@ -1617,7 +1779,7 @@ tier1_html = f'''
                     <div class="ndr-bench-zone" style="left:50%;width:20%;background:#ca8a04" title="Moderate (70-80%)"></div>
                     <div class="ndr-bench-zone" style="left:70%;width:15%;background:#15803d" title="Healthy (80-90%)"></div>
                     <div class="ndr-bench-zone" style="left:85%;width:15%;background:#166534" title="Strong (>90%)"></div>
-                    <div class="ndr-bench-marker" style="left:{max(0, min(100, latest_gross_ret)):.1f}%" title="Portfolio: {latest_gross_ret:.0f}%"></div>
+                    <div class="ndr-bench-marker" id="bench-gret-marker" style="left:{max(0, min(100, latest_gross_ret)):.1f}%" title="Portfolio: {latest_gross_ret:.0f}%"></div>
                 </div>
                 <div class="ndr-bench-labels">
                     <span>0%</span>
@@ -2341,6 +2503,23 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .chart-desc {{ font-size:11px; color:{DIM}; line-height:1.6; margin-top:10px; padding:0 4px; }}
 .chart-desc strong {{ color:{TEXT}; font-weight:600; }}
 
+/* ========== PARTNER RANGE SLIDER ========== */
+.pulse-slider {{ display:flex; align-items:center; gap:16px; padding:10px 0 14px; margin-bottom:8px; }}
+.slider-label {{ font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:{MUTED}; white-space:nowrap; }}
+.slider-container {{ flex:1; position:relative; min-width:0; }}
+.slider-container input[type=range] {{ -webkit-appearance:none; appearance:none; width:100%; height:4px; background:{GRID}; border-radius:2px; outline:none; cursor:pointer; }}
+.slider-container input[type=range]::-webkit-slider-thumb {{ -webkit-appearance:none; width:16px; height:16px; border-radius:50%; background:{ACCENT}; cursor:pointer; border:2px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,0.15); transition:transform 0.1s ease; }}
+.slider-container input[type=range]::-webkit-slider-thumb:hover {{ transform:scale(1.15); }}
+.slider-container input[type=range]::-moz-range-thumb {{ width:16px; height:16px; border-radius:50%; background:{ACCENT}; cursor:pointer; border:2px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,0.15); }}
+.slider-container input[type=range]::-webkit-slider-runnable-track {{ height:4px; border-radius:2px; }}
+.slider-container input[type=range]::-moz-range-track {{ height:4px; border-radius:2px; background:{GRID}; }}
+.slider-ticks {{ position:relative; height:16px; margin-top:2px; }}
+.slider-ticks .tick {{ position:absolute; transform:translateX(-50%); font-size:9px; color:{MUTED}; cursor:pointer; white-space:nowrap; }}
+.slider-ticks .tick::before {{ content:''; position:absolute; top:-4px; left:50%; width:1px; height:4px; background:{MUTED}; opacity:0.4; }}
+.slider-ticks .tick:hover {{ color:{ACCENT}; }}
+.slider-value {{ font-size:12px; color:{TEXT}; font-weight:500; white-space:nowrap; font-variant-numeric:tabular-nums; min-width:80px; text-align:right; }}
+.slider-value #slider-count {{ font-weight:700; color:{ACCENT}; }}
+
 /* ========== TIER 1: PULSE BLOCK ========== */
 .pulse-block {{ margin-bottom:40px; padding-bottom:32px; border-bottom:1px solid {GRID}; }}
 
@@ -2585,6 +2764,10 @@ html {{ scroll-behavior:smooth; }}
 }}
 
 @media (max-width:480px) {{
+    .pulse-slider {{ flex-wrap:wrap; gap:8px; }}
+    .slider-label {{ font-size:10px; }}
+    .slider-value {{ font-size:11px; min-width:auto; }}
+    .slider-ticks .tick {{ font-size:8px; }}
     .kpi-row {{ grid-template-columns:1fr; }}
     .pulse-cards {{ grid-template-columns:1fr; }}
     .analysis-header {{ flex-direction:column; align-items:flex-start; gap:6px; }}
@@ -3110,6 +3293,203 @@ document.querySelectorAll('.partner-list').forEach(wrap => {{
     }}
 
     render();
+
+    // Expose render for slider to call
+    window.__wf_render = render;
+    window.__wf_setScope = function(scope) {{ curScope = scope; }};
+    window.__wf_setPeriod = function(period) {{ curPeriod = period; }};
+    window.__wf_getCurPeriod = function() {{ return curPeriod; }};
+    window.__wf_getCurView = function() {{ return curView; }};
+    window.__wf_getCurScope = function() {{ return curScope; }};
+}})();
+
+// ======== PARTNER RANGE SLIDER ========
+(function() {{
+    const PBN = window.__pulse_by_n;
+    if (!PBN) return;
+    const slider = document.getElementById('partner-range');
+    const countEl = document.getElementById('slider-count');
+    const labelEl = document.getElementById('slider-value-label');
+    const nActive = window.__n_active;
+    const nTotal = window.__n_total;
+    if (!slider) return;
+
+    const ACCENT = '{ACCENT}';
+    const GAIN = '{GAIN}';
+    const LOSS = '{LOSS}';
+    const GA_RETAINED = '{GA_RETAINED}';
+    const GA_NEW = '{GA_NEW}';
+    const GA_EXPANSION = '{GA_EXPANSION}';
+    const GA_RESURRECTED = '{GA_RESURRECTED}';
+    const GA_CONTRACTION = '{GA_CONTRACTION}';
+    const GA_CHURNED = '{GA_CHURNED}';
+
+    const SNAP_POINTS = [3, 5, 10, nActive];
+    const SNAP_THRESHOLD = 1;
+
+    function snap(val) {{
+        for (const sp of SNAP_POINTS) {{
+            if (Math.abs(val - sp) <= SNAP_THRESHOLD && sp <= nActive) return sp;
+        }}
+        return val;
+    }}
+
+    function updateLabel(n) {{
+        if (n >= nActive) {{
+            labelEl.innerHTML = 'All <span id="slider-count" style="font-weight:700;color:' + ACCENT + '">' + nActive + '</span> of ' + nTotal;
+        }} else {{
+            labelEl.innerHTML = 'Top <span id="slider-count" style="font-weight:700;color:' + ACCENT + '">' + n + '</span> of ' + nTotal;
+        }}
+    }}
+
+    function colorQR(v) {{ return v >= 4 ? '#16A34A' : v >= 1 ? '#CA8A04' : '#DC2626'; }}
+    function colorNDR(v) {{ return v >= 100 ? '#16A34A' : '#DC2626'; }}
+    function colorGRet(v) {{ return v >= 80 ? '#16A34A' : v >= 60 ? '#CA8A04' : '#DC2626'; }}
+
+    function updateKPIs(d) {{
+        const kpiActive = document.getElementById('kpi-active');
+        const kpiQR = document.getElementById('kpi-qr');
+        const kpiNDR = document.getElementById('kpi-ndr');
+        const kpiNDRSub = document.getElementById('kpi-ndr-sub');
+        const kpiGRet = document.getElementById('kpi-gret');
+        if (kpiActive) kpiActive.textContent = d.active;
+        if (kpiQR) {{ kpiQR.textContent = d.qr.toFixed(1) + 'x'; kpiQR.style.color = colorQR(d.qr); }}
+        if (kpiNDR) {{ kpiNDR.textContent = Math.round(d.ndr) + '%'; kpiNDR.style.color = colorNDR(d.ndr); }}
+        if (kpiNDRSub) {{ kpiNDRSub.innerHTML = (d.ndr >= 100 ? 'Expanding' : 'Contracting') + ' &middot; existing partners'; }}
+        if (kpiGRet) {{ kpiGRet.textContent = Math.round(d.gross_ret) + '%'; kpiGRet.style.color = colorGRet(d.gross_ret); }}
+
+        // Update benchmark markers
+        const qrMarker = document.getElementById('bench-qr-marker');
+        if (qrMarker) {{ qrMarker.style.left = Math.max(0, Math.min(100, d.qr / 6 * 100)).toFixed(1) + '%'; qrMarker.title = 'Portfolio: ' + d.qr.toFixed(1) + 'x'; }}
+        const ndrMarker = document.getElementById('bench-ndr-marker');
+        if (ndrMarker) {{ ndrMarker.style.left = Math.max(0, Math.min(100, (d.ndr - 80) / (180 - 80) * 100)).toFixed(1) + '%'; ndrMarker.title = 'Portfolio: ' + Math.round(d.ndr) + '%'; }}
+        const gretMarker = document.getElementById('bench-gret-marker');
+        if (gretMarker) {{ gretMarker.style.left = Math.max(0, Math.min(100, d.gross_ret)).toFixed(1) + '%'; gretMarker.title = 'Portfolio: ' + Math.round(d.gross_ret) + '%'; }}
+    }}
+
+    function updateExpansionVsLosses(d) {{
+        const panel = document.getElementById('el1-panel');
+        if (!panel) return;
+        const maxBar = Math.max(d.el1_gains, d.el1_losses, 1);
+        const gainsPct = d.el1_gains / maxBar * 100;
+        const lossesPct = d.el1_losses / maxBar * 100;
+        const covColor = d.el1_coverage > 1.0 ? '{SUCCESS}' : '{DANGER}';
+        const greenFill = panel.querySelector('.el1-fill-green');
+        const redFill = panel.querySelector('.el1-fill-red');
+        const summary = panel.querySelector('.el1-summary');
+        if (greenFill) greenFill.style.width = gainsPct.toFixed(1) + '%';
+        if (redFill) redFill.style.width = lossesPct.toFixed(1) + '%';
+        if (summary) summary.innerHTML = 'Gains: $' + d.el1_gains.toLocaleString('en-US', {{maximumFractionDigits:0}}) + ' &middot; Losses: $' + d.el1_losses.toLocaleString('en-US', {{maximumFractionDigits:0}}) + ' &middot; Coverage: <span style="color:' + covColor + ';font-weight:600">' + d.el1_coverage.toFixed(1) + 'x</span>';
+    }}
+
+    function updateWaterfall(d) {{
+        // Replace __waterfall_data with slider-filtered data, using only 'all' scope
+        const wfData = window.__waterfall_data;
+        if (!wfData || !d.wf) return;
+        // Inject the slider-filtered data for all scope x period combos
+        for (const period of ['1M', '3M', '6M', '12M', 'YTD', 'All']) {{
+            wfData['all|' + period] = d.wf[period];
+        }}
+        // Re-render waterfall using existing render function
+        if (window.__wf_render) {{
+            // Force scope to 'all' when slider changes
+            if (window.__wf_getCurScope && window.__wf_getCurScope() !== 'all') {{
+                window.__wf_setScope('all');
+                document.querySelectorAll('.wf-pill[data-scope]').forEach(function(b) {{ b.classList.remove('active'); }});
+                var allBtn = document.querySelector('.wf-pill[data-scope="all"]');
+                if (allBtn) allBtn.classList.add('active');
+            }}
+            window.__wf_render();
+        }}
+    }}
+
+    function updateGACMGRChart(d) {{
+        const el = document.getElementById('pulse-ga-cmgr');
+        if (!el || typeof Plotly === 'undefined') return;
+        const ga = d.ga_chart;
+        const cm = d.cmgr_chart;
+        if (!ga.months.length) return;
+
+        const traces = [
+            {{ x: ga.months, y: ga.retained, name: 'Retained', marker: {{color: GA_RETAINED}}, opacity: 0.5, type: 'bar', legendgroup: 'ga', legendgrouptitle: {{text: 'Growth Accounting'}}, hovertemplate: 'Retained: $%{{y:,.0f}}<extra></extra>' }},
+            {{ x: ga.months, y: ga['new'], name: 'New', marker: {{color: GA_NEW}}, type: 'bar', legendgroup: 'ga', hovertemplate: 'New: $%{{y:,.0f}}<extra></extra>' }},
+            {{ x: ga.months, y: ga.expansion, name: 'Expansion', marker: {{color: GA_EXPANSION}}, type: 'bar', legendgroup: 'ga', hovertemplate: 'Expansion: $%{{y:,.0f}}<extra></extra>' }},
+            {{ x: ga.months, y: ga.resurrected, name: 'Resurrected', marker: {{color: GA_RESURRECTED}}, type: 'bar', legendgroup: 'ga', hovertemplate: 'Resurrected: $%{{y:,.0f}}<extra></extra>' }},
+            {{ x: ga.months, y: ga.contraction.map(function(v){{return -v}}), name: 'Contraction', marker: {{color: GA_CONTRACTION}}, type: 'bar', legendgroup: 'ga', hovertemplate: 'Contraction: -$%{{y:,.0f}}<extra></extra>' }},
+            {{ x: ga.months, y: ga.churned.map(function(v){{return -v}}), name: 'Churned', marker: {{color: GA_CHURNED}}, type: 'bar', legendgroup: 'ga', hovertemplate: 'Churned: -$%{{y:,.0f}}<extra></extra>' }},
+        ];
+
+        // CMGR lines
+        var cmgrColors = [['cmgr3', 'CMGR-3', '#3B6BE0', 'solid'], ['cmgr6', 'CMGR-6', '#6366f1', 'dash'], ['cmgr12', 'CMGR-12', '#a78bfa', 'dot']];
+        cmgrColors.forEach(function(cfg) {{
+            var key = cfg[0], name = cfg[1], color = cfg[2], dash = cfg[3];
+            var validX = [], validY = [];
+            cm.months.forEach(function(m, i) {{
+                if (cm[key][i] !== null) {{ validX.push(m); validY.push(cm[key][i]); }}
+            }});
+            if (validX.length > 0) {{
+                traces.push({{
+                    x: validX, y: validY, name: name, mode: 'lines+markers',
+                    line: {{color: color, width: 3, dash: dash}}, marker: {{size: 5}},
+                    yaxis: 'y2', legendgroup: 'cmgr', legendgrouptitle: {{text: 'CMGR'}},
+                    hovertemplate: name + ': %{{y:.1f}}%<extra></extra>', type: 'scatter'
+                }});
+            }}
+        }});
+
+        Plotly.react(el, traces, el.layout);
+    }}
+
+    function updateAoEChart(d) {{
+        const el = document.getElementById('pulse-rev-share');
+        if (!el || typeof Plotly === 'undefined') return;
+        const aoe = d.aoe_chart;
+        if (!aoe.months.length) return;
+
+        var traces = [];
+        aoe.traces.forEach(function(t) {{
+            traces.push({{
+                x: aoe.months, y: t.y, name: t.name, stackgroup: 'one',
+                line: {{width: 0.5, color: t.color}}, fillcolor: t.fillcolor,
+                hovertemplate: t.name + ': %{{y:.1f}}%<extra></extra>', type: 'scatter'
+            }});
+        }});
+
+        Plotly.react(el, traces, el.layout);
+    }}
+
+    function onSliderChange() {{
+        var val = parseInt(slider.value);
+        val = snap(val);
+        slider.value = val;
+        updateLabel(val);
+        var d = PBN[String(val)];
+        if (!d) return;
+        updateKPIs(d);
+        updateExpansionVsLosses(d);
+        updateWaterfall(d);
+        updateGACMGRChart(d);
+        updateAoEChart(d);
+    }}
+
+    slider.addEventListener('input', function() {{
+        var val = parseInt(slider.value);
+        updateLabel(val);
+        // Live preview of KPIs while dragging
+        var d = PBN[String(val)];
+        if (d) updateKPIs(d);
+    }});
+
+    slider.addEventListener('change', onSliderChange);
+
+    // Tick label clicks
+    document.querySelectorAll('.slider-ticks .tick').forEach(function(tick) {{
+        tick.addEventListener('click', function() {{
+            var val = parseInt(tick.dataset.val);
+            slider.value = val;
+            onSliderChange();
+        }});
+    }});
 }})();
 </script>
 
