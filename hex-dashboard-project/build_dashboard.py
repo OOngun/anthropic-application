@@ -751,6 +751,10 @@ _wf_json_str = json.dumps(_wf_json)
 # Net API Churn = (Churned + Contraction - Resurrected - Expansion) / Prior Revenue
 net_churn = (latest_ga['churned_revenue'] + latest_ga['contraction_revenue'] - latest_ga['resurrected_revenue'] - latest_ga['expansion_revenue']) / prior_total * 100 if prior_total > 0 else 0
 
+# Net Dollar Retention (NDR) = (Beginning + Expansion + Resurrected - Churn - Contraction) / Beginning × 100
+# a16z definition: measures how many dollars you've secured from existing partners after expansion, downsell, and churn
+ndr = (prior_total + latest_ga['expansion_revenue'] + latest_ga['resurrected_revenue'] - latest_ga['churned_revenue'] - latest_ga['contraction_revenue']) / prior_total * 100 if prior_total > 0 else 0
+
 # Active partners count
 active_partners = len([m for m in company_metrics if m['last_active_days'] < 30])
 
@@ -1566,10 +1570,10 @@ tier1_html = f'''
             <div class="pc-value">{portfolio_qr:.1f}x</div>
             <div class="pc-sub">(new+res+exp) / (churn+contr)</div>
         </div>
-        <div class="pulse-card" data-tip="net-churn">
-            <div class="pc-label">NET API CHURN</div>
-            <div class="pc-value">{net_churn_display}</div>
-            <div class="pc-sub">{net_churn_note}</div>
+        <div class="pulse-card" data-tip="ndr">
+            <div class="pc-label">NET DOLLAR RETENTION</div>
+            <div class="pc-value" style="color:{'#16A34A' if ndr >= 100 else '#DC2626'}">{ndr:.0f}%</div>
+            <div class="pc-sub">{'Expanding' if ndr >= 100 else 'Contracting'} &middot; existing partners</div>
         </div>
         <div class="pulse-card" data-tip="gross-retention">
             <div class="pc-label">GROSS RETENTION</div>
@@ -3088,10 +3092,11 @@ document.querySelectorAll('.partner-list').forEach(wrap => {{
     <div class="tip-bench">&gt; 4&times; very healthy &middot; 1&ndash;4&times; moderate &middot; &lt; 1&times; shrinking</div>
 </div>
 
-<div id="tip-net-churn">
-    <div class="tip-title">Net API Churn</div>
-    <div class="tip-formula"><span class="frac"><span class="frac-num">Churned + Contraction &minus; Resurrected &minus; Expansion</span><span class="frac-den">Prior Period Revenue</span></span></div>
-    <div class="tip-body">Negative = existing base is growing without new partners. The holy grail of net negative churn.</div>
+<div id="tip-ndr">
+    <div class="tip-title">Net Dollar Retention (NDR)</div>
+    <div class="tip-formula"><span class="frac"><span class="frac-num">Beginning ARR + Expansion + Resurrected &minus; Churn &minus; Contraction</span><span class="frac-den">Beginning ARR</span></span><span class="op">&times;</span>100</div>
+    <div class="tip-body">Measures how many dollars you retain from existing partners after expansion, downsell, and churn. &gt;100% means the portfolio grows even without new partners.</div>
+    <div class="tip-bench">a16z benchmarks: 128% (25th pctl) &middot; 149% (50th) &middot; 153% (75th) &middot; 157% (90th)</div>
 </div>
 
 <div id="tip-gross-retention">
