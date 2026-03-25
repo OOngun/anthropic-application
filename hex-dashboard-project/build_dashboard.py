@@ -438,15 +438,6 @@ for sid in ALL_SIDS:
                     churn_prob = min(0.1 + 0.02 * (mi - n_months * 0.4), 0.6)
                     if np.random.random() < churn_prob:
                         continue
-            elif arch in ('star', 'rocket'):
-                if tenure > 0 and np.random.random() < 0.02:
-                    continue
-            elif arch in ('strong', 'steady'):
-                if tenure > 0 and np.random.random() < 0.04:
-                    continue
-            elif arch == 'fine':
-                if tenure > 0 and np.random.random() < 0.08:
-                    continue
             else:
                 if tenure > 0 and np.random.random() < 0.05:
                     continue
@@ -460,21 +451,13 @@ for sid in ALL_SIDS:
             continue
 
         n_active = len(active_devs)
-        # Each dev gets a PERMANENT weight based on their dev_id hash
-        # This ensures the same dev gets the same share of revenue each month
-        dev_weights = {}
-        for d in active_devs:
-            if d['dev_id'] not in dev_weights:
-                dev_weights[d['dev_id']] = 0.5 + abs(hash(d['dev_id']) % 1000) / 1000.0
+        raw_weights = np.array([1.0 / (i + 1) ** 0.7 for i in range(n_active)])
+        raw_weights = raw_weights / raw_weights.sum() * target_rev
 
-        raw_w = np.array([dev_weights[d['dev_id']] for d in active_devs])
-        raw_w = raw_w / raw_w.sum() * target_rev
-
-        # Tight noise for top performers, looser for others
-        noise_scale = 0.02 if arch in ('star', 'rocket', 'strong', 'steady') else 0.06
+        np.random.shuffle(active_devs)
 
         for i, d in enumerate(active_devs):
-            rev = round(max(raw_w[i] * (1 + np.random.normal(0, noise_scale)), 0.01), 2)
+            rev = round(max(raw_weights[i] + np.random.normal(0, raw_weights[i] * 0.1), 0.01), 2)
             _dev_rows.append({
                 'dev_id': d['dev_id'], 'startup_id': sid,
                 'month': months[mi].strftime('%Y-%m-%d'), 'revenue': rev
