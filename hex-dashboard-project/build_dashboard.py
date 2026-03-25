@@ -1701,18 +1701,21 @@ fig_rev_share.update_layout(**rev_share_layout)
 rev_share_div = to_div(fig_rev_share, 'pulse-rev-share')
 
 tier1_html = f'''
-<div class="pulse-slider">
-    <div class="slider-label">Partners included</div>
-    <div class="slider-container">
-        <input type="range" id="partner-range" min="1" max="{n_active}" value="{n_active}" step="1">
-        <div class="slider-ticks">
-            <span class="tick" data-val="3" style="left:{3/n_active*100:.1f}%">Top 3</span>
-            <span class="tick" data-val="5" style="left:{5/n_active*100:.1f}%">Top 5</span>
-            <span class="tick" data-val="10" style="left:{min(10,n_active)/n_active*100:.1f}%">Top 10</span>
-            <span class="tick" data-val="{n_active}" style="left:100%">All Active</span>
+<div class="pulse-slider-compact">
+    <div class="slider-row">
+        <div class="slider-label">Partners</div>
+        <div class="slider-container-compact">
+            <input type="range" id="partner-range" min="1" max="{n_total}" value="{n_total}" step="1">
         </div>
+        <div class="slider-value" id="slider-value-label"><span id="slider-count">{n_total}</span> / {n_total}</div>
     </div>
-    <div class="slider-value" id="slider-value-label">All <span id="slider-count">{n_active}</span> of {n_total}</div>
+    <div class="slider-presets">
+        <button class="slider-preset" data-val="3">Top 3</button>
+        <button class="slider-preset" data-val="5">Top 5</button>
+        <button class="slider-preset" data-val="10">Top 10</button>
+        <button class="slider-preset" data-val="{n_active}">Active ({n_active})</button>
+        <button class="slider-preset active" data-val="{n_total}">All ({n_total})</button>
+    </div>
 </div>
 <script>window.__pulse_by_n = {_pulse_by_n_json}; window.__n_active = {n_active}; window.__n_total = {n_total};</script>
 <div class="pulse-block" id="pulse-block-main">
@@ -2504,21 +2507,22 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .chart-desc strong {{ color:{TEXT}; font-weight:600; }}
 
 /* ========== PARTNER RANGE SLIDER ========== */
-.pulse-slider {{ display:flex; align-items:center; gap:16px; padding:10px 0 14px; margin-bottom:8px; }}
-.slider-label {{ font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:{MUTED}; white-space:nowrap; }}
-.slider-container {{ flex:1; position:relative; min-width:0; }}
-.slider-container input[type=range] {{ -webkit-appearance:none; appearance:none; width:100%; height:4px; background:{GRID}; border-radius:2px; outline:none; cursor:pointer; }}
-.slider-container input[type=range]::-webkit-slider-thumb {{ -webkit-appearance:none; width:16px; height:16px; border-radius:50%; background:{ACCENT}; cursor:pointer; border:2px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,0.15); transition:transform 0.1s ease; }}
-.slider-container input[type=range]::-webkit-slider-thumb:hover {{ transform:scale(1.15); }}
-.slider-container input[type=range]::-moz-range-thumb {{ width:16px; height:16px; border-radius:50%; background:{ACCENT}; cursor:pointer; border:2px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,0.15); }}
-.slider-container input[type=range]::-webkit-slider-runnable-track {{ height:4px; border-radius:2px; }}
-.slider-container input[type=range]::-moz-range-track {{ height:4px; border-radius:2px; background:{GRID}; }}
-.slider-ticks {{ position:relative; height:16px; margin-top:2px; }}
-.slider-ticks .tick {{ position:absolute; transform:translateX(-50%); font-size:9px; color:{MUTED}; cursor:pointer; white-space:nowrap; }}
-.slider-ticks .tick::before {{ content:''; position:absolute; top:-4px; left:50%; width:1px; height:4px; background:{MUTED}; opacity:0.4; }}
-.slider-ticks .tick:hover {{ color:{ACCENT}; }}
-.slider-value {{ font-size:12px; color:{TEXT}; font-weight:500; white-space:nowrap; font-variant-numeric:tabular-nums; min-width:80px; text-align:right; }}
+.pulse-slider-compact {{ padding:8px 0 12px; margin-bottom:4px; }}
+.slider-row {{ display:flex; align-items:center; gap:12px; }}
+.slider-label {{ font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:{MUTED}; white-space:nowrap; }}
+.slider-container-compact {{ flex:1; min-width:0; }}
+.slider-container-compact input[type=range] {{ -webkit-appearance:none; appearance:none; width:100%; height:3px; background:{GRID}; border-radius:2px; outline:none; cursor:pointer; }}
+.slider-container-compact input[type=range]::-webkit-slider-thumb {{ -webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:{ACCENT}; cursor:pointer; border:2px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,0.15); transition:transform 0.1s ease; }}
+.slider-container-compact input[type=range]::-webkit-slider-thumb:hover {{ transform:scale(1.2); }}
+.slider-container-compact input[type=range]::-moz-range-thumb {{ width:14px; height:14px; border-radius:50%; background:{ACCENT}; cursor:pointer; border:2px solid #fff; }}
+.slider-container-compact input[type=range]::-webkit-slider-runnable-track {{ height:3px; border-radius:2px; }}
+.slider-container-compact input[type=range]::-moz-range-track {{ height:3px; border-radius:2px; background:{GRID}; }}
+.slider-value {{ font-size:11px; color:{TEXT}; font-weight:500; white-space:nowrap; font-variant-numeric:tabular-nums; min-width:50px; text-align:right; }}
 .slider-value #slider-count {{ font-weight:700; color:{ACCENT}; }}
+.slider-presets {{ display:flex; gap:6px; margin-top:6px; }}
+.slider-preset {{ padding:3px 10px; font-size:10px; font-family:inherit; border:1px solid {GRID}; border-radius:12px; background:transparent; color:{MUTED}; cursor:pointer; transition:all 0.15s; }}
+.slider-preset:hover {{ border-color:{MUTED}; color:{TEXT}; }}
+.slider-preset.active {{ background:rgba(59,130,246,0.1); border-color:{ACCENT}; color:{ACCENT}; font-weight:600; }}
 
 /* ========== TIER 1: PULSE BLOCK ========== */
 .pulse-block {{ margin-bottom:40px; padding-bottom:32px; border-bottom:1px solid {GRID}; }}
@@ -3324,22 +3328,29 @@ document.querySelectorAll('.partner-list').forEach(wrap => {{
     const GA_CONTRACTION = '{GA_CONTRACTION}';
     const GA_CHURNED = '{GA_CHURNED}';
 
-    const SNAP_POINTS = [3, 5, 10, nActive];
+    const SNAP_POINTS = [3, 5, 10, nActive, nTotal];
     const SNAP_THRESHOLD = 1;
 
     function snap(val) {{
         for (const sp of SNAP_POINTS) {{
-            if (Math.abs(val - sp) <= SNAP_THRESHOLD && sp <= nActive) return sp;
+            if (Math.abs(val - sp) <= SNAP_THRESHOLD && sp <= nTotal) return sp;
         }}
         return val;
     }}
 
     function updateLabel(n) {{
-        if (n >= nActive) {{
-            labelEl.innerHTML = 'All <span id="slider-count" style="font-weight:700;color:' + ACCENT + '">' + nActive + '</span> of ' + nTotal;
+        if (n >= nTotal) {{
+            countEl.textContent = nTotal;
         }} else {{
-            labelEl.innerHTML = 'Top <span id="slider-count" style="font-weight:700;color:' + ACCENT + '">' + n + '</span> of ' + nTotal;
+            countEl.textContent = n;
         }}
+    }}
+
+    function updatePresetHighlight(n) {{
+        document.querySelectorAll('.slider-preset').forEach(function(btn) {{
+            var val = parseInt(btn.dataset.val);
+            btn.classList.toggle('active', val === n);
+        }});
     }}
 
     function colorQR(v) {{ return v >= 4 ? '#16A34A' : v >= 1 ? '#CA8A04' : '#DC2626'; }}
@@ -3463,7 +3474,9 @@ document.querySelectorAll('.partner-list').forEach(wrap => {{
         val = snap(val);
         slider.value = val;
         updateLabel(val);
-        var d = PBN[String(val)];
+        updatePresetHighlight(val);
+        var key = String(Math.min(val, nActive));
+        var d = PBN[key] || PBN[String(nActive)];
         if (!d) return;
         updateKPIs(d);
         updateExpansionVsLosses(d);
@@ -3475,17 +3488,18 @@ document.querySelectorAll('.partner-list').forEach(wrap => {{
     slider.addEventListener('input', function() {{
         var val = parseInt(slider.value);
         updateLabel(val);
-        // Live preview of KPIs while dragging
-        var d = PBN[String(val)];
+        updatePresetHighlight(snap(val));
+        var key = String(Math.min(val, nActive));
+        var d = PBN[key] || PBN[String(nActive)];
         if (d) updateKPIs(d);
     }});
 
     slider.addEventListener('change', onSliderChange);
 
-    // Tick label clicks
-    document.querySelectorAll('.slider-ticks .tick').forEach(function(tick) {{
-        tick.addEventListener('click', function() {{
-            var val = parseInt(tick.dataset.val);
+    // Preset button clicks
+    document.querySelectorAll('.slider-preset').forEach(function(btn) {{
+        btn.addEventListener('click', function() {{
+            var val = parseInt(btn.dataset.val);
             slider.value = val;
             onSliderChange();
         }});
