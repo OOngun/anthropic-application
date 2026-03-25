@@ -337,10 +337,11 @@ def _gen_cs_devs(sid, cohort_plan, churn_range, rev_power=0.5):
             df.loc[mask, 'revenue'] = (df.loc[mask, 'revenue'] / actual * target).round(2)
     return df.to_dict('records')
 
-# CS01 WriteFlow: consumer app, 40-60 total unique devs, moderate turnover (18-28% churn)
-_cs01_cohorts = [(0,6),(1,4),(2,6),(3,4),(4,2),(5,2),(6,4),(7,3),(8,1),(9,1),
-                 (10,1),(11,1),(12,2),(13,1),(14,2),(15,2),(16,1),(18,1),(20,1),(21,1),(22,1),(23,1)]
-_dev_rows.extend(_gen_cs_devs('CS01', _cs01_cohorts, (0.18, 0.28), 0.5))
+# CS01 WriteFlow: consumer app, 80+ total unique devs, HIGH turnover (35-50% churn)
+# B2C business — API calls tied directly to consumer usage. Expect lots of devs cycling through.
+_cs01_cohorts = [(0,8),(1,6),(2,8),(3,6),(4,5),(5,4),(6,6),(7,5),(8,3),(9,3),
+                 (10,3),(11,2),(12,4),(13,3),(14,4),(15,4),(16,3),(17,2),(18,3),(19,2),(20,3),(21,3),(22,2),(23,2)]
+_dev_rows.extend(_gen_cs_devs('CS01', _cs01_cohorts, (0.35, 0.50), 0.5))
 
 # CS02 FinLedger: internal dev tooling, 8-12 devs, very low churn (2%)
 _cs02_cohorts = [(0,4),(5,1),(10,1),(15,1),(20,1)]
