@@ -15,7 +15,6 @@ OUTPUT_DIR = '/Users/ongunozdemir/Desktop/Anthropic/anthropic-application/hex-da
 startups = pd.read_csv(f'{OUTPUT_DIR}/startups.csv')
 monthly_usage = pd.read_csv(f'{OUTPUT_DIR}/monthly_usage.csv')
 monthly_usage['month'] = pd.to_datetime(monthly_usage['month'])
-credits = pd.read_csv(f'{OUTPUT_DIR}/credit_grants.csv')
 unit_economics = pd.read_csv(f'{OUTPUT_DIR}/unit_economics.csv')
 unit_economics['month'] = pd.to_datetime(unit_economics['month'])
 engagement = pd.read_csv(f'{OUTPUT_DIR}/engagement_depth.csv')
@@ -158,7 +157,6 @@ GA_CHURNED = LOSS       # #D85A30
 company_metrics = []
 for sid in ALL_SIDS:
     u = monthly_usage[monthly_usage['startup_id'] == sid].sort_values('month')
-    c = credits[credits['startup_id'] == sid]['amount_usd'].sum()
     ue = unit_economics[unit_economics['startup_id'] == sid]
     ga = startup_ga[startup_ga['startup_id'] == sid].sort_values('month')
     s = startups[startups['startup_id'] == sid].iloc[0]
@@ -203,8 +201,6 @@ for sid in ALL_SIDS:
     sonnet_total = (u['revenue_usd'] * u['sonnet_pct']).sum()
     opus_total = (u['revenue_usd'] * u['opus_pct']).sum()
     haiku_total = (u['revenue_usd'] * u['haiku_pct']).sum()
-    roi = total_rev / c if c > 0 else 0
-    payback = ue[ue['payback_achieved']].iloc[0]['months_since_onboard'] if ue['payback_achieved'].any() else None
     rev_per_dev = latest['revenue_usd'] / latest['active_developers'] if latest['active_developers'] > 0 else 0
     tok_per_dev = latest['total_tokens'] / latest['active_developers'] if latest['active_developers'] > 0 else 0
 
@@ -243,7 +239,6 @@ for sid in ALL_SIDS:
         cmgr3_rev=cmgr3_rev, cmgr6_rev=cmgr6_rev, cmgr12_rev=cmgr12_rev,
         sonnet_rev=sonnet_rev, opus_rev=opus_rev, haiku_rev=haiku_rev,
         sonnet_total=sonnet_total, opus_total=opus_total, haiku_total=haiku_total,
-        credits=c, roi=roi, payback=payback,
         active_devs=int(latest['active_developers']),
         rev_per_dev=rev_per_dev, tok_per_dev=tok_per_dev,
         momentum=momentum, avg_qr=avg_qr,
@@ -1703,15 +1698,6 @@ def metric_class(val, thresholds, invert=False):
 
 partner_rows = ''
 for m in company_metrics:
-    # Credit payback: compact "Nx" text
-    if m['roi'] >= 1:
-        bar_color = SUCCESS
-    elif m['roi'] >= 0.5:
-        bar_color = WARNING
-    else:
-        bar_color = DANGER
-    bar_label = f'{m["roi"]:.1f}x'
-
     cmgr3_val = m['cmgr3'] if m['cmgr3'] is not None else 0
     cagr_cls = metric_class(cmgr3_val, (0.10, 0.03))  # >10% green, 3-10% amber, <3% red
     qr_cls = metric_class(m['avg_qr'], (2.0, 1.0))
@@ -1730,13 +1716,12 @@ for m in company_metrics:
 
     partner_rows += f'''<tr class="perf-row" data-sid="{m['sid']}" data-name="{m['name'].lower()}"
         data-arch="{archetype}" data-revenue="{m['latest_mrr']:.2f}" data-mau="{m['active_devs']}"
-        data-payback="{m['roi']:.4f}" data-cmgr="{cmgr3_val:.6f}"
+        data-cmgr="{cmgr3_val:.6f}"
         data-qr="{m['avg_qr']:.4f}" data-gret="{m['gross_retention']:.2f}" data-active="{m['last_active_days']}"
         style="cursor:pointer">
         <td><span class="dot-sm" style="background:{COLORS[m['sid']]}"></span>{m['name']} <span class="stage-badge">{m['stage']}</span></td>
         <td class="metric-cell num">{rev_display}</td>
         <td class="metric-cell num">{mau_display}</td>
-        <td class="metric-cell num" style="color:{bar_color}">{bar_label}</td>
         <td class="metric-cell num {cagr_cls}">{f'{cmgr3_val*100:.1f}%' if m['cmgr3'] is not None else 'n/a'}</td>
         <td class="metric-cell num {qr_cls}">{m['avg_qr']:.1f}x</td>
         <td class="metric-cell num {gret_cls}">{m['gross_retention']:.0f}%</td>
@@ -1769,7 +1754,6 @@ tier2_html = f'''
                     <th class="sortable" data-sort="name">Company <span class="sort-icon">⇅</span></th>
                     <th class="num sortable" data-sort="revenue">Revenue <span class="sort-icon">⇅</span></th>
                     <th class="num sortable" data-sort="mau">MAU <span class="sort-icon">⇅</span></th>
-                    <th class="num sortable" data-sort="payback" data-tip="credit-payback">ROI <span class="sort-icon">⇅</span></th>
                     <th class="num sortable" data-sort="cmgr" data-tip="cmgr">CMGR-3 <span class="sort-icon">⇅</span></th>
                     <th class="num sortable" data-sort="qr" data-tip="quick-ratio">Quick Ratio <span class="sort-icon">⇅</span></th>
                     <th class="num sortable" data-sort="gret" data-tip="gross-retention">Gross Ret. <span class="sort-icon">⇅</span></th>
@@ -1791,7 +1775,6 @@ def startup_kpis(sid):
     d_dga = dev_ga[dev_ga['startup_id'] == sid].sort_values('month')
     latest_dqr = d_dga.iloc[-1]['dev_quick_ratio'] if len(d_dga) > 0 else 0
 
-    roi_color = SUCCESS if m['roi'] > 2 else WARNING if m['roi'] > 1 else DANGER
     cagr_color = SUCCESS if m['token_cagr'] > 2 else WARNING if m['token_cagr'] > 0.5 else DANGER
     dqr_color = SUCCESS if latest_dqr > 2 else WARNING if latest_dqr > 1 else DANGER
 
@@ -1820,7 +1803,6 @@ def startup_kpis(sid):
             <div class="kpi-breakdown-row">12mo: {cmgr12_display}</div>
         </div>
     </div>'''
-    html += kpi('Credit ROI', f'{m["roi"]:.1f}x', f'${m["credits"]:,.0f} invested', roi_color)
     html += kpi('Active Devs', f'{m["active_devs"]}', 'current month')
     html += kpi('Dev Quick Ratio', f'{latest_dqr:.1f}x' if not np.isnan(latest_dqr) else 'N/A', 'new+resurrected / churned', dqr_color)
     html += '</div>'
@@ -2520,14 +2502,6 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 
 .stage-badge {{ font-size:9px; font-weight:600; padding:1px 6px; border-radius:8px; background:{ACCENT_LIGHT}; color:{ACCENT}; text-transform:uppercase; letter-spacing:0.03em; margin-left:6px; }}
 
-/* Credit payback progress bar */
-.payback-cell {{ min-width:120px; }}
-.payback-bar {{ position:relative; height:18px; background:{BORDER_SUBTLE}; border-radius:9px; overflow:visible; }}
-.payback-fill {{ height:100%; border-radius:9px; transition:width 0.6s cubic-bezier(0.22,1,0.36,1); min-width:2px; }}
-.payback-overflow .payback-fill {{ border-radius:9px; box-shadow:0 0 6px rgba(34,197,94,0.4); }}
-.payback-label {{ position:absolute; right:6px; top:50%; transform:translateY(-50%); font-size:10px; font-weight:700; color:{TEXT}; }}
-.payback-overflow .payback-label {{ color:#fff; }}
-
 /* Metric cell color coding */
 .metric-cell {{ font-weight:500; font-variant-numeric:tabular-nums; }}
 .metric-cell.metric-green {{ color:{SUCCESS}; }}
@@ -2624,7 +2598,7 @@ html {{ scroll-behavior:smooth; }}
     <div class="topbar-row">
         <div>
             <h1>Anthropic EMEA Startup Partnerships</h1>
-            <div class="subtitle">Partner Consumption & Credit Economics</div>
+            <div class="subtitle">Partner Consumption Analytics</div>
         </div>
         <span class="meta">Ongun Ozdemir &middot; Mar 2026 &middot; Synthetic data</span>
     </div>
@@ -2633,7 +2607,6 @@ html {{ scroll-behavior:smooth; }}
 <div class="assumptions">
     <div class="a-item"><strong>$10/1M tokens</strong> blended (Sonnet/Opus/Haiku, 5:1 I/O)</div>
     <div class="a-item"><strong>65% gross margin</strong> est.</div>
-    <div class="a-item"><strong>$25K base credit</strong> per growth-tier partner</div>
     <div class="a-item"><strong>24 months</strong> Jan 2024 &ndash; Dec 2025</div>
 </div>
 
@@ -3167,12 +3140,6 @@ document.querySelectorAll('.partner-list').forEach(wrap => {{
     <div class="tip-formula"><span class="frac"><span class="frac-num">Retained Revenue</span><span class="frac-den">Prior Period Revenue</span></span><span class="op">&times;</span>100</div>
     <div class="tip-body">The floor &mdash; how much revenue survives without new business or expansion.</div>
     <div class="tip-bench">&gt; 80% healthy &middot; 60&ndash;80% watch &middot; &lt; 60% critical</div>
-</div>
-
-<div id="tip-credit-payback">
-    <div class="tip-title">Credit Payback</div>
-    <div class="tip-formula"><span class="frac"><span class="frac-num">Cumulative Revenue</span><span class="frac-den">Credits Granted</span></span></div>
-    <div class="tip-body">Above 1&times; = investment has paid back. The progress bar shows proximity to breakeven.</div>
 </div>
 
 <div id="tip-cmgr">
