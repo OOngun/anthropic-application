@@ -1589,7 +1589,7 @@ tier1_html = f'''
                     <span style="left:73%">153</span>
                     <span style="left:100%">157+</span>
                 </div>
-                <div class="ndr-bench-note">a16z enterprise SaaS benchmarks (P25–P90)</div>
+                <div class="ndr-bench-note">Industry benchmarks (P25–P90)</div>
             </div>
         </div>
         <div class="pulse-card" data-tip="gross-retention">
@@ -1597,10 +1597,6 @@ tier1_html = f'''
             <div class="pc-value">{latest_gross_ret:.0f}%</div>
             <div class="pc-sub">30-day rolling</div>
         </div>
-    </div>
-
-    <div class="pulse-insights-row" style="grid-template-columns:1fr">
-        {el1_html}
     </div>
 
     <div class="pulse-panels">
@@ -1634,6 +1630,7 @@ tier1_html = f'''
             </div>
             <div id="wf-content"></div>
             <script>window.__waterfall_data = {_wf_json_str};</script>
+            {el1_html}
         </div>
 
         <div class="pulse-panel pulse-panel-chart">
@@ -3124,7 +3121,7 @@ document.querySelectorAll('.partner-list').forEach(wrap => {{
     <div class="tip-title">Net Dollar Retention (NDR)</div>
     <div class="tip-formula"><span class="frac"><span class="frac-num">Beginning ARR + Expansion + Resurrected &minus; Churn &minus; Contraction</span><span class="frac-den">Beginning ARR</span></span><span class="op">&times;</span>100</div>
     <div class="tip-body">Measures how many dollars you retain from existing partners after expansion, downsell, and churn. &gt;100% means the portfolio grows even without new partners.</div>
-    <div class="tip-bench">a16z benchmarks: 128% (25th pctl) &middot; 149% (50th) &middot; 153% (75th) &middot; 157% (90th)</div>
+    <div class="tip-bench">Benchmarks: 128% (25th pctl) &middot; 149% (50th) &middot; 153% (75th) &middot; 157% (90th)</div>
 </div>
 
 <div id="tip-gross-retention">
