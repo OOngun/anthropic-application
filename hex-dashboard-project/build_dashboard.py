@@ -3383,10 +3383,11 @@ document.querySelectorAll('.partner-list').forEach(wrap => {{
 }})();
 
 // ======== GA CHART CLICK DRILLDOWN ========
+setTimeout(function() {{
 (function() {{
     var gaEl = document.getElementById('pulse-ga-cmgr');
     var ddData = window.__ga_drilldown;
-    if (!gaEl || !ddData) return;
+    if (!gaEl || !ddData) {{ console.warn('GA drilldown: chart or data not found'); return; }}
 
     var componentMap = {{
         'Retained': 'retained_revenue',
@@ -3451,6 +3452,7 @@ document.querySelectorAll('.partner-list').forEach(wrap => {{
         dd.scrollIntoView({{ behavior: 'smooth', block: 'nearest' }});
     }});
 }})();
+}}, 1000);  // wait for Plotly to finish rendering
 
 // ======== PARTNER RANGE SLIDER ========
 (function() {{
