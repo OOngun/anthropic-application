@@ -1530,6 +1530,63 @@ for sid in ALL_SIDS:
         f.update_yaxes(ticksuffix='%', range=[0, 105])
         charts['gross_ret'] = to_div(f)
 
+    # ── SaaS Health Charts (Social+Capital style) ──────────────
+    if len(d_ga) > 1:
+        # Chart A: Cumulative MRR — Beginning MRR + Net New MRR
+        beginning_mrr = d_ga['total_revenue'].shift(1).fillna(0)
+        net_new_mrr = d_ga['total_revenue'] - beginning_mrr
+        f = go.Figure()
+        f.add_trace(go.Bar(x=d_ga['month'], y=beginning_mrr, name='Beginning MRR',
+            marker_color='#64748b', hovertemplate='$%{y:,.0f}<extra></extra>'))
+        f.add_trace(go.Bar(x=d_ga['month'], y=net_new_mrr, name='Net New MRR',
+            marker_color='#38bdf8', hovertemplate='$%{y:,.0f}<extra></extra>'))
+        f.update_layout(**layout('Cumulative MRR Build-Up'), barmode='stack')
+        f.update_yaxes(tickprefix='$', tickformat=',')
+        charts['cumulative_mrr'] = to_div(f)
+
+        # Chart B: Gross MRR Churn % — monthly churn rate with benchmark
+        prev_total = d_ga['total_revenue'].shift(1)
+        gross_churn_pct = (d_ga['churned_revenue'] + d_ga['contraction_revenue']) / prev_total * 100
+        gross_churn_pct = gross_churn_pct.replace([np.inf, -np.inf], np.nan)
+        f = go.Figure()
+        f.add_trace(go.Scatter(x=d_ga['month'], y=gross_churn_pct,
+            mode='lines+markers', line=dict(color=TEXT, width=2.5),
+            marker=dict(size=6, color=TEXT, symbol='square'),
+            showlegend=False, hovertemplate='%{y:.1f}%<extra></extra>'))
+        f.add_hline(y=3, line_dash="dash", line_color='#EAB308', line_width=3,
+            annotation_text="3% Benchmark", annotation_position="bottom right",
+            annotation_font=dict(color='#EAB308', size=12))
+        _max_churn = gross_churn_pct.dropna().max() if gross_churn_pct.dropna().any() else 10
+        f.update_yaxes(ticksuffix='%', range=[0, max(_max_churn * 1.15, 5)])
+        f.update_layout(**layout('Gross MRR Churn (%)'))
+        charts['gross_churn_pct'] = to_div(f)
+
+        # Chart C: New MRR vs Cancelled MRR — mirrored bars
+        f = go.Figure()
+        f.add_trace(go.Bar(x=d_ga['month'], y=d_ga['new_revenue'], name='New MRR Added',
+            marker_color='#64748b', hovertemplate='$%{y:,.0f}<extra></extra>'))
+        f.add_trace(go.Bar(x=d_ga['month'], y=-(d_ga['churned_revenue'] + d_ga['contraction_revenue']),
+            name='Cancelled MRR', marker_color='#EAB308',
+            hovertemplate='$%{customdata:,.0f}<extra></extra>',
+            customdata=d_ga['churned_revenue'] + d_ga['contraction_revenue']))
+        f.update_layout(**layout('New MRR vs Cancelled MRR'), barmode='relative')
+        f.update_yaxes(tickprefix='$', tickformat=',')
+        charts['new_vs_cancelled'] = to_div(f)
+
+        # Chart D: Expansion saves growth — New + Expansion vs Cancelled
+        f = go.Figure()
+        f.add_trace(go.Bar(x=d_ga['month'], y=d_ga['new_revenue'], name='New MRR Added',
+            marker_color='#64748b', hovertemplate='$%{y:,.0f}<extra></extra>'))
+        f.add_trace(go.Bar(x=d_ga['month'], y=d_ga['expansion_revenue'], name='Expansion MRR',
+            marker_color='#38bdf8', hovertemplate='$%{y:,.0f}<extra></extra>'))
+        f.add_trace(go.Bar(x=d_ga['month'], y=-(d_ga['churned_revenue'] + d_ga['contraction_revenue']),
+            name='Cancelled MRR', marker_color='#EAB308',
+            hovertemplate='$%{customdata:,.0f}<extra></extra>',
+            customdata=d_ga['churned_revenue'] + d_ga['contraction_revenue']))
+        f.update_layout(**layout('Only Expansion MRR Allows Growth'), barmode='relative')
+        f.update_yaxes(tickprefix='$', tickformat=',')
+        charts['expansion_breakdown'] = to_div(f)
+
     startup_charts[sid] = charts
 
 # ============================================================
@@ -2184,6 +2241,9 @@ def startup_tab_html(sid):
         </div>
     </div>
 
+    <!-- SECTION: SaaS Health Deep Dive -->
+    {'<div class="analysis-section" data-section="' + sid + '-saas-health">' + chr(10) + '        <div class="analysis-header" onclick="toggleSection(this)">' + chr(10) + '            <div class="analysis-title"><span class="chevron">&#x25BC;</span> SaaS Health</div>' + chr(10) + '            <div class="analysis-summary"><span class="sum-item">Churn &amp; Expansion analysis</span></div>' + chr(10) + '        </div>' + chr(10) + '        <div class="analysis-body">' + chr(10) + '            <div class="mode-tabs" data-section="' + sid + '-saas-health">' + chr(10) + '                <div class="mode-tab active" data-mode="cumulative">Cumulative MRR</div>' + chr(10) + '                <div class="mode-tab" data-mode="churn-pct">Gross Churn %</div>' + chr(10) + '                <div class="mode-tab" data-mode="new-vs-cancel">New vs Cancelled</div>' + chr(10) + '                <div class="mode-tab" data-mode="expansion">Expansion Breakdown</div>' + chr(10) + '            </div>' + chr(10) + '            <div class="mode-panel active" data-mode="cumulative"><div class="row-1"><div class="card">' + ch.get("cumulative_mrr", "") + '</div></div></div>' + chr(10) + '            <div class="mode-panel" data-mode="churn-pct"><div class="row-1"><div class="card">' + ch.get("gross_churn_pct", "") + '</div></div></div>' + chr(10) + '            <div class="mode-panel" data-mode="new-vs-cancel"><div class="row-1"><div class="card">' + ch.get("new_vs_cancelled", "") + '</div></div></div>' + chr(10) + '            <div class="mode-panel" data-mode="expansion"><div class="row-1"><div class="card">' + ch.get("expansion_breakdown", "") + '</div></div></div>' + chr(10) + '        </div>' + chr(10) + '    </div>' if 'cumulative_mrr' in ch else ''}
+
     <!-- SECTION 2: Developer Adoption — GA first -->
     <div class="analysis-section" data-section="{sid}-user-ga">
         <div class="analysis-header" onclick="toggleSection(this)">
@@ -2537,6 +2597,34 @@ for cs in CASE_STUDIES:
     cmgr3 = m['cmgr3'] if m and m['cmgr3'] else 0
     devs = m['active_devs'] if m else 0
 
+    # SaaS Health section — only for CS01 (WriteFlow) case study
+    saas_health_html = ''
+    if sid == 'CS01' and 'cumulative_mrr' in ch:
+        # Compute Quick Ratio for display
+        _cs_ga = per_company_ga_df[sid]
+        _cs_latest_qr = _cs_ga['quick_ratio'].iloc[-1] if len(_cs_ga) > 0 else 0
+        _cs_avg_churn = ((_cs_ga['churned_revenue'] + _cs_ga['contraction_revenue']) / _cs_ga['total_revenue'].shift(1) * 100).dropna()
+        _cs_avg_churn_val = _cs_avg_churn.iloc[-3:].mean() if len(_cs_avg_churn) >= 3 else _cs_avg_churn.mean() if len(_cs_avg_churn) > 0 else 0
+        _qr_color = SUCCESS if _cs_latest_qr >= 4 else WARNING if _cs_latest_qr >= 2 else DANGER
+        _churn_color = SUCCESS if _cs_avg_churn_val < 3 else WARNING if _cs_avg_churn_val < 7 else DANGER
+        saas_health_html = f'''
+            <div class="cs-section">
+                <div class="cs-section-title">SaaS Health Deep Dive</div>
+                <p class="cs-section-text">Decomposing revenue growth reveals the underlying health beyond the headline MRR curve. High gross churn masked by acquisition is a key risk signal.</p>
+                <div class="cs-kpis" style="margin:12px 0">
+                    <div class="cs-kpi"><div class="cs-kpi-label">Quick Ratio</div><div class="cs-kpi-value" style="color:{_qr_color}">{_cs_latest_qr:.1f}x</div></div>
+                    <div class="cs-kpi"><div class="cs-kpi-label">Avg Gross Churn</div><div class="cs-kpi-value" style="color:{_churn_color}">{_cs_avg_churn_val:.1f}%</div></div>
+                </div>
+            </div>
+            <div class="cs-charts">
+                <div class="card">{ch['cumulative_mrr']}</div>
+                <div class="card">{ch['gross_churn_pct']}</div>
+            </div>
+            <div class="cs-charts">
+                <div class="card">{ch['new_vs_cancelled']}</div>
+                <div class="card">{ch['expansion_breakdown']}</div>
+            </div>'''
+
     cs_cards_html += f'''
     <div class="cs-card" style="border-top:3px solid {cs['type_color']}">
         <div class="cs-header-clickable" onclick="toggleCaseStudy(this)">
@@ -2573,6 +2661,8 @@ for cs in CASE_STUDIES:
                 {ga_chart_html}
                 {rev_chart_html}
             </div>
+
+            {saas_health_html}
 
             {ltv_section_html}
 
