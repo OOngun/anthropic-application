@@ -2575,7 +2575,7 @@ for cs in CASE_STUDIES:
 
             {ltv_section_html}
 
-            <div class="cs-link" onclick="event.stopPropagation(); showDetail('{sid}')">View full analysis &rarr;</div>
+            <div class="cs-link" onclick="event.stopPropagation(); showPartnerDetail('{sid}')">View full analysis &rarr;</div>
         </div>
     </div>
     '''
@@ -3586,7 +3586,7 @@ document.querySelectorAll('.partner-list').forEach(wrap => {{
             }}
             var netColor = r.net >= 0 ? '{SUCCESS}' : '{DANGER}';
             var netSign = r.net >= 0 ? '+' : '-';
-            html += '<tr onclick="showDetail(&quot;' + r.sid + '&quot;)" style="cursor:pointer" title="View ' + r.name + '">';
+            html += '<tr onclick="showPartnerDetail(&quot;' + r.sid + '&quot;)" style="cursor:pointer" title="View ' + r.name + '">';
             html += '<td style="font-weight:500">' + r.name + '</td>';
             html += '<td style="text-align:right">' + fmt(r.new_revenue, false) + '</td>';
             html += '<td style="text-align:right">' + fmt(r.expansion_revenue, false) + '</td>';
