@@ -1372,16 +1372,16 @@ for sid in ALL_SIDS:
                 xgap=1, ygap=1
             ), row=1, col=2)
 
-            _hm_height = max(400, len(cohorts_sorted) * 32 + 100)
+            _hm_height = max(400, len(cohorts_sorted) * 38 + 120)
             fig_ltv_hm.update_layout(
                 height=_hm_height,
-                margin=dict(t=50, b=45, l=10, r=10),
+                margin=dict(t=60, b=50, l=10, r=80),
                 paper_bgcolor='white', plot_bgcolor='white',
-                title=dict(text=f'LTV by Cohort (color scale capped at {_ltv_cap_label})',
-                           font=dict(size=14, family='IBM Plex Sans')),
+                title=dict(text=f'Cumulative LTV per Developer by Cohort<br><span style="font-size:11px;color:#94a3b8">color scale capped at {_ltv_cap_label}</span>',
+                           font=dict(size=13, family='IBM Plex Sans'), x=0.08, xanchor='left'),
                 font=dict(family='IBM Plex Sans, Inter, sans-serif', size=11)
             )
-            fig_ltv_hm.update_xaxes(title_text='cohort size', row=1, col=1, showticklabels=False, side='bottom')
+            fig_ltv_hm.update_xaxes(title_text='', row=1, col=1, showticklabels=False)
             fig_ltv_hm.update_xaxes(title_text='period', row=1, col=2)
             fig_ltv_hm.update_yaxes(autorange='reversed', row=1, col=1)
             charts['ltv_heatmap'] = to_div(fig_ltv_hm, f'ltv-hm-{sid}')
