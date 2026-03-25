@@ -1567,8 +1567,27 @@ tier1_html = f'''
         </div>
         <div class="pulse-card" data-tip="quick-ratio">
             <div class="pc-label">QUICK RATIO</div>
-            <div class="pc-value">{portfolio_qr:.1f}x</div>
+            <div class="pc-value" style="color:{'#16A34A' if portfolio_qr >= 4 else '#CA8A04' if portfolio_qr >= 1 else '#DC2626'}">{portfolio_qr:.1f}x</div>
             <div class="pc-sub">(new+res+exp) / (churn+contr)</div>
+            <div class="ndr-bench">
+                <div class="ndr-bench-track">
+                    <div class="ndr-bench-zone" style="left:0%;width:20%;background:#7f1d1d" title="Shrinking (<1x)"></div>
+                    <div class="ndr-bench-zone" style="left:20%;width:20%;background:#b45309" title="Weak (1-2x)"></div>
+                    <div class="ndr-bench-zone" style="left:40%;width:20%;background:#ca8a04" title="Moderate (2-3x)"></div>
+                    <div class="ndr-bench-zone" style="left:60%;width:20%;background:#15803d" title="Healthy (3-4x)"></div>
+                    <div class="ndr-bench-zone" style="left:80%;width:20%;background:#166534" title="Strong (>4x)"></div>
+                    <div class="ndr-bench-marker" style="left:{max(0, min(100, portfolio_qr / 6 * 100)):.1f}%" title="Portfolio: {portfolio_qr:.1f}x"></div>
+                </div>
+                <div class="ndr-bench-labels">
+                    <span>0x</span>
+                    <span style="left:20%">1x</span>
+                    <span style="left:40%">2x</span>
+                    <span style="left:60%">3x</span>
+                    <span style="left:80%">4x</span>
+                    <span style="left:100%">6x</span>
+                </div>
+                <div class="ndr-bench-note">Industry benchmarks · &gt;4x very healthy</div>
+            </div>
         </div>
         <div class="pulse-card" data-tip="ndr">
             <div class="pc-label">NET DOLLAR RETENTION</div>
@@ -1594,8 +1613,27 @@ tier1_html = f'''
         </div>
         <div class="pulse-card" data-tip="gross-retention">
             <div class="pc-label">GROSS RETENTION</div>
-            <div class="pc-value">{latest_gross_ret:.0f}%</div>
+            <div class="pc-value" style="color:{'#16A34A' if latest_gross_ret >= 80 else '#CA8A04' if latest_gross_ret >= 60 else '#DC2626'}">{latest_gross_ret:.0f}%</div>
             <div class="pc-sub">30-day rolling</div>
+            <div class="ndr-bench">
+                <div class="ndr-bench-track">
+                    <div class="ndr-bench-zone" style="left:0%;width:30%;background:#7f1d1d" title="Critical (<60%)"></div>
+                    <div class="ndr-bench-zone" style="left:30%;width:20%;background:#b45309" title="Watch (60-70%)"></div>
+                    <div class="ndr-bench-zone" style="left:50%;width:20%;background:#ca8a04" title="Moderate (70-80%)"></div>
+                    <div class="ndr-bench-zone" style="left:70%;width:15%;background:#15803d" title="Healthy (80-90%)"></div>
+                    <div class="ndr-bench-zone" style="left:85%;width:15%;background:#166534" title="Strong (>90%)"></div>
+                    <div class="ndr-bench-marker" style="left:{max(0, min(100, latest_gross_ret)):.1f}%" title="Portfolio: {latest_gross_ret:.0f}%"></div>
+                </div>
+                <div class="ndr-bench-labels">
+                    <span>0%</span>
+                    <span style="left:30%">60</span>
+                    <span style="left:50%">70</span>
+                    <span style="left:70%">80</span>
+                    <span style="left:85%">90</span>
+                    <span style="left:100%">100</span>
+                </div>
+                <div class="ndr-bench-note">Industry benchmarks · &gt;80% healthy</div>
+            </div>
         </div>
     </div>
 
