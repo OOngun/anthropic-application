@@ -172,11 +172,135 @@ const doc = new Document({
 
             para("From these components we derive three key metrics:"),
 
-            bullet("Quick Ratio = (New + Resurrected + Expansion) / (Churned + Contraction) \u2014 measures growth efficiency"),
-            bullet("Gross Retention = Retained / Prior Revenue \u2014 the floor, how much survives without new business"),
-            bullet("Net Dollar Retention = (Retained + Expansion + Resurrected) / Prior Revenue \u2014 whether the existing base is growing or shrinking"),
+            sectionBreak(),
+
+            // QUICK RATIO formula block
+            new Paragraph({
+                spacing: { before: 80, after: 40 },
+                children: [new TextRun({ text: "Quick Ratio", bold: true, size: 22, font: "Arial" })]
+            }),
+            new Paragraph({
+                alignment: AlignmentType.CENTER,
+                spacing: { before: 60, after: 20 },
+                border: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.SINGLE, size: 3, color: "3B82F6", space: 8 } },
+                indent: { left: 1440, right: 1440 },
+                children: [new TextRun({ text: "New  +  Resurrected  +  Expansion", font: "Cambria Math", size: 22, color: "1E293B" })]
+            }),
+            new Paragraph({
+                alignment: AlignmentType.CENTER,
+                spacing: { before: 0, after: 0 },
+                indent: { left: 1440, right: 1440 },
+                children: [new TextRun({ text: "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500", font: "Cambria Math", size: 18, color: "94A3B8" })]
+            }),
+            new Paragraph({
+                alignment: AlignmentType.CENTER,
+                spacing: { before: 0, after: 40 },
+                border: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.SINGLE, size: 3, color: "3B82F6", space: 8 } },
+                indent: { left: 1440, right: 1440 },
+                children: [new TextRun({ text: "Churned  +  Contraction", font: "Cambria Math", size: 22, color: "1E293B" })]
+            }),
+            new Paragraph({
+                spacing: { after: 160 },
+                indent: { left: 360 },
+                children: [new TextRun({ text: "Measures growth efficiency. How many units gained for every unit lost. >4x = very healthy, <1x = shrinking.", size: 20, font: "Arial", color: "64748B", italics: true })]
+            }),
+
+            // GROSS RETENTION formula block
+            new Paragraph({
+                spacing: { before: 80, after: 40 },
+                children: [new TextRun({ text: "Gross Dollar Retention (GDR)", bold: true, size: 22, font: "Arial" })]
+            }),
+            new Paragraph({
+                alignment: AlignmentType.CENTER,
+                spacing: { before: 60, after: 20 },
+                border: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.SINGLE, size: 3, color: "16A34A", space: 8 } },
+                indent: { left: 1440, right: 1440 },
+                children: [new TextRun({ text: "Retained Revenue", font: "Cambria Math", size: 22, color: "1E293B" })]
+            }),
+            new Paragraph({
+                alignment: AlignmentType.CENTER,
+                spacing: { before: 0, after: 0 },
+                indent: { left: 1440, right: 1440 },
+                children: [new TextRun({ text: "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500", font: "Cambria Math", size: 18, color: "94A3B8" })]
+            }),
+            new Paragraph({
+                alignment: AlignmentType.CENTER,
+                spacing: { before: 0, after: 40 },
+                border: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.SINGLE, size: 3, color: "16A34A", space: 8 } },
+                indent: { left: 1440, right: 1440 },
+                children: [new TextRun({ text: "Prior Period Revenue", font: "Cambria Math", size: 22, color: "1E293B" })]
+            }),
+            new Paragraph({
+                spacing: { after: 160 },
+                indent: { left: 360 },
+                children: [new TextRun({ text: "The floor \u2014 how much revenue survives month-to-month without any new business. Caps at 100%. B2B SaaS median: 91%.", size: 20, font: "Arial", color: "64748B", italics: true })]
+            }),
+
+            // NET DOLLAR RETENTION formula block
+            new Paragraph({
+                spacing: { before: 80, after: 40 },
+                children: [new TextRun({ text: "Net Dollar Retention (NDR)", bold: true, size: 22, font: "Arial" })]
+            }),
+            new Paragraph({
+                alignment: AlignmentType.CENTER,
+                spacing: { before: 60, after: 20 },
+                border: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.SINGLE, size: 3, color: "D97706", space: 8 } },
+                indent: { left: 1440, right: 1440 },
+                children: [new TextRun({ text: "Retained  +  Expansion  +  Resurrected", font: "Cambria Math", size: 22, color: "1E293B" })]
+            }),
+            new Paragraph({
+                alignment: AlignmentType.CENTER,
+                spacing: { before: 0, after: 0 },
+                indent: { left: 1440, right: 1440 },
+                children: [new TextRun({ text: "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500", font: "Cambria Math", size: 18, color: "94A3B8" })]
+            }),
+            new Paragraph({
+                alignment: AlignmentType.CENTER,
+                spacing: { before: 0, after: 40 },
+                border: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.SINGLE, size: 3, color: "D97706", space: 8 } },
+                indent: { left: 1440, right: 1440 },
+                children: [new TextRun({ text: "Prior Period Revenue", font: "Cambria Math", size: 22, color: "1E293B" })]
+            }),
+            new Paragraph({
+                spacing: { after: 160 },
+                indent: { left: 360 },
+                children: [new TextRun({ text: "Whether the existing base is growing or shrinking. >100% = expansion exceeds losses (the goal). Enterprise B2B SaaS median: 110\u2013118%.", size: 20, font: "Arial", color: "64748B", italics: true })]
+            }),
 
             para("Critically, the same Quick Ratio can mean very different things depending on the partner\u2019s use case. A consumer product with QR 2.0x (high churn offset by high new) is healthy. A B2B enterprise product with QR 2.0x (moderate churn, moderate new) may be concerning. The case studies below demonstrate this principle."),
+
+            sectionBreak(),
+
+            // ============ PULSE SECTION DETAIL ============
+            heading("Pulse Section: Key Visualisations", HeadingLevel.HEADING_1),
+
+            heading("Compound Monthly Growth Rate (CMGR)", HeadingLevel.HEADING_2),
+
+            para("CMGR measures the smoothed monthly growth rate over trailing windows \u2014 3, 6, and 12 months. We show all three simultaneously because the relationship between them tells a story that no single number can."),
+
+            para("When CMGR-3 leads CMGR-12 (short-term growth exceeds long-term average), the portfolio is accelerating. When CMGR-3 trails CMGR-12, growth has decelerated \u2014 recent months are underperforming the historical trend. This spread is surfaced as an explicit callout in the Pulse section because it\u2019s the earliest signal of a structural slowdown versus a seasonal dip."),
+
+            para("For a startup partnerships portfolio, CMGR is more useful than annualised CAGR because the time horizons are short (12\u201324 months of partner history) and the growth rates are volatile. A partner showing 1,500% CAGR from a $100 base is mathematically correct but operationally meaningless. CMGR-3 of 8% tells you they\u2019re compounding steadily right now, which is actionable."),
+
+            heading("Portfolio Revenue Share", HeadingLevel.HEADING_2),
+
+            para("The stacked area chart shows each partner\u2019s proportional share of total portfolio revenue over time. Partners below a significance threshold are grouped into \u201COthers\u201D to keep the visual clean \u2014 we care about who\u2019s winning, not the long tail of minimal contributors."),
+
+            para("This view naturally surfaces the power law. In our synthetic portfolio, MedScribe AI, NovaMed AI, BrieflyAI, and Eigen Technologies emerge as the clear top performers, collectively accounting for the majority of portfolio revenue. The remaining partners contribute individually small amounts."),
+
+            para("The practical implication: these top performers are the candidates to watch most closely and allocate more resources to. Depending on internal policies and thresholds, they would be the first candidates to transition from the partnerships team to dedicated account management \u2014 or to hand over to account executives for deeper commercial relationships. They represent the portfolio\u2019s future revenue base, and their retention is disproportionately important to the programme\u2019s overall ROI."),
+
+            para("The \u201COthers\u201D band is equally informative. If it\u2019s growing as a proportion, the portfolio is diversifying \u2014 more partners are contributing meaningfully. If it\u2019s shrinking, concentration risk is increasing and the portfolio\u2019s health depends on fewer bets."),
+
+            heading("Revenue Distribution", HeadingLevel.HEADING_2),
+
+            para("The revenue distribution chart shows the shape of revenue across the entire partner portfolio. Two views are provided:"),
+
+            bullet("Power Law / Pareto: a horizontal bar chart of each partner\u2019s monthly revenue (sorted high to low) with a cumulative percentage line. This immediately reveals whether the portfolio follows a power law distribution \u2014 in a typical startup portfolio, the top 3\u20135 partners will generate 50\u201370% of total revenue."),
+
+            bullet("Histogram: groups partners into revenue buckets ($0, $0\u2013500, $500\u20132K, $2K\u201310K, $10K+) showing how many partners fall into each tier. A healthy portfolio has a few partners in the high buckets and a long tail of smaller ones \u2014 not a uniform distribution."),
+
+            para("This visualisation directly informs resource allocation. If your top 3 partners account for 65% of portfolio revenue, those relationships need disproportionate attention. If the distribution is flatter, the portfolio is more resilient but may lack breakout performers."),
 
             new Paragraph({ children: [new PageBreak()] }),
 

@@ -337,18 +337,18 @@ def _gen_cs_devs(sid, cohort_plan, churn_range, rev_power=0.5):
             df.loc[mask, 'revenue'] = (df.loc[mask, 'revenue'] / actual * target).round(2)
     return df.to_dict('records')
 
-# CS01 WriteFlow: consumer app, 40-60 total unique devs, high turnover (28-40% churn)
+# CS01 WriteFlow: consumer app, 40-60 total unique devs, moderate turnover (18-28% churn)
 _cs01_cohorts = [(0,6),(1,4),(2,6),(3,4),(4,2),(5,2),(6,4),(7,3),(8,1),(9,1),
                  (10,1),(11,1),(12,2),(13,1),(14,2),(15,2),(16,1),(18,1),(20,1),(21,1),(22,1),(23,1)]
-_dev_rows.extend(_gen_cs_devs('CS01', _cs01_cohorts, (0.28, 0.40), 0.5))
+_dev_rows.extend(_gen_cs_devs('CS01', _cs01_cohorts, (0.18, 0.28), 0.5))
 
 # CS02 FinLedger: internal dev tooling, 8-12 devs, very low churn (2%)
 _cs02_cohorts = [(0,4),(5,1),(10,1),(15,1),(20,1)]
 _dev_rows.extend(_gen_cs_devs('CS02', _cs02_cohorts, (0.01, 0.03), 0.3))
 
-# CS03 BrieflyAI: B2B platform, 15-25 devs, step-function onboarding, moderate churn (8-12%)
+# CS03 BrieflyAI: B2B platform, 15-25 devs, step-function onboarding, low-moderate churn (4-8%)
 _cs03_cohorts = [(0,5),(5,3),(10,4),(12,1),(16,4),(21,4),(23,1)]
-_dev_rows.extend(_gen_cs_devs('CS03', _cs03_cohorts, (0.08, 0.12), 0.4))
+_dev_rows.extend(_gen_cs_devs('CS03', _cs03_cohorts, (0.04, 0.08), 0.4))
 
 # --- Standard partner generation ---
 for sid in ALL_SIDS:
@@ -435,8 +435,14 @@ for sid in ALL_SIDS:
                     churn_prob = min(0.1 + 0.02 * (mi - n_months * 0.4), 0.6)
                     if np.random.random() < churn_prob:
                         continue
+            elif arch in ('star', 'rocket', 'strong'):
+                if tenure > 0 and np.random.random() < 0.01:
+                    continue
+            elif arch in ('fine', 'steady'):
+                if tenure > 0 and np.random.random() < 0.02:
+                    continue
             else:
-                if tenure > 0 and np.random.random() < 0.05:
+                if tenure > 0 and np.random.random() < 0.04:
                     continue
             active_devs.append(d)
 
@@ -448,13 +454,21 @@ for sid in ALL_SIDS:
             continue
 
         n_active = len(active_devs)
-        raw_weights = np.array([1.0 / (i + 1) ** 0.7 for i in range(n_active)])
+        # Flatter distribution for healthy partners, steeper for others
+        _power = 0.3 if arch in ('star', 'rocket', 'strong', 'fine', 'steady') else 0.7
+        raw_weights = np.array([1.0 / (i + 1) ** _power for i in range(n_active)])
         raw_weights = raw_weights / raw_weights.sum() * target_rev
 
-        np.random.shuffle(active_devs)
+        # For growing partners, sort by dev_id for consistent allocation
+        # (reduces artificial contraction noise). Others get shuffled.
+        if arch in ('star', 'rocket', 'strong', 'fine', 'steady'):
+            active_devs.sort(key=lambda d: d['dev_id'])
+        else:
+            np.random.shuffle(active_devs)
 
+        _noise_scale = 0.005 if arch in ('star', 'rocket', 'strong', 'fine', 'steady') else 0.1
         for i, d in enumerate(active_devs):
-            rev = round(max(raw_weights[i] + np.random.normal(0, raw_weights[i] * 0.1), 0.01), 2)
+            rev = round(max(raw_weights[i] + np.random.normal(0, raw_weights[i] * _noise_scale), 0.01), 2)
             _dev_rows.append({
                 'dev_id': d['dev_id'], 'startup_id': sid,
                 'month': months[mi].strftime('%Y-%m-%d'), 'revenue': rev
@@ -825,14 +839,22 @@ net_churn = (latest_ga['churned_revenue'] + latest_ga['contraction_revenue'] - l
 
 # Net Dollar Retention (NDR) = (Beginning + Expansion + Resurrected - Churn - Contraction) / Beginning × 100
 # a16z definition: measures how many dollars you've secured from existing partners after expansion, downsell, and churn
-ndr = (prior_total + latest_ga['expansion_revenue'] + latest_ga['resurrected_revenue'] - latest_ga['churned_revenue'] - latest_ga['contraction_revenue']) / prior_total * 100 if prior_total > 0 else 0
+# Use trailing 6-month average for stability
+_ndr_window = agg_rev_ga.tail(7)  # need 7 rows to get 6 transitions
+_ndr_beginning = _ndr_window.iloc[0]['total_revenue']
+_ndr_exp = _ndr_window.iloc[1:]['expansion_revenue'].sum() / 6
+_ndr_res = _ndr_window.iloc[1:]['resurrected_revenue'].sum() / 6
+_ndr_churn = _ndr_window.iloc[1:]['churned_revenue'].sum() / 6
+_ndr_contr = _ndr_window.iloc[1:]['contraction_revenue'].sum() / 6
+ndr = (_ndr_beginning + _ndr_exp + _ndr_res - _ndr_churn - _ndr_contr) / _ndr_beginning * 100 if _ndr_beginning > 0 else 0
 
 # Active partners count
 active_partners = len([m for m in company_metrics if m['last_active_days'] < 30])
 
-# Portfolio Quick Ratio (latest month)
-gains = latest_ga['new_revenue'] + latest_ga['expansion_revenue'] + latest_ga['resurrected_revenue']
-losses = latest_ga['churned_revenue'] + latest_ga['contraction_revenue']
+# Portfolio Quick Ratio (trailing 6-month average for stability)
+_qr_window = agg_rev_ga.tail(6)
+gains = _qr_window['new_revenue'].sum() + _qr_window['expansion_revenue'].sum() + _qr_window['resurrected_revenue'].sum()
+losses = _qr_window['churned_revenue'].sum() + _qr_window['contraction_revenue'].sum()
 portfolio_qr = gains / losses if losses > 0 else 10.0
 
 # Gross retention (latest)
@@ -868,13 +890,18 @@ for N in range(1, n_active + 1):
     # Recompute GA for this subset using dev_activity
     sub_ga_df = _compute_ga_for_sids(top_n_sids)
     if len(sub_ga_df) >= 2:
-        sub_latest = sub_ga_df.iloc[-1]
-        sub_prior_total = sub_ga_df.iloc[-2]['total']
-        sub_gains = sub_latest['new'] + sub_latest['expansion'] + sub_latest['resurrected']
-        sub_losses = sub_latest['churned'] + sub_latest['contraction']
+        # Trailing 6-month average for QR and NDR stability
+        _sub_window = sub_ga_df.tail(6)
+        sub_gains = _sub_window['new'].sum() + _sub_window['expansion'].sum() + _sub_window['resurrected'].sum()
+        sub_losses = _sub_window['churned'].sum() + _sub_window['contraction'].sum()
         sub_qr = round(sub_gains / sub_losses, 1) if sub_losses > 0 else 10.0
-        sub_ndr = round((sub_prior_total + sub_latest['expansion'] + sub_latest['resurrected'] - sub_latest['churned'] - sub_latest['contraction']) / sub_prior_total * 100, 0) if sub_prior_total > 0 else 0
-        sub_net_churn = round((sub_latest['churned'] + sub_latest['contraction'] - sub_latest['resurrected'] - sub_latest['expansion']) / sub_prior_total * 100, 1) if sub_prior_total > 0 else 0
+        _sub_ndr_w = sub_ga_df.tail(7)
+        _sub_ndr_begin = _sub_ndr_w.iloc[0]['total'] if len(_sub_ndr_w) >= 7 else sub_ga_df.iloc[-2]['total']
+        _sub_ndr_rows = _sub_ndr_w.iloc[1:] if len(_sub_ndr_w) >= 7 else sub_ga_df.tail(1)
+        _sub_ndr_n = max(len(_sub_ndr_rows), 1)
+        sub_ndr = round((_sub_ndr_begin + _sub_ndr_rows['expansion'].sum()/_sub_ndr_n + _sub_ndr_rows['resurrected'].sum()/_sub_ndr_n - _sub_ndr_rows['churned'].sum()/_sub_ndr_n - _sub_ndr_rows['contraction'].sum()/_sub_ndr_n) / _sub_ndr_begin * 100, 0) if _sub_ndr_begin > 0 else 0
+        sub_prior_total = sub_ga_df.iloc[-2]['total']
+        sub_net_churn = round((sub_ga_df.iloc[-1]['churned'] + sub_ga_df.iloc[-1]['contraction'] - sub_ga_df.iloc[-1]['resurrected'] - sub_ga_df.iloc[-1]['expansion']) / sub_prior_total * 100, 1) if sub_prior_total > 0 else 0
         sub_gross_ret_series = sub_ga_df['retained'] / sub_ga_df['total'].shift(1) * 100
         sub_gross_ret = round(sub_gross_ret_series.dropna().iloc[-1], 0) if sub_gross_ret_series.dropna().any() else 0
     else:
@@ -1752,6 +1779,72 @@ fig_rev_share.update_layout(**rev_share_layout)
 
 rev_share_div = to_div(fig_rev_share, 'pulse-rev-share')
 
+# ============================================================
+# ELEMENT 4: REVENUE DISTRIBUTION (Pareto + Histogram)
+# ============================================================
+
+# Latest month revenue per partner
+_latest_month_rev = monthly_usage[monthly_usage['month'] == monthly_usage['month'].max()].groupby('startup_id')['revenue_usd'].sum().sort_values(ascending=False)
+_rev_dist_partners = _latest_month_rev[_latest_month_rev > 0]
+
+# --- A) Pareto / Power Law chart ---
+_pareto_names = [NAMES.get(sid, sid) for sid in _rev_dist_partners.index]
+_pareto_vals = _rev_dist_partners.values
+_pareto_cumsum = _pareto_vals.cumsum()
+_pareto_cum_pct = _pareto_cumsum / _pareto_cumsum[-1] * 100 if _pareto_cumsum[-1] > 0 else _pareto_cumsum * 0
+
+fig_pareto = go.Figure()
+fig_pareto.add_trace(go.Bar(
+    x=_pareto_vals, y=_pareto_names, orientation='h',
+    marker_color=[COLORS.get(sid, ACCENT) for sid in _rev_dist_partners.index],
+    name='Revenue', hovertemplate='%{y}: $%{x:,.0f}<extra></extra>'))
+fig_pareto.add_trace(go.Scatter(
+    x=_pareto_cum_pct, y=_pareto_names,
+    mode='lines+markers', name='Cumulative %',
+    line=dict(color=CMGR_BLUE, width=2.5), marker=dict(size=5, color=CMGR_BLUE),
+    xaxis='x2', hovertemplate='Cumulative: %{x:.1f}%<extra></extra>'))
+
+# Find top-3 contribution
+_top3_pct = _pareto_cum_pct[2] if len(_pareto_cum_pct) > 2 else (_pareto_cum_pct[-1] if len(_pareto_cum_pct) > 0 else 0)
+
+_pareto_layout = layout(f'Revenue Power Law (Top 3 = {_top3_pct:.0f}%)', h=max(280, len(_pareto_names) * 28))
+_pareto_layout['xaxis'] = dict(title='Monthly Revenue ($)', tickprefix='$', tickformat=',', gridcolor=BORDER_SUBTLE, side='bottom')
+_pareto_layout['xaxis2'] = dict(title='Cumulative %', ticksuffix='%', overlaying='x', side='top', range=[0, 105],
+    showgrid=False, titlefont=dict(color=CMGR_BLUE, size=11), tickfont=dict(color=CMGR_BLUE, size=10))
+_pareto_layout['yaxis'] = dict(autorange='reversed', gridcolor=BORDER_SUBTLE, tickfont=dict(size=10))
+_pareto_layout['margin'] = dict(l=120, r=50, t=50, b=40)
+_pareto_layout['legend'] = dict(bgcolor='rgba(0,0,0,0)', orientation='h', yanchor='bottom', y=-0.15, xanchor='center', x=0.5, font=dict(size=10))
+_pareto_layout['barmode'] = 'overlay'
+fig_pareto.update_layout(**_pareto_layout)
+pareto_div = to_div(fig_pareto, 'pulse-rev-pareto')
+
+# --- B) Revenue histogram ---
+_hist_buckets = ['$0', '$0-500', '$500-2K', '$2K-10K', '$10K+']
+_hist_counts = [0, 0, 0, 0, 0]
+_all_latest_rev = monthly_usage[monthly_usage['month'] == monthly_usage['month'].max()].groupby('startup_id')['revenue_usd'].sum()
+for sid in ALL_SIDS:
+    rev = _all_latest_rev.get(sid, 0)
+    if rev <= 0: _hist_counts[0] += 1
+    elif rev <= 500: _hist_counts[1] += 1
+    elif rev <= 2000: _hist_counts[2] += 1
+    elif rev <= 10000: _hist_counts[3] += 1
+    else: _hist_counts[4] += 1
+
+_hist_colors = [DANGER, WARNING, '#94a3b8', SUCCESS, ACCENT]
+fig_histogram = go.Figure()
+fig_histogram.add_trace(go.Bar(
+    x=_hist_buckets, y=_hist_counts,
+    marker_color=_hist_colors, text=_hist_counts, textposition='outside',
+    hovertemplate='%{x}: %{y} partners<extra></extra>'))
+
+_hist_layout = layout('Partners by Revenue Tier', h=280)
+_hist_layout['xaxis'] = dict(title='Monthly Revenue Bucket', gridcolor=BORDER_SUBTLE, tickfont=dict(size=11))
+_hist_layout['yaxis'] = dict(title='Number of Partners', gridcolor=BORDER_SUBTLE, dtick=1)
+_hist_layout['margin'] = dict(l=50, r=20, t=45, b=50)
+_hist_layout['showlegend'] = False
+fig_histogram.update_layout(**_hist_layout)
+histogram_div = to_div(fig_histogram, 'pulse-rev-histogram')
+
 tier1_html = f'''
 <div class="pulse-slider-compact">
     <div class="slider-row">
@@ -2348,7 +2441,29 @@ rev_share_section = f'''<div class="pulse-block" style="border-bottom:none;margi
     </div>
 </div>'''
 
-pulse_content = tier1_html + rev_share_section + tier2_html
+rev_dist_section = f'''<div class="pulse-block" style="border-bottom:none;margin-bottom:0;padding-bottom:0">
+    <div class="pulse-panel pulse-panel-chart" style="border:1px solid {GRID};border-radius:12px;padding:20px">
+        <div class="panel-title">REVENUE DISTRIBUTION</div>
+        <div class="rev-dist-tabs" style="display:flex;gap:8px;margin-bottom:12px">
+            <button class="wf-pill active" data-revdist="pareto" onclick="
+                this.parentElement.querySelectorAll('.wf-pill').forEach(b=>b.classList.remove('active'));
+                this.classList.add('active');
+                document.getElementById('rev-dist-pareto').style.display='block';
+                document.getElementById('rev-dist-histogram').style.display='none';
+            ">Power Law</button>
+            <button class="wf-pill" data-revdist="histogram" onclick="
+                this.parentElement.querySelectorAll('.wf-pill').forEach(b=>b.classList.remove('active'));
+                this.classList.add('active');
+                document.getElementById('rev-dist-pareto').style.display='none';
+                document.getElementById('rev-dist-histogram').style.display='block';
+            ">Histogram</button>
+        </div>
+        <div id="rev-dist-pareto" style="display:block">{pareto_div}</div>
+        <div id="rev-dist-histogram" style="display:none">{histogram_div}</div>
+    </div>
+</div>'''
+
+pulse_content = tier1_html + rev_share_section + rev_dist_section + tier2_html
 partners_content = f'''{tier2_html}
 {scoreboard_html}'''
 
