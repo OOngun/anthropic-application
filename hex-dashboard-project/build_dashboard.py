@@ -18,8 +18,6 @@ monthly_usage['month'] = pd.to_datetime(monthly_usage['month'])
 unit_economics = pd.read_csv(f'{OUTPUT_DIR}/unit_economics.csv')
 unit_economics['month'] = pd.to_datetime(unit_economics['month'])
 engagement = pd.read_csv(f'{OUTPUT_DIR}/engagement_depth.csv')
-startup_ga = pd.read_csv(f'{OUTPUT_DIR}/startup_growth_accounting.csv')
-startup_ga['month'] = pd.to_datetime(startup_ga['month'])
 
 # Dynamic: build COLORS and NAMES from startups CSV
 ALL_SIDS = startups['startup_id'].tolist()
@@ -158,7 +156,6 @@ company_metrics = []
 for sid in ALL_SIDS:
     u = monthly_usage[monthly_usage['startup_id'] == sid].sort_values('month')
     ue = unit_economics[unit_economics['startup_id'] == sid]
-    ga = startup_ga[startup_ga['startup_id'] == sid].sort_values('month')
     s = startups[startups['startup_id'] == sid].iloc[0]
 
     latest = u.iloc[-1]
@@ -211,10 +208,10 @@ for sid in ALL_SIDS:
     else:
         momentum = 0
 
-    avg_qr = ga['quick_ratio'].tail(6).mean() if len(ga) > 0 and 'quick_ratio' in ga.columns and not ga['quick_ratio'].isna().all() else 0
+    avg_qr = 0  # overwritten after per-company GA is computed from dev_activity
 
     # Latest gross retention for this company
-    latest_gross_ret = ga['gross_retention_pct'].iloc[-1] if len(ga) > 0 and 'gross_retention_pct' in ga.columns and not ga['gross_retention_pct'].isna().all() else 0
+    latest_gross_ret = 0  # overwritten after per-company GA is computed from dev_activity
 
     # Days since last active — based on whether latest month has revenue
     if latest['revenue_usd'] > 0:
@@ -512,6 +509,55 @@ for i in range(1, len(months_sorted)):
 agg_rev_ga = pd.DataFrame(ga_rows).sort_values('month')
 agg_rev_ga['gross_ret'] = agg_rev_ga['retained_revenue'] / agg_rev_ga['total_revenue'].shift(1) * 100
 
+# ============================================================
+# PRE-COMPUTE PER-COMPANY GA FROM developer_activity (used by
+# company_metrics AND per-company charts later)
+# ============================================================
+_ga_empty_cols = ['month','new_revenue','expansion_revenue','resurrected_revenue',
+                  'retained_revenue','churned_revenue','contraction_revenue',
+                  'total_revenue','quick_ratio','gross_retention_pct']
+per_company_ga_df = {}
+for sid in ALL_SIDS:
+    _dev_sid = dev_activity[dev_activity['startup_id'] == sid]
+    _d_usage = monthly_usage[monthly_usage['startup_id'] == sid].sort_values('month')
+    if len(_dev_sid) == 0 or len(_d_usage) < 2:
+        per_company_ga_df[sid] = pd.DataFrame(columns=_ga_empty_cols)
+        continue
+    _dev_first = _dev_sid.groupby('dev_id')['month'].min().to_dict()
+    _months_list = sorted(_d_usage['month'].unique())
+    _rows = []
+    for _j in range(1, len(_months_list)):
+        _prev_m, _curr_m = _months_list[_j-1], _months_list[_j]
+        _prev = _dev_sid[_dev_sid['month'] == _prev_m].set_index('dev_id')['revenue']
+        _curr = _dev_sid[_dev_sid['month'] == _curr_m].set_index('dev_id')['revenue']
+        _all_ids = set(_prev.index) | set(_curr.index)
+        _new = _exp = _res = _ret = _churn = _contr = 0
+        for _did in _all_ids:
+            _p = _prev.get(_did, 0)
+            _c = _curr.get(_did, 0)
+            _is_new = _dev_first.get(_did) == _curr_m
+            if _c > 0 and _p > 0:
+                _ret += min(_c, _p)
+                if _c > _p: _exp += (_c - _p)
+                elif _c < _p: _contr += (_p - _c)
+            elif _c > 0 and _p == 0:
+                if _is_new: _new += _c
+                else: _res += _c
+            elif _c == 0 and _p > 0:
+                _churn += _p
+        _pt = _prev.sum()
+        _qr = (_exp + _new + _res) / (_contr + _churn) if (_contr + _churn) > 0 else 10.0
+        _gret = _ret / _pt * 100 if _pt > 0 else 0
+        _rows.append({
+            'month': _curr_m,
+            'new_revenue': _new, 'expansion_revenue': _exp,
+            'resurrected_revenue': _res, 'retained_revenue': _ret,
+            'churned_revenue': _churn, 'contraction_revenue': _contr,
+            'total_revenue': _ret + _new + _exp + _res,
+            'quick_ratio': _qr, 'gross_retention_pct': _gret,
+        })
+    per_company_ga_df[sid] = pd.DataFrame(_rows) if _rows else pd.DataFrame(columns=_ga_empty_cols)
+
 # Per-partner QR (from partner-level) and gross retention (from developer-level)
 per_partner_qr = {}
 per_partner_gret = {}
@@ -549,11 +595,18 @@ for sid in ALL_SIDS:
         per_partner_qr[sid] = 0
         if sid not in per_partner_gret: per_partner_gret[sid] = 0
 
-# Fix last_active_days: derive from actual data, not random
+# Fix last_active_days and overwrite avg_qr / gross_retention from per-company GA
 for m in company_metrics:
     sid = m['sid']
-    if sid in per_partner_qr: m['avg_qr'] = per_partner_qr[sid]
-    if sid in per_partner_gret: m['gross_retention'] = per_partner_gret[sid]
+    _cga = per_company_ga_df.get(sid)
+    if _cga is not None and len(_cga) > 0 and 'quick_ratio' in _cga.columns:
+        m['avg_qr'] = _cga['quick_ratio'].tail(6).mean()
+    elif sid in per_partner_qr:
+        m['avg_qr'] = per_partner_qr[sid]
+    if _cga is not None and len(_cga) > 0 and 'gross_retention_pct' in _cga.columns and not _cga['gross_retention_pct'].isna().all():
+        m['gross_retention'] = _cga['gross_retention_pct'].iloc[-1]
+    elif sid in per_partner_gret:
+        m['gross_retention'] = per_partner_gret[sid]
     # Last active: deterministic based on revenue tier
     # >$1000/mo => 0-2 days, $100-1000 => 1-5 days, churned => 30+
     if m['latest_mrr'] > 1000:
@@ -967,45 +1020,8 @@ for sid in ALL_SIDS:
     charts = {}
     d_usage = monthly_usage[monthly_usage['startup_id'] == sid].sort_values('month')
 
-    # Compute per-company GA from developer_activity.csv (developer-level decomposition)
-    _dev_sid = dev_activity[dev_activity['startup_id'] == sid]
-    _dev_first = _dev_sid.groupby('dev_id')['month'].min().to_dict()
-    _months_list = sorted(d_usage['month'].unique())
-    _company_ga_rows = []
-    for _j in range(1, len(_months_list)):
-        _prev_m, _curr_m = _months_list[_j-1], _months_list[_j]
-        _prev = _dev_sid[_dev_sid['month'] == _prev_m].set_index('dev_id')['revenue']
-        _curr = _dev_sid[_dev_sid['month'] == _curr_m].set_index('dev_id')['revenue']
-        _all_ids = set(_prev.index) | set(_curr.index)
-        _new = _exp = _res = _ret = _churn = _contr = 0
-        for _did in _all_ids:
-            _p = _prev.get(_did, 0)
-            _c = _curr.get(_did, 0)
-            _is_new = _dev_first.get(_did) == _curr_m
-            if _c > 0 and _p > 0:
-                _ret += min(_c, _p)
-                if _c > _p: _exp += (_c - _p)
-                elif _c < _p: _contr += (_p - _c)
-            elif _c > 0 and _p == 0:
-                if _is_new: _new += _c
-                else: _res += _c
-            elif _c == 0 and _p > 0:
-                _churn += _p
-        _pt = _prev.sum()
-        _qr = (_exp + _new + _res) / (_contr + _churn) if (_contr + _churn) > 0 else 10.0
-        _gret = _ret / _pt * 100 if _pt > 0 else 0
-        _company_ga_rows.append({
-            'month': _curr_m,
-            'new_revenue': _new, 'expansion_revenue': _exp,
-            'resurrected_revenue': _res, 'retained_revenue': _ret,
-            'churned_revenue': _churn, 'contraction_revenue': _contr,
-            'total_revenue': _ret + _new + _exp + _res,
-            'quick_ratio': _qr, 'gross_retention_pct': _gret,
-        })
-    d_ga = pd.DataFrame(_company_ga_rows) if _company_ga_rows else pd.DataFrame(
-        columns=['month','new_revenue','expansion_revenue','resurrected_revenue',
-                 'retained_revenue','churned_revenue','contraction_revenue',
-                 'total_revenue','quick_ratio','gross_retention_pct'])
+    # Use pre-computed per-company GA from developer_activity
+    d_ga = per_company_ga_df[sid]
 
     # Revenue
     f = go.Figure()
@@ -1055,12 +1071,16 @@ for sid in ALL_SIDS:
 
     # Growth Accounting (revenue) — uses canonical GA colors matching Pulse
     f = go.Figure()
-    f.add_trace(go.Bar(x=d_ga['month'], y=d_ga['retained_revenue'], name='Retained', marker_color=GA_RETAINED, opacity=0.5))
-    f.add_trace(go.Bar(x=d_ga['month'], y=d_ga['new_revenue'], name='New', marker_color=GA_NEW))
-    f.add_trace(go.Bar(x=d_ga['month'], y=d_ga['expansion_revenue'], name='Expansion', marker_color=GA_EXPANSION))
-    f.add_trace(go.Bar(x=d_ga['month'], y=d_ga['resurrected_revenue'], name='Resurrected', marker_color=GA_RESURRECTED))
-    f.add_trace(go.Bar(x=d_ga['month'], y=-d_ga['contraction_revenue'], name='Contraction', marker_color=GA_CONTRACTION))
-    f.add_trace(go.Bar(x=d_ga['month'], y=-d_ga['churned_revenue'], name='Churned', marker_color=GA_CHURNED))
+    if len(d_ga) > 0:
+        f.add_trace(go.Bar(x=d_ga['month'], y=d_ga['retained_revenue'], name='Retained', marker_color=GA_RETAINED, opacity=0.5))
+        f.add_trace(go.Bar(x=d_ga['month'], y=d_ga['new_revenue'], name='New', marker_color=GA_NEW))
+        f.add_trace(go.Bar(x=d_ga['month'], y=d_ga['expansion_revenue'], name='Expansion', marker_color=GA_EXPANSION))
+        f.add_trace(go.Bar(x=d_ga['month'], y=d_ga['resurrected_revenue'], name='Resurrected', marker_color=GA_RESURRECTED))
+        f.add_trace(go.Bar(x=d_ga['month'], y=-d_ga['contraction_revenue'], name='Contraction', marker_color=GA_CONTRACTION))
+        f.add_trace(go.Bar(x=d_ga['month'], y=-d_ga['churned_revenue'], name='Churned', marker_color=GA_CHURNED))
+    else:
+        f.add_annotation(text="Insufficient data", xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False, font=dict(size=13, color=MUTED))
     f.update_layout(**layout('Spend Growth Accounting'), barmode='relative')
     f.update_yaxes(tickprefix='$', tickformat=',')
     charts['growth_acct'] = to_div(f)
@@ -1078,13 +1098,17 @@ for sid in ALL_SIDS:
     # Developer Quick Ratio (per-startup)
     d_dev_qr = d_dev_ga.dropna(subset=['dev_quick_ratio'])
     f = go.Figure()
-    f.add_trace(go.Scatter(x=d_dev_qr['month'], y=d_dev_qr['dev_quick_ratio'],
-        mode='lines+markers', line=dict(color=COLORS[sid], width=2.5), marker=dict(size=5), showlegend=False))
-    f.add_hline(y=2, line_dash="dash", line_color=SUCCESS, annotation_text="2.0x", annotation_position="top right", annotation_font_color=SUCCESS)
-    f.add_hline(y=1, line_dash="dash", line_color=DANGER, annotation_text="1.0x", annotation_position="bottom right", annotation_font_color=DANGER)
+    if len(d_dev_qr) > 0:
+        f.add_trace(go.Scatter(x=d_dev_qr['month'], y=d_dev_qr['dev_quick_ratio'],
+            mode='lines+markers', line=dict(color=COLORS[sid], width=2.5), marker=dict(size=5), showlegend=False))
+        f.add_hline(y=2, line_dash="dash", line_color=SUCCESS, annotation_text="2.0x", annotation_position="top right", annotation_font_color=SUCCESS)
+        f.add_hline(y=1, line_dash="dash", line_color=DANGER, annotation_text="1.0x", annotation_position="bottom right", annotation_font_color=DANGER)
+        max_qr = d_dev_qr['dev_quick_ratio'].max()
+        f.update_yaxes(range=[0, min(max_qr * 1.2, 8)])
+    else:
+        f.add_annotation(text="No churn data (zero developer churn)", xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False, font=dict(size=13, color=MUTED))
     f.update_layout(**layout('Developer Quick Ratio', h=300))
-    max_qr = d_dev_qr['dev_quick_ratio'].max() if len(d_dev_qr) > 0 else 5
-    f.update_yaxes(range=[0, min(max_qr * 1.2, 8)])
     charts['dev_qr'] = to_div(f)
 
     # Developer Retention curve (per-startup)
@@ -1430,16 +1454,20 @@ for sid in ALL_SIDS:
 
     # Spend Quick Ratio (per-company)
     f = go.Figure()
-    f.add_trace(go.Scatter(x=d_ga['month'], y=d_ga['quick_ratio'],
-        mode='lines+markers', line=dict(color=COLORS[sid], width=2.5), marker=dict(size=5), showlegend=False))
-    f.add_hline(y=4, line_dash="dash", line_color=SUCCESS, annotation_text="4.0x Strong", annotation_position="top right", annotation_font_color=SUCCESS)
-    f.add_hline(y=1, line_dash="dash", line_color=DANGER, annotation_text="1.0x Flat", annotation_position="bottom right", annotation_font_color=DANGER)
+    if len(d_ga) > 0 and 'quick_ratio' in d_ga.columns:
+        f.add_trace(go.Scatter(x=d_ga['month'], y=d_ga['quick_ratio'],
+            mode='lines+markers', line=dict(color=COLORS[sid], width=2.5), marker=dict(size=5), showlegend=False))
+        f.add_hline(y=4, line_dash="dash", line_color=SUCCESS, annotation_text="4.0x Strong", annotation_position="top right", annotation_font_color=SUCCESS)
+        f.add_hline(y=1, line_dash="dash", line_color=DANGER, annotation_text="1.0x Flat", annotation_position="bottom right", annotation_font_color=DANGER)
+        f.update_yaxes(range=[0, 12])
+    else:
+        f.add_annotation(text="Insufficient data", xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False, font=dict(size=13, color=MUTED))
     f.update_layout(**layout('Spend Quick Ratio', h=300))
-    f.update_yaxes(range=[0, 12])
     charts['spend_qr'] = to_div(f)
 
     # Gross retention (per-company)
-    if 'gross_retention_pct' in d_ga.columns:
+    if len(d_ga) > 0 and 'gross_retention_pct' in d_ga.columns:
         f = go.Figure()
         f.add_trace(go.Scatter(x=d_ga['month'], y=d_ga['gross_retention_pct'],
             mode='lines+markers', line=dict(color=COLORS[sid], width=2.5), marker=dict(size=5), showlegend=False,
