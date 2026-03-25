@@ -363,7 +363,7 @@ for sid in ALL_SIDS:
     n_months = len(months)
 
     # Decide total unique developers and onboarding schedule
-    total_devs_ever = max(int(max(dev_counts) * 1.4), 2)
+    total_devs_ever = max(int(max(dev_counts) * 2.2), 4)
 
     # Build per-month onboarding count: stagger across months
     onboard_schedule = np.zeros(n_months, dtype=int)
@@ -436,13 +436,13 @@ for sid in ALL_SIDS:
                     if np.random.random() < churn_prob:
                         continue
             elif arch in ('star', 'rocket', 'strong'):
-                if tenure > 0 and np.random.random() < 0.01:
+                if tenure > 0 and np.random.random() < 0.08:
                     continue
             elif arch in ('fine', 'steady'):
-                if tenure > 0 and np.random.random() < 0.02:
+                if tenure > 0 and np.random.random() < 0.12:
                     continue
             else:
-                if tenure > 0 and np.random.random() < 0.04:
+                if tenure > 0 and np.random.random() < 0.18:
                     continue
             active_devs.append(d)
 
