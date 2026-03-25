@@ -1885,23 +1885,23 @@ tier1_html = f'''
 
         <div class="pulse-panel pulse-panel-chart">
             <div class="panel-title">GROWTH ACCOUNTING + CMGR</div>
-            <div class="panel-subtitle">Revenue breakdown with compound monthly growth rate. Click a bar to see which partners drove that component.</div>
+            <div class="panel-subtitle">Revenue breakdown with compound monthly growth rate</div>
             {ga_cmgr_div}
-            <div class="ga-breakdown-trigger">
-                <button class="ga-breakdown-btn" onclick="document.getElementById('ga-breakdown').style.display=document.getElementById('ga-breakdown').style.display==='none'?'block':'none'">View monthly breakdown by partner &rarr;</button>
-            </div>
-            <div id="ga-breakdown" class="ga-breakdown" style="display:none">
-                <div class="ga-dd-header">
-                    <div style="display:flex;align-items:center;gap:12px">
-                        <span class="ga-dd-title">Growth Accounting by Partner</span>
-                        <select id="ga-month-select" class="ga-month-select"></select>
-                    </div>
-                    <span class="ga-dd-close" onclick="document.getElementById('ga-breakdown').style.display='none'">&times;</span>
-                </div>
-                <div id="ga-breakdown-body" class="ga-dd-body"></div>
-            </div>
             {cmgr_note_html}
         </div>
+    </div>
+    <div class="ga-breakdown-trigger">
+        <button class="ga-breakdown-btn" id="ga-breakdown-toggle">View monthly breakdown by partner &rarr;</button>
+    </div>
+    <div id="ga-breakdown" class="ga-breakdown" style="display:none">
+        <div class="ga-dd-header">
+            <div style="display:flex;align-items:center;gap:12px">
+                <span class="ga-dd-title">Growth Accounting by Partner</span>
+                <select id="ga-month-select" class="ga-month-select"></select>
+            </div>
+            <span class="ga-dd-close" id="ga-breakdown-close">&times;</span>
+        </div>
+        <div id="ga-breakdown-body" class="ga-dd-body"></div>
     </div>
 </div>
 <script>window.__ga_drilldown = {_ga_drilldown_json};</script>
@@ -3398,7 +3398,17 @@ document.querySelectorAll('.partner-list').forEach(wrap => {{
     if (!ddData) return;
     var select = document.getElementById('ga-month-select');
     var body = document.getElementById('ga-breakdown-body');
-    if (!select || !body) return;
+    var toggleBtn = document.getElementById('ga-breakdown-toggle');
+    var closeBtn = document.getElementById('ga-breakdown-close');
+    var panel = document.getElementById('ga-breakdown');
+    if (!select || !body || !toggleBtn || !panel) return;
+
+    toggleBtn.addEventListener('click', function() {{
+        panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    }});
+    if (closeBtn) closeBtn.addEventListener('click', function() {{
+        panel.style.display = 'none';
+    }});
 
     var months = Object.keys(ddData).sort().reverse();
     months.forEach(function(m) {{
@@ -3461,7 +3471,7 @@ document.querySelectorAll('.partner-list').forEach(wrap => {{
             }}
             var netColor = r.net >= 0 ? '{SUCCESS}' : '{DANGER}';
             var netSign = r.net >= 0 ? '+' : '-';
-            html += '<tr onclick="showDetail(\'' + r.sid + '\')" style="cursor:pointer" title="View ' + r.name + '">';
+            html += '<tr onclick="showDetail(&quot;' + r.sid + '&quot;)" style="cursor:pointer" title="View ' + r.name + '">';
             html += '<td style="font-weight:500">' + r.name + '</td>';
             html += '<td style="text-align:right">' + fmt(r.new_revenue, false) + '</td>';
             html += '<td style="text-align:right">' + fmt(r.expansion_revenue, false) + '</td>';
