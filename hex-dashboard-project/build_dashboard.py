@@ -2507,8 +2507,8 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .chart-desc strong {{ color:{TEXT}; font-weight:600; }}
 
 /* ========== PARTNER RANGE SLIDER ========== */
-.pulse-slider-compact {{ padding:8px 0 12px; margin-bottom:4px; }}
-.slider-row {{ display:flex; align-items:center; gap:12px; }}
+.pulse-slider-compact {{ padding:8px 0 12px; margin-bottom:4px; display:flex; flex-direction:column; align-items:center; }}
+.slider-row {{ display:flex; align-items:center; gap:10px; width:33%; min-width:200px; }}
 .slider-label {{ font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:{MUTED}; white-space:nowrap; }}
 .slider-container-compact {{ flex:1; min-width:0; }}
 .slider-container-compact input[type=range] {{ -webkit-appearance:none; appearance:none; width:100%; height:3px; background:{GRID}; border-radius:2px; outline:none; cursor:pointer; }}
@@ -2517,9 +2517,9 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .slider-container-compact input[type=range]::-moz-range-thumb {{ width:14px; height:14px; border-radius:50%; background:{ACCENT}; cursor:pointer; border:2px solid #fff; }}
 .slider-container-compact input[type=range]::-webkit-slider-runnable-track {{ height:3px; border-radius:2px; }}
 .slider-container-compact input[type=range]::-moz-range-track {{ height:3px; border-radius:2px; background:{GRID}; }}
-.slider-value {{ font-size:11px; color:{TEXT}; font-weight:500; white-space:nowrap; font-variant-numeric:tabular-nums; min-width:50px; text-align:right; }}
+.slider-value {{ font-size:11px; color:{TEXT}; font-weight:500; white-space:nowrap; font-variant-numeric:tabular-nums; min-width:40px; text-align:right; }}
 .slider-value #slider-count {{ font-weight:700; color:{ACCENT}; }}
-.slider-presets {{ display:flex; gap:6px; margin-top:6px; }}
+.slider-presets {{ display:flex; gap:6px; margin-top:6px; justify-content:center; }}
 .slider-preset {{ padding:3px 10px; font-size:10px; font-family:inherit; border:1px solid {GRID}; border-radius:12px; background:transparent; color:{MUTED}; cursor:pointer; transition:all 0.15s; }}
 .slider-preset:hover {{ border-color:{MUTED}; color:{TEXT}; }}
 .slider-preset.active {{ background:rgba(59,130,246,0.1); border-color:{ACCENT}; color:{ACCENT}; font-weight:600; }}
