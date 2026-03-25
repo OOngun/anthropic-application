@@ -1574,6 +1574,23 @@ tier1_html = f'''
             <div class="pc-label">NET DOLLAR RETENTION</div>
             <div class="pc-value" style="color:{'#16A34A' if ndr >= 100 else '#DC2626'}">{ndr:.0f}%</div>
             <div class="pc-sub">{'Expanding' if ndr >= 100 else 'Contracting'} &middot; existing partners</div>
+            <div class="ndr-bench">
+                <div class="ndr-bench-track">
+                    <div class="ndr-bench-zone" style="left:0%;width:25%;background:#1e3a5f" title="Below 25th pctl"></div>
+                    <div class="ndr-bench-zone" style="left:25%;width:25%;background:#2563eb" title="25th-50th pctl"></div>
+                    <div class="ndr-bench-zone" style="left:50%;width:25%;background:#60a5fa" title="50th-75th pctl"></div>
+                    <div class="ndr-bench-zone" style="left:75%;width:25%;background:#93c5fd" title="75th-90th pctl"></div>
+                    <div class="ndr-bench-marker" style="left:{max(0, min(100, (ndr - 80) / (180 - 80) * 100)):.1f}%" title="Portfolio: {ndr:.0f}%"></div>
+                </div>
+                <div class="ndr-bench-labels">
+                    <span>80%</span>
+                    <span style="left:48%">128</span>
+                    <span style="left:69%">149</span>
+                    <span style="left:73%">153</span>
+                    <span style="left:100%">157+</span>
+                </div>
+                <div class="ndr-bench-note">a16z enterprise SaaS benchmarks (P25–P90)</div>
+            </div>
         </div>
         <div class="pulse-card" data-tip="gross-retention">
             <div class="pc-label">GROSS RETENTION</div>
@@ -2316,6 +2333,17 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .pc-label {{ font-size:10px; text-transform:uppercase; letter-spacing:0.05em; color:{MUTED}; font-weight:600; margin-bottom:4px; }}
 .pc-value {{ font-size:24px; font-weight:700; color:{TEXT}; font-variant-numeric:tabular-nums; }}
 .pc-sub {{ font-size:11px; color:{MUTED}; margin-top:3px; }}
+
+/* NDR Benchmark bar */
+.ndr-bench {{ margin-top:8px; }}
+.ndr-bench-track {{ position:relative; height:6px; border-radius:3px; overflow:visible; display:flex; }}
+.ndr-bench-zone {{ height:100%; }}
+.ndr-bench-zone:first-child {{ border-radius:3px 0 0 3px; }}
+.ndr-bench-zone:last-of-type {{ border-radius:0 3px 3px 0; }}
+.ndr-bench-marker {{ position:absolute; top:-3px; width:3px; height:12px; background:{TEXT}; border-radius:2px; transform:translateX(-50%); z-index:2; }}
+.ndr-bench-labels {{ display:flex; justify-content:space-between; position:relative; margin-top:3px; font-size:9px; color:{DIM}; font-variant-numeric:tabular-nums; }}
+.ndr-bench-labels span {{ position:relative; }}
+.ndr-bench-note {{ font-size:8px; color:{DIM}; margin-top:2px; text-align:center; font-style:italic; }}
 
 .pulse-panels {{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }}
 .pulse-panel {{ background:#fff; border:1px solid {GRID}; border-radius:12px; padding:22px 24px; }}
