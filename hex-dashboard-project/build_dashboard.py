@@ -558,6 +558,30 @@ for sid in ALL_SIDS:
         })
     per_company_ga_df[sid] = pd.DataFrame(_rows) if _rows else pd.DataFrame(columns=_ga_empty_cols)
 
+# Build per-partner-per-month GA breakdown for click drilldown
+_ga_drilldown = {}  # { 'YYYY-MM-DD': { 'contraction': [{name, amount}, ...], 'churned': [...], ... } }
+_all_ga_months = sorted(set(m for df in per_company_ga_df.values() for m in df['month'].tolist() if len(df) > 0))
+for _m in _all_ga_months:
+    _m_str = _m.strftime('%Y-%m-%d') if hasattr(_m, 'strftime') else str(_m)[:10]
+    _ga_drilldown[_m_str] = {comp: [] for comp in ['new_revenue','expansion_revenue','resurrected_revenue','contraction_revenue','churned_revenue']}
+    for sid in ALL_SIDS:
+        _cga = per_company_ga_df.get(sid)
+        if _cga is None or len(_cga) == 0:
+            continue
+        _row = _cga[_cga['month'] == _m]
+        if len(_row) == 0:
+            continue
+        _r = _row.iloc[0]
+        for comp in ['new_revenue','expansion_revenue','resurrected_revenue','contraction_revenue','churned_revenue']:
+            val = float(_r.get(comp, 0))
+            if val > 0.5:  # only include if meaningful
+                _ga_drilldown[_m_str][comp].append({'name': NAMES.get(sid, sid), 'sid': sid, 'amount': round(val, 0)})
+    # Sort each component by amount descending
+    for comp in _ga_drilldown[_m_str]:
+        _ga_drilldown[_m_str][comp].sort(key=lambda x: -x['amount'])
+
+_ga_drilldown_json = json.dumps(_ga_drilldown)
+
 # Per-partner QR (from partner-level) and gross retention (from developer-level)
 per_partner_qr = {}
 per_partner_gret = {}
@@ -1861,12 +1885,20 @@ tier1_html = f'''
 
         <div class="pulse-panel pulse-panel-chart">
             <div class="panel-title">GROWTH ACCOUNTING + CMGR</div>
-            <div class="panel-subtitle">Revenue breakdown with compound monthly growth rate. Click legend groups to toggle.</div>
+            <div class="panel-subtitle">Revenue breakdown with compound monthly growth rate. Click a bar to see which partners drove that component.</div>
             {ga_cmgr_div}
+            <div id="ga-drilldown" class="ga-drilldown" style="display:none">
+                <div class="ga-dd-header">
+                    <span class="ga-dd-title" id="ga-dd-title"></span>
+                    <span class="ga-dd-close" onclick="document.getElementById('ga-drilldown').style.display='none'">&times;</span>
+                </div>
+                <div id="ga-dd-body" class="ga-dd-body"></div>
+            </div>
             {cmgr_note_html}
         </div>
     </div>
 </div>
+<script>window.__ga_drilldown = {_ga_drilldown_json};</script>
 '''
 
 # ============================================================
@@ -2551,6 +2583,21 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .slider-preset {{ padding:3px 10px; font-size:10px; font-family:inherit; border:1px solid {GRID}; border-radius:12px; background:transparent; color:{MUTED}; cursor:pointer; transition:all 0.15s; }}
 .slider-preset:hover {{ border-color:{MUTED}; color:{TEXT}; }}
 .slider-preset.active {{ background:rgba(59,130,246,0.1); border-color:{ACCENT}; color:{ACCENT}; font-weight:600; }}
+
+/* ========== GA DRILLDOWN ========== */
+.ga-drilldown {{ background:{CARD}; border:1px solid {GRID}; border-radius:8px; margin-top:12px; padding:12px 16px; animation:fadeIn 0.2s ease; }}
+.ga-dd-header {{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }}
+.ga-dd-title {{ font-size:12px; font-weight:600; color:{TEXT}; }}
+.ga-dd-close {{ font-size:18px; color:{MUTED}; cursor:pointer; line-height:1; padding:0 4px; }}
+.ga-dd-close:hover {{ color:{TEXT}; }}
+.ga-dd-body {{ font-size:12px; }}
+.ga-dd-table {{ width:100%; border-collapse:collapse; }}
+.ga-dd-table th {{ text-align:left; padding:4px 8px; font-size:10px; text-transform:uppercase; letter-spacing:0.04em; color:{MUTED}; font-weight:600; border-bottom:1px solid {GRID}; }}
+.ga-dd-table th:last-child {{ text-align:right; }}
+.ga-dd-table td {{ padding:5px 8px; border-bottom:1px solid rgba(0,0,0,0.04); }}
+.ga-dd-table td:last-child {{ text-align:right; font-variant-numeric:tabular-nums; font-weight:500; }}
+.ga-dd-table tr:hover {{ background:rgba(0,0,0,0.02); cursor:pointer; }}
+.ga-dd-empty {{ color:{MUTED}; font-style:italic; font-size:11px; padding:8px 0; }}
 
 /* ========== TIER 1: PULSE BLOCK ========== */
 .pulse-block {{ margin-bottom:40px; padding-bottom:32px; border-bottom:1px solid {GRID}; }}
@@ -3333,6 +3380,76 @@ document.querySelectorAll('.partner-list').forEach(wrap => {{
     window.__wf_getCurPeriod = function() {{ return curPeriod; }};
     window.__wf_getCurView = function() {{ return curView; }};
     window.__wf_getCurScope = function() {{ return curScope; }};
+}})();
+
+// ======== GA CHART CLICK DRILLDOWN ========
+(function() {{
+    var gaEl = document.getElementById('pulse-ga-cmgr');
+    var ddData = window.__ga_drilldown;
+    if (!gaEl || !ddData) return;
+
+    var componentMap = {{
+        'Retained': 'retained_revenue',
+        'New': 'new_revenue',
+        'Expansion': 'expansion_revenue',
+        'Resurrected': 'resurrected_revenue',
+        'Contraction': 'contraction_revenue',
+        'Churned': 'churned_revenue'
+    }};
+
+    var colorMap = {{
+        'new_revenue': '{GA_NEW}',
+        'expansion_revenue': '{GA_EXPANSION}',
+        'resurrected_revenue': '{GA_RESURRECTED}',
+        'contraction_revenue': '{GA_CONTRACTION}',
+        'churned_revenue': '{GA_CHURNED}',
+        'retained_revenue': '{GA_RETAINED}'
+    }};
+
+    gaEl.on('plotly_click', function(data) {{
+        var pt = data.points[0];
+        if (!pt) return;
+        var traceName = pt.data.name;
+        var compKey = componentMap[traceName];
+        if (!compKey) return;
+
+        // Get the month from the x value
+        var monthStr = pt.x;
+        // Find matching month in drilldown data (try exact match and date parsing)
+        var monthData = null;
+        for (var key in ddData) {{
+            if (key === monthStr || key.substring(0, 7) === monthStr.substring(0, 7)) {{
+                monthData = ddData[key];
+                break;
+            }}
+        }}
+        if (!monthData || !monthData[compKey]) return;
+
+        var partners = monthData[compKey];
+        var dd = document.getElementById('ga-drilldown');
+        var title = document.getElementById('ga-dd-title');
+        var body = document.getElementById('ga-dd-body');
+
+        var monthLabel = monthStr.substring(0, 7);
+        var color = colorMap[compKey] || '{TEXT}';
+        title.innerHTML = '<span style="color:' + color + '">' + traceName + '</span> — ' + monthLabel;
+
+        if (partners.length === 0) {{
+            body.innerHTML = '<div class="ga-dd-empty">No partners in this component for ' + monthLabel + '</div>';
+        }} else {{
+            var total = partners.reduce(function(s, p) {{ return s + p.amount; }}, 0);
+            var html = '<table class="ga-dd-table"><thead><tr><th>Partner</th><th style="text-align:right">Amount</th><th style="text-align:right">% of Total</th></tr></thead><tbody>';
+            partners.forEach(function(p) {{
+                var pct = (p.amount / total * 100).toFixed(0);
+                html += '<tr onclick="showDetail(\'' + p.sid + '\')" title="Click to view ' + p.name + '"><td>' + p.name + '</td><td style="text-align:right">$' + p.amount.toLocaleString('en-US', {{maximumFractionDigits:0}}) + '</td><td style="text-align:right">' + pct + '%</td></tr>';
+            }});
+            html += '</tbody></table>';
+            body.innerHTML = html;
+        }}
+
+        dd.style.display = 'block';
+        dd.scrollIntoView({{ behavior: 'smooth', block: 'nearest' }});
+    }});
 }})();
 
 // ======== PARTNER RANGE SLIDER ========
