@@ -337,11 +337,12 @@ def _gen_cs_devs(sid, cohort_plan, churn_range, rev_power=0.5):
             df.loc[mask, 'revenue'] = (df.loc[mask, 'revenue'] / actual * target).round(2)
     return df.to_dict('records')
 
-# CS01 WriteFlow: consumer app, 80+ total unique devs, HIGH turnover (35-50% churn)
-# B2C business — API calls tied directly to consumer usage. Expect lots of devs cycling through.
-_cs01_cohorts = [(0,8),(1,6),(2,8),(3,6),(4,5),(5,4),(6,6),(7,5),(8,3),(9,3),
-                 (10,3),(11,2),(12,4),(13,3),(14,4),(15,4),(16,3),(17,2),(18,3),(19,2),(20,3),(21,3),(22,2),(23,2)]
-_dev_rows.extend(_gen_cs_devs('CS01', _cs01_cohorts, (0.35, 0.50), 0.5))
+# CS01 WriteFlow: consumer app, steady MAU climb masking a leaky bucket.
+# B2C — high acquisition papers over churn. MAU chart should look like a smooth
+# staircase (à la Social+Capital MRR example) so the GA reveal is more dramatic.
+_cs01_cohorts = [(0,10),(1,8),(2,9),(3,8),(4,9),(5,10),(6,10),(7,11),(8,12),(9,12),
+                 (10,13),(11,11),(12,14),(13,13),(14,14),(15,15),(16,14),(17,13),(18,15),(19,14),(20,15),(21,16),(22,15),(23,14)]
+_dev_rows.extend(_gen_cs_devs('CS01', _cs01_cohorts, (0.18, 0.25), 0.5))
 
 # CS02 FinLedger: internal dev tooling, 8-12 devs, very low churn (2%)
 _cs02_cohorts = [(0,4),(5,1),(10,1),(15,1),(20,1)]
@@ -1120,6 +1121,16 @@ for sid in ALL_SIDS:
     f.update_layout(**layout('Model Mix %', h=300))
     f.update_yaxes(ticksuffix='%', range=[0, 100])
     charts['model_mix'] = to_div(f)
+
+    # MAU (Monthly Active Users / Developers)
+    d_dev_ga_mau = dev_ga[dev_ga['startup_id'] == sid].sort_values('month')
+    if len(d_dev_ga_mau) > 0:
+        f = go.Figure()
+        f.add_trace(go.Bar(x=d_dev_ga_mau['month'], y=d_dev_ga_mau['active_devs'],
+            marker_color=COLORS[sid], opacity=0.7, showlegend=False,
+            hovertemplate='%{y:,} MAU<extra></extra>'))
+        f.update_layout(**layout('Monthly Active Users'))
+        charts['mau'] = to_div(f)
 
     # Growth Accounting (revenue) — uses canonical GA colors matching Pulse
     f = go.Figure()
@@ -2436,35 +2447,42 @@ top5_html = f'''
     </table>
 </div>'''
 
-rev_share_section = f'''<div class="pulse-block" style="border-bottom:none;margin-bottom:0;padding-bottom:0">
-    <div class="pulse-panel pulse-panel-chart" style="border:1px solid {GRID};border-radius:12px">
-        {rev_share_div}
-    </div>
-</div>'''
-
-rev_dist_section = f'''<div class="pulse-block" style="border-bottom:none;margin-bottom:0;padding-bottom:0">
+rev_combined_section = f'''<div class="pulse-block" style="border-bottom:none;margin-bottom:0;padding-bottom:0">
     <div class="pulse-panel pulse-panel-chart" style="border:1px solid {GRID};border-radius:12px;padding:20px">
-        <div class="panel-title">REVENUE DISTRIBUTION</div>
-        <div class="rev-dist-tabs" style="display:flex;gap:8px;margin-bottom:12px">
-            <button class="wf-pill active" data-revdist="pareto" onclick="
+        <div class="panel-title">PORTFOLIO REVENUE</div>
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+            <button class="wf-pill active" onclick="
                 this.parentElement.querySelectorAll('.wf-pill').forEach(b=>b.classList.remove('active'));
                 this.classList.add('active');
-                document.getElementById('rev-dist-pareto').style.display='block';
-                document.getElementById('rev-dist-histogram').style.display='none';
+                document.getElementById('rev-view-share').style.display='block';
+                document.getElementById('rev-view-pareto').style.display='none';
+                document.getElementById('rev-view-histogram').style.display='none';
+                setTimeout(()=>window.dispatchEvent(new Event('resize')),50);
+            ">Revenue Share</button>
+            <button class="wf-pill" onclick="
+                this.parentElement.querySelectorAll('.wf-pill').forEach(b=>b.classList.remove('active'));
+                this.classList.add('active');
+                document.getElementById('rev-view-share').style.display='none';
+                document.getElementById('rev-view-pareto').style.display='block';
+                document.getElementById('rev-view-histogram').style.display='none';
+                setTimeout(()=>window.dispatchEvent(new Event('resize')),50);
             ">Power Law</button>
-            <button class="wf-pill" data-revdist="histogram" onclick="
+            <button class="wf-pill" onclick="
                 this.parentElement.querySelectorAll('.wf-pill').forEach(b=>b.classList.remove('active'));
                 this.classList.add('active');
-                document.getElementById('rev-dist-pareto').style.display='none';
-                document.getElementById('rev-dist-histogram').style.display='block';
+                document.getElementById('rev-view-share').style.display='none';
+                document.getElementById('rev-view-pareto').style.display='none';
+                document.getElementById('rev-view-histogram').style.display='block';
+                setTimeout(()=>window.dispatchEvent(new Event('resize')),50);
             ">Histogram</button>
         </div>
-        <div id="rev-dist-pareto" style="display:block">{pareto_div}</div>
-        <div id="rev-dist-histogram" style="display:none">{histogram_div}</div>
+        <div id="rev-view-share" style="display:block">{rev_share_div}</div>
+        <div id="rev-view-pareto" style="display:none">{pareto_div}</div>
+        <div id="rev-view-histogram" style="display:none">{histogram_div}</div>
     </div>
 </div>'''
 
-pulse_content = tier1_html + rev_share_section + rev_dist_section + tier2_html
+pulse_content = tier1_html + rev_combined_section + tier2_html
 partners_content = f'''{tier2_html}
 {scoreboard_html}'''
 
@@ -2516,6 +2534,9 @@ for cs in CASE_STUDIES:
     # Revenue chart
     rev_chart_html = f'<div class="card">{ch["revenue"]}</div>' if 'revenue' in ch else ''
 
+    # MAU chart
+    mau_chart_html = f'<div class="card">{ch["mau"]}</div>' if 'mau' in ch else ''
+
     # LTV charts — CS02 gets a text note instead of charts
     if sid == 'CS02':
         ltv_section_html = '''<div class="cs-section">
@@ -2537,7 +2558,92 @@ for cs in CASE_STUDIES:
     cmgr3 = m['cmgr3'] if m and m['cmgr3'] else 0
     devs = m['active_devs'] if m else 0
 
-    cs_cards_html += f'''
+    # ── CS01 (WriteFlow): narrative case study ──────────────
+    if sid == 'CS01':
+        # Compute Quick Ratio & churn stats for narrative KPIs
+        _cs_ga = per_company_ga_df[sid]
+        _cs_latest_qr = _cs_ga['quick_ratio'].iloc[-1] if len(_cs_ga) > 0 else 0
+        _cs_prev_total = _cs_ga['total_revenue'].shift(1)
+        _cs_churn_pct = (_cs_ga['churned_revenue'] + _cs_ga['contraction_revenue']) / _cs_prev_total * 100
+        _cs_churn_pct = _cs_churn_pct.replace([np.inf, -np.inf], np.nan).dropna()
+        _cs_avg_churn = _cs_churn_pct.iloc[-3:].mean() if len(_cs_churn_pct) >= 3 else (_cs_churn_pct.mean() if len(_cs_churn_pct) > 0 else 0)
+        _qr_color = SUCCESS if _cs_latest_qr >= 4 else WARNING if _cs_latest_qr >= 2 else DANGER
+        _churn_color = SUCCESS if _cs_avg_churn < 3 else WARNING if _cs_avg_churn < 7 else DANGER
+
+        # Quick Ratio chart
+        qr_chart_html = f'<div class="card">{ch["spend_qr"]}</div>' if 'spend_qr' in ch else ''
+        # Retention curve chart
+        ret_chart_html = f'<div class="card">{ch["dev_retention"]}</div>' if 'dev_retention' in ch else ''
+
+        cs_cards_html += f'''
+    <div class="cs-card" style="border-top:3px solid {cs['type_color']}">
+        <div class="cs-header-clickable" onclick="toggleCaseStudy(this)">
+            <div class="cs-header-left">
+                <span class="cs-chevron">&#x25BC;</span>
+                <span class="cs-name">{cs['name']}</span>
+                <span class="cs-type-badge" style="background:{cs['type_color']}">{cs['type']}</span>
+                <span class="cs-tagline-inline">{cs['tagline']}</span>
+            </div>
+            <span class="cs-meta">{cs['stage']} &middot; {cs['hq']}</span>
+        </div>
+
+        <div class="cs-body">
+            <p class="cs-desc">{cs['summary']}</p>
+
+            <div class="cs-kpis">
+                <div class="cs-kpi"><div class="cs-kpi-label">MRR</div><div class="cs-kpi-value">${latest_rev:,.0f}</div></div>
+                <div class="cs-kpi"><div class="cs-kpi-label">CMGR-3</div><div class="cs-kpi-value">{cmgr3*100:.1f}%</div></div>
+                <div class="cs-kpi"><div class="cs-kpi-label">Active Users</div><div class="cs-kpi-value">{devs}</div></div>
+                <div class="cs-kpi"><div class="cs-kpi-label">Model Mix</div><div class="cs-kpi-value" style="font-size:11px">{cs['model_mix']}</div></div>
+            </div>
+
+            <!-- Step 1: MAU looks great -->
+            <div class="cs-section">
+                <div class="cs-section-title">1 &mdash; MAU Growth</div>
+                <p class="cs-section-text">This is a consumer business, which means the growth accounting profile looks fundamentally different from B2B. In B2C cases, higher churn is expected and offset by acquisition. Typical MAU analyses do not surface this &mdash; which is where growth accounting becomes useful. WriteFlow appears to be growing in MAU:</p>
+            </div>
+            <div class="cs-charts">
+                {mau_chart_html}
+                {rev_chart_html}
+            </div>
+
+            <!-- Step 2: GA reveals the problem -->
+            <div class="cs-section">
+                <div class="cs-section-title">2 &mdash; Growth Accounting Reveals Diminishing Returns</div>
+                <p class="cs-section-text">However, when we apply the growth accounting framework, we see diminishing returns. Over time, churn is cancelling out retained revenue. This signals a leaky bucket problem &mdash; WriteFlow is running to stand still.</p>
+            </div>
+            <div class="cs-charts">
+                {ga_chart_html}
+                {qr_chart_html}
+            </div>
+            <div class="cs-kpis" style="margin-top:8px">
+                <div class="cs-kpi"><div class="cs-kpi-label">Quick Ratio</div><div class="cs-kpi-value" style="color:{_qr_color}">{_cs_latest_qr:.1f}x</div></div>
+                <div class="cs-kpi"><div class="cs-kpi-label">Avg Gross Churn</div><div class="cs-kpi-value" style="color:{_churn_color}">{_cs_avg_churn:.1f}%</div></div>
+            </div>
+
+            <!-- Step 3: LTV is the saving grace -->
+            <div class="cs-section">
+                <div class="cs-section-title">3 &mdash; Cohort LTV: The Saving Grace</div>
+                <p class="cs-section-text">Users sign up during essay season, try it for a week, and leave. Growth is driven by new user acquisition, not retention. However, a saving grace is the increasing cohort lifetime value &mdash; newer cohorts display significantly higher usage of the product and the Claude API. The users who stay are worth more.</p>
+            </div>
+            <div class="cs-charts">
+                {ret_chart_html}
+            </div>
+            {ltv_section_html}
+
+            <div class="cs-section" style="margin-top:12px">
+                <div class="cs-section-title">Recommendation</div>
+                <p class="cs-section-text">The high churn and sub-2x Quick Ratio signal a leaky bucket that acquisition alone cannot fill indefinitely. We do not recommend allocating additional credits until WriteFlow demonstrates improved retention in the M2+ cohorts. Monitor the LTV trend &mdash; if newer cohorts continue to increase in value, there may be a path to sustainable unit economics despite the churn.</p>
+            </div>
+
+            <div class="cs-link" onclick="event.stopPropagation(); showPartnerDetail('{sid}')">View full analysis &rarr;</div>
+        </div>
+    </div>
+    '''
+
+    # ── CS02, CS03 and others: standard layout ──────────────
+    else:
+        cs_cards_html += f'''
     <div class="cs-card" style="border-top:3px solid {cs['type_color']}">
         <div class="cs-header-clickable" onclick="toggleCaseStudy(this)">
             <div class="cs-header-left">
