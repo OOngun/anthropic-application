@@ -1,0 +1,147 @@
+\documentclass[letterpaper,11pt]{article}
+
+\usepackage[empty]{fullpage}
+\usepackage{titlesec}
+\usepackage[usenames,dvipsnames]{color}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fancyhdr}
+\usepackage[english]{babel}
+\usepackage{tabularx}
+\usepackage{fontawesome5}
+\usepackage{geometry}
+\usepackage{textcomp}
+
+\geometry{left=0.5in, right=0.5in, top=0.4in, bottom=0.4in}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyfoot{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+\urlstyle{same}
+
+\raggedbottom
+\setlength{\tabcolsep}{0in}
+
+% Section formatting — horizontal rule below section title
+\titleformat{\section}{
+  \vspace{-6pt}\scshape\raggedright\large
+}{}{0em}{}[\color{black}\titlerule\vspace{-5pt}]
+
+% Custom commands
+\newcommand{\resumeSubheading}[4]{
+  \vspace{-2pt}\item
+    \begin{tabular*}{\textwidth}[t]{l@{\extracolsep{\fill}}r}
+      \textbf{#1} & #2 \\
+      \textit{\small#3} & \textit{\small #4} \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeItem}[1]{
+  \item\small{#1\vspace{-2pt}}
+}
+
+\newcommand{\resumeSubHeadingListStart}{\begin{itemize}[leftmargin=0.0in, label={}]}
+\newcommand{\resumeSubHeadingListEnd}{\end{itemize}}
+\newcommand{\resumeItemListStart}{\begin{itemize}[leftmargin=0.15in, label=\textbullet]}
+\newcommand{\resumeItemListEnd}{\end{itemize}\vspace{-5pt}}
+
+\begin{document}
+
+%----------HEADING----------
+\begin{center}
+    {\Huge\bfseries Ongun \"Ozdemir} \\[4pt]
+    \small
+    \faEnvelope\ \href{mailto:ongunozdemir95@gmail.com}{ongunozdemir95@gmail.com} \quad$|$\quad
+    \faLinkedin\ \href{https://linkedin.com/in/ongunozdemir}{LinkedIn} \quad$|$\quad
+    \faPhone\ +44 7305030613
+\end{center}
+
+%-----------SUMMARY-----------
+\section{Professional Summary}
+\small
+GTM operator and ecosystem builder with 8+ years scaling startup programs, technology adoption, and VC partnerships. Built a \$15.5M startup program from scratch across 50 companies, driving 42\% transaction growth. Deep relationships across EMEA VC, accelerator, and founder networks.
+
+%-----------EXPERIENCE-----------
+\section{Experience}
+
+\resumeSubHeadingListStart
+
+    \resumeSubheading
+      {Investments, Product \& Ecosystem Lead}{London, UK}
+      {RootstockLabs — Deep Tech Infrastructure Lab}{Aug 2022 -- Present}
+      \resumeItemListStart
+        \resumeItem{Drove C-Suite investment committee for equity and convertible deals cumulating \$25M}
+        \resumeItem{Co-led \$30M portfolio exit to global neobank — full lifecycle from investment through M\&A close}
+        \resumeItem{Built \$5.5M grant program from 0-to-1, grew ecosystem 40\%; scaled to \$15.5M DAO with governance model}
+        \resumeItem{Wrote the strategic analysis that drove a company-wide pivot — pitched to board with CFO, approved}
+        \resumeItem{Ran 6 rounds of pitch days, virtual hackathons, and demo days; spoke at DEFCON and 5+ Ethereum events}
+        \resumeItem{Led grants committee of CEO, CPO, CFO, VPs; cross-functional GTM across product, eng, and partnerships}
+        \resumeItem{Authored 16-page LayerZero and 13-page Uniswap technical analyses; built developer onboarding playbook}
+        \resumeItem{Leading financial product design: lending protocol with counterparty risk model, customer discovery, board approval}
+      \resumeItemListEnd
+
+    \resumeSubheading
+      {Analyst — Employee \#10}{Remote — San Francisco}
+      {VC Lab / Decile Group — Launched 500+ VC Firms}{Aug 2021 -- May 2022}
+      \resumeItemListStart
+        \resumeItem{Shipped fund domicile reports (Asia, Netherlands, Hong Kong, Ontario) — still live today}
+        \resumeItem{Worked 1:1 with founder Adeo Resi building resources for emerging GPs who raised \$500M+ from LPs}
+        \resumeItem{Part of the operating team that created the Decile Group: Fund of Funds, LLM co-pilot, fund services}
+      \resumeItemListEnd
+
+    \resumeSubheading
+      {Analyst}{London, UK}
+      {Portfolio Ventures}{May 2019 -- Oct 2021}
+      \resumeItemListStart
+        \resumeItem{Managed platform operations: 4,000 deal flow pipeline and 1,000 limited partners}
+        \resumeItem{Originated early-stage deals across fintech, insurtech, and SaaS verticals in the UK}
+      \resumeItemListEnd
+
+    \resumeSubheading
+      {Venture Fellow}{Remote — Poland / San Francisco}
+      {SMOK Ventures — Paul Bragiel (early Uber investor)}{June 2021 -- Sept 2021}
+      \resumeItemListStart
+        \resumeItem{Recommended tax-efficient domicile (Netherlands) — adopted by \texteuro50M Fund II}
+        \resumeItem{Evaluated inbound deal flow and assisted LP fundraising alongside founding partners}
+      \resumeItemListEnd
+
+    \resumeSubheading
+      {Performance Media / CRM Executive}{London, UK}
+      {Kaplan}{May 2017 -- April 2019}
+      \resumeItemListStart
+        \resumeItem{Built automated CRM infrastructure across 15 markets, improving conversion by 30\%}
+      \resumeItemListEnd
+
+\resumeSubHeadingListEnd
+
+%-----------VC INITIATIVES-----------
+\section{VC Initiatives}
+\vspace{-1pt}
+\begin{tabular*}{\textwidth}{l@{\extracolsep{\fill}}r}
+  \textbf{Ada Ventures} $|$ \small{Venture Scout for \pounds65M fund — healthcare, economic empowerment, climate} & 2024 -- Present \\
+  \textbf{Diversity VC} \small{(Team Member)} $|$ \small{Contributions recognised at Downing Street by the PM} & 2021 -- 2023 \\
+\end{tabular*}\vspace{-7pt}
+
+%-----------EDUCATION-----------
+\section{Education}
+
+\resumeSubHeadingListStart
+    \resumeSubheading
+      {The University of Kent}{Canterbury, UK}
+      {BSc Economics — Econometrics, Monetary Economics, Statistical Analysis}{2013 -- 2016}
+\resumeSubHeadingListEnd
+
+%-----------SKILLS-----------
+\section{Skills, Languages \& Interests}
+\begin{itemize}[leftmargin=0.15in, label={}]
+    \small{\item{
+     \textbf{Languages:} English (Native), Turkish (Professional Working Proficiency) \\
+     \textbf{Technical:} Financial Modeling (Advanced), SQL (Intermediate), Python, Hex Dashboards, Claude/LLM tooling \\
+     \textbf{Interests:} Rock Climbing (V3--V5), Trading (Investopedia Simulator: Rank 36/3,218 — 20\% alpha)
+    }}
+\end{itemize}
+
+\end{document}

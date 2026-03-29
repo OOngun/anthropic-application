@@ -182,7 +182,13 @@ Click into any company for granular breakdown across three sections:
 3. **Developer Retention Curve** — cohort lines showing % of developers still active at month 1, 2, 3...
 4. **Total Active Developers** — simple line showing MAD over time
 
-**Note on "users":** This depends on how the partner integrates. If they use Anthropic Console with workspace members, we see real seat count. If they use raw API keys, we use distinct active API keys as a proxy. The dashboard should flag which measurement is in use per partner.
+**Definition: "Active Developers"**
+
+Throughout this dashboard, "Active Developers" is defined as **distinct API keys with at least 1 API call in the trailing 30 days**.
+
+This is a simplification. In practice, the mapping between API keys and actual developers is ambiguous — one developer may use multiple keys (e.g. dev vs production), or a team may share a single key. Alternative measurements include workspace seats (if the partner uses Anthropic Console) or distinct user-agent strings. For the sake of simplicity and consistency, we treat each active API key as one developer.
+
+**Revenue is not driven by developer count.** Revenue = tokens × model pricing. Developer count is an adoption/integration depth signal — more developers generally correlates with more features built on Claude, which correlates with more tokens, but the relationship is not mechanical. A startup with 2 devs running a high-volume batch pipeline can generate more revenue than one with 20 devs doing light prototyping.
 
 ---
 
@@ -191,6 +197,36 @@ Click into any company for granular breakdown across three sections:
 Token consumption and revenue are the **same underlying activity measured in different units** (Revenue = Tokens × Price per Token). They belong in one section, not two.
 
 **Why they're shown together:** A partner could increase token volume while decreasing revenue (migrating Opus → Haiku), or vice versa. The model mix is the bridge between the two.
+
+### ⚠️ Open Issue: Token vs Revenue GA and Anthropic's Pricing Model
+
+**The relationship between token usage and revenue is not 1:1 across models.** Anthropic's pricing is per-token but varies dramatically by model:
+- Haiku: ~$1/1M tokens (cheap, batch processing)
+- Sonnet: ~$15/1M tokens (mid-tier, most common)
+- Opus: ~$75/1M tokens (expensive, complex reasoning)
+
+This means:
+- A developer switching from Haiku to Sonnet with **the same token volume** creates 15× revenue expansion — but no change in usage behaviour
+- A developer doubling their Haiku volume creates only marginal revenue expansion
+- A developer migrating from Opus to Haiku (cost-cutting) creates massive revenue contraction while usage may actually increase
+
+**Implication for Growth Accounting:** The GA decomposition should ideally be done on **two parallel tracks**:
+1. **Token GA** — measures actual usage behaviour (are developers using more/less?)
+2. **Revenue GA** — measures monetary impact (are we earning more/less?)
+
+The gap between them reveals **model mix drift** as a distinct signal. Currently the dashboard only runs revenue GA. Adding token GA and a "model mix effect" decomposition is a future improvement.
+
+**Implication for expansion/contraction in GA:** Most genuine expansion comes from:
+- New developers joining (new API keys)
+- Developers scaling up call volume (more features, more users of their product)
+- Model upgrades (Haiku → Sonnet for quality, shows as revenue expansion)
+
+Most contraction comes from:
+- Model downgrades (cost optimisation, often a pre-churn signal)
+- Reduced call volume (feature deprecated, fewer end-users)
+- Developer leaving (churn at API key level)
+
+The retained portion should be naturally high (~80-85%) in a healthy portfolio because established developers using the same models produce very similar revenue month-over-month. Per-token pricing means there's no seat-based step function — growth is gradual.
 
 **Charts:**
 1. **Revenue Growth Accounting** — stacked bar: New, Retained, Expansion, Resurrected above axis; Contraction, Churned below. The core Tribe Capital chart.
