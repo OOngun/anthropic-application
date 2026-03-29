@@ -35,34 +35,65 @@ NAMES = {row['startup_id']: row['startup_name'] for _, row in startups.iterrows(
 
 np.random.seed(42)
 dev_ga_records = []
+
+# For case study partners, derive GA from real developer_activity.csv
+_CS_SIDS = {'CS01', 'CS02', 'CS03'}
 for sid in ALL_SIDS:
-    u = monthly_usage[monthly_usage['startup_id'] == sid].sort_values('month')
-    prev_devs = 0
-    cumulative_ever = 0
-    for i, row in u.iterrows():
-        month = row['month']
-        total = int(row['active_developers'])
-        if prev_devs == 0:
+    if sid in _CS_SIDS:
+        # Use actual per-dev activity for exact new/retained/churned accounting
+        _da_csv = pd.read_csv('data/developer_activity.csv')
+        _da_csv['month'] = pd.to_datetime(_da_csv['month'])
+        _da = _da_csv[_da_csv['startup_id'] == sid].copy()
+        _da_months = sorted(_da['month'].unique())
+        prev_set = set()
+        ever_set = set()
+        for mi, m in enumerate(_da_months):
+            curr_set = set(_da[_da['month'] == m]['dev_id'].unique())
+            if mi == 0:
+                dev_ga_records.append(dict(startup_id=sid, month=m,
+                    active_devs=len(curr_set), new_devs=len(curr_set),
+                    retained_devs=0, resurrected_devs=0, churned_devs=0))
+                prev_set = curr_set
+                ever_set = curr_set.copy()
+                continue
+            retained = curr_set & prev_set
+            churned = prev_set - curr_set
+            returning = curr_set & (ever_set - prev_set)
+            new = curr_set - ever_set
+            dev_ga_records.append(dict(startup_id=sid, month=m,
+                active_devs=len(curr_set), new_devs=len(new),
+                retained_devs=len(retained), resurrected_devs=len(returning),
+                churned_devs=len(churned)))
+            prev_set = curr_set
+            ever_set |= new
+    else:
+        u = monthly_usage[monthly_usage['startup_id'] == sid].sort_values('month')
+        prev_devs = 0
+        cumulative_ever = 0
+        for i, row in u.iterrows():
+            month = row['month']
+            total = int(row['active_developers'])
+            if prev_devs == 0:
+                dev_ga_records.append(dict(startup_id=sid, month=month, active_devs=total,
+                    new_devs=total, retained_devs=0, resurrected_devs=0, churned_devs=0))
+                prev_devs = total
+                cumulative_ever = total
+                continue
+            retain_rate = np.clip(np.random.normal(0.75, 0.05), 0.60, 0.90)
+            retained = int(min(round(prev_devs * retain_rate), total))
+            churned = prev_devs - retained
+            remaining = total - retained
+            if cumulative_ever > prev_devs and remaining > 0:
+                resurrect_pool = cumulative_ever - prev_devs
+                resurrected = int(min(round(remaining * np.random.uniform(0.1, 0.3)), resurrect_pool, remaining))
+            else:
+                resurrected = 0
+            new_devs = max(remaining - resurrected, 0)
             dev_ga_records.append(dict(startup_id=sid, month=month, active_devs=total,
-                new_devs=total, retained_devs=0, resurrected_devs=0, churned_devs=0))
+                new_devs=new_devs, retained_devs=retained, resurrected_devs=resurrected,
+                churned_devs=churned))
             prev_devs = total
-            cumulative_ever = total
-            continue
-        retain_rate = np.clip(np.random.normal(0.75, 0.05), 0.60, 0.90)
-        retained = int(min(round(prev_devs * retain_rate), total))
-        churned = prev_devs - retained
-        remaining = total - retained
-        if cumulative_ever > prev_devs and remaining > 0:
-            resurrect_pool = cumulative_ever - prev_devs
-            resurrected = int(min(round(remaining * np.random.uniform(0.1, 0.3)), resurrect_pool, remaining))
-        else:
-            resurrected = 0
-        new_devs = max(remaining - resurrected, 0)
-        dev_ga_records.append(dict(startup_id=sid, month=month, active_devs=total,
-            new_devs=new_devs, retained_devs=retained, resurrected_devs=resurrected,
-            churned_devs=churned))
-        prev_devs = total
-        cumulative_ever += new_devs
+            cumulative_ever += new_devs
 
 dev_ga = pd.DataFrame(dev_ga_records)
 dev_ga['dev_quick_ratio'] = dev_ga.apply(
@@ -348,9 +379,10 @@ _dev_rows.extend(_gen_cs_devs('CS01', _cs01_cohorts, (0.18, 0.25), 0.5))
 _cs02_cohorts = [(0,4),(5,1),(10,1),(15,1),(20,1)]
 _dev_rows.extend(_gen_cs_devs('CS02', _cs02_cohorts, (0.01, 0.03), 0.3))
 
-# CS03 BrieflyAI: B2B platform, 15-25 devs, step-function onboarding, low-moderate churn (4-8%)
-_cs03_cohorts = [(0,5),(5,3),(10,4),(12,1),(16,4),(21,4),(23,1)]
-_dev_rows.extend(_gen_cs_devs('CS03', _cs03_cohorts, (0.04, 0.08), 0.4))
+# CS03 BrieflyAI: B2B platform, 9-10 devs, step-function client wins, very low churn (2-4%)
+# 12 months only (Jan-Dec 2025). Onboards: month 0 (3), month 2 (2), month 5 (2), month 7 (1), month 10 (3)
+_cs03_cohorts = [(0,3),(2,2),(5,2),(7,1),(10,3)]
+_dev_rows.extend(_gen_cs_devs('CS03', _cs03_cohorts, (0.02, 0.04), 0.4))
 
 # --- Standard partner generation ---
 for sid in ALL_SIDS:
@@ -1126,10 +1158,18 @@ for sid in ALL_SIDS:
     d_dev_ga_mau = dev_ga[dev_ga['startup_id'] == sid].sort_values('month')
     if len(d_dev_ga_mau) > 0:
         f = go.Figure()
-        f.add_trace(go.Bar(x=d_dev_ga_mau['month'], y=d_dev_ga_mau['active_devs'],
+        _mau_vals = d_dev_ga_mau['active_devs']
+        _mau_label = 'Monthly Active Users'
+        # CS01 is consumer — values represent thousands
+        if sid == 'CS01':
+            _mau_vals = _mau_vals * 1000
+            _mau_label = 'Monthly Active Users (K)'
+        f.add_trace(go.Bar(x=d_dev_ga_mau['month'], y=_mau_vals,
             marker_color=COLORS[sid], opacity=0.7, showlegend=False,
-            hovertemplate='%{y:,} MAU<extra></extra>'))
-        f.update_layout(**layout('Monthly Active Users'))
+            hovertemplate='%{y:,.0f} MAU<extra></extra>'))
+        f.update_layout(**layout(_mau_label))
+        if sid == 'CS01':
+            f.update_yaxes(tickformat=',d')
         charts['mau'] = to_div(f)
 
     # Growth Accounting (revenue) — uses canonical GA colors matching Pulse
@@ -1240,43 +1280,82 @@ for sid in ALL_SIDS:
         _qual_colors = px.colors.qualitative.D3 + px.colors.qualitative.Set2 + px.colors.qualitative.Vivid
         _coh_colors = [_qual_colors[i % len(_qual_colors)] for i in range(_n_coh)]
 
-        f = go.Figure()
         _fmt_label = lambda ck: f"Q{((ck.month-1)//3)+1} {ck.year}" if _needs_quarterly else ck.strftime('%Y-%m')
-        for ci, ck in enumerate(_ltv_cohorts):
+
+        # --- Cohort LTV bar chart: total LTV per cohort member, normalised by age ---
+        # For each cohort, compute: total revenue / cohort_size / months_observed
+        # This gives "average monthly revenue per user" — newer cohorts should trend higher
+        _cohort_ltv_summary = []
+        for ck in _ltv_cohorts:
             coh = _cohort_agg_ltv[_cohort_agg_ltv['cohort_key'] == ck].sort_values('age')
-            # Ensure cumulative LTV is monotonically non-decreasing
-            coh = coh.copy()
-            coh['cum_ltv_per_dev'] = coh['cum_ltv_per_dev'].cummax()
-            _label = _fmt_label(ck)
-            _in_top = ck in _top_cohorts
-            f.add_trace(go.Scatter(x=coh['age'], y=coh['cum_ltv_per_dev'],
-                mode='lines', name=_label,
-                line=dict(width=2, color=_coh_colors[ci]),
-                legendgroup=_label,
-                showlegend=_in_top,
-                hovertemplate=f'{_label}<br>Period %{{x}}: $%{{y:,.0f}}/dev<extra></extra>'))
+            if len(coh) == 0:
+                continue
+            _total_rev = coh['revenue'].sum()
+            _cs = coh['cohort_size'].iloc[0]
+            _max_age = int(coh['age'].max()) + 1
+            _ltv_per_user = _total_rev / _cs
+            _monthly_rev_per_user = _total_rev / _cs / max(1, _max_age)
+            _cohort_ltv_summary.append({
+                'cohort_key': ck, 'label': _fmt_label(ck),
+                'cohort_size': _cs, 'total_rev': _total_rev,
+                'ltv_per_user': _ltv_per_user,
+                'monthly_rev_per_user': _monthly_rev_per_user,
+                'months_observed': _max_age
+            })
+        _cltv_df = pd.DataFrame(_cohort_ltv_summary)
 
-        # Dashed black average line (thick, prominent)
-        _avg_ltv = _cohort_agg_ltv.groupby('age')['cum_ltv_per_dev'].mean().reset_index().sort_values('age')
-        _avg_ltv['cum_ltv_per_dev'] = _avg_ltv['cum_ltv_per_dev'].cummax()
-        if len(_avg_ltv) > 1:
-            f.add_trace(go.Scatter(x=_avg_ltv['age'], y=_avg_ltv['cum_ltv_per_dev'],
-                mode='lines', name='Average',
-                line=dict(width=3, color='black', dash='dash'),
-                hovertemplate='Average<br>Period %{x}: $%{y:,.0f}/dev<extra></extra>'))
-
-        f.update_layout(**layout('Cumulative LTV per Developer by Cohort', h=350))
-        f.update_layout(legend=dict(bgcolor='rgba(0,0,0,0)', orientation='v',
-            yanchor='top', y=1, xanchor='left', x=1.02, font=dict(size=10),
-            tracegroupgap=2))
-        f.update_layout(margin=dict(l=55, r=140, t=40, b=40))
-        _max_ltv_val = _cohort_agg_ltv['cum_ltv_per_dev'].max() if len(_cohort_agg_ltv) > 0 else 1000
-        if _max_ltv_val >= 1000:
-            f.update_yaxes(tickprefix='$', tickformat='.1s')
-        else:
+        if len(_cltv_df) > 0:
+            f = go.Figure()
+            # Bar: LTV per user for each cohort
+            f.add_trace(go.Bar(
+                x=_cltv_df['label'], y=_cltv_df['ltv_per_user'],
+                marker_color=COLORS[sid], opacity=0.8, showlegend=False,
+                hovertemplate='%{x}<br>LTV/user: $%{y:,.0f}<br>Cohort: %{customdata[0]} users<br>Observed: %{customdata[1]} months<extra></extra>',
+                customdata=list(zip(_cltv_df['cohort_size'], _cltv_df['months_observed']))))
+            # Trend line
+            _x_num = np.arange(len(_cltv_df))
+            _y_vals = _cltv_df['ltv_per_user'].values
+            if len(_x_num) > 2:
+                _z = np.polyfit(_x_num, _y_vals, 1)
+                _trend = np.polyval(_z, _x_num)
+                f.add_trace(go.Scatter(x=_cltv_df['label'].tolist(), y=_trend,
+                    mode='lines', line=dict(color='black', width=2, dash='dash'),
+                    showlegend=False, hoverinfo='skip'))
+            f.update_layout(**layout('Cohort Lifetime Value', h=350))
+            f.update_layout(margin=dict(l=55, r=30, t=40, b=60))
             f.update_yaxes(tickprefix='$', tickformat=',.0f')
-        f.update_xaxes(title_text='period')
-        charts['ltv_curve'] = to_div(f)
+            f.update_xaxes(tickangle=-45)
+            charts['ltv_curve'] = to_div(f)
+
+        # --- Cohort LTV bar chart: avg monthly revenue per user by cohort ---
+        # Normalizes for cohort age so newer cohorts aren't penalized for less time-in-market
+        _cohort_total_ltv = _d_dev_ltv.groupby('cohort_key').agg(
+            total_rev=('revenue', 'sum'),
+            n_user_months=('dev_id', 'count')  # each row = one user-month of activity
+        ).reset_index()
+        _cohort_total_ltv = _cohort_total_ltv.merge(_cohort_sizes_ltv, on='cohort_key')
+        _cohort_total_ltv['avg_monthly_rev'] = _cohort_total_ltv['total_rev'] / _cohort_total_ltv['n_user_months']
+        _cohort_total_ltv = _cohort_total_ltv.sort_values('cohort_key')
+        _cohort_total_ltv['label'] = _cohort_total_ltv['cohort_key'].apply(_fmt_label)
+
+        f_cltv = go.Figure()
+        f_cltv.add_trace(go.Bar(
+            x=_cohort_total_ltv['label'], y=_cohort_total_ltv['avg_monthly_rev'],
+            marker_color=COLORS[sid], opacity=0.8, showlegend=False,
+            hovertemplate='%{x}<br>Avg rev/user/mo: $%{y:,.0f}<br>Cohort size: %{customdata}<extra></extra>',
+            customdata=_cohort_total_ltv['cohort_size']))
+        # Trend line
+        _x_num = np.arange(len(_cohort_total_ltv))
+        _y_vals = _cohort_total_ltv['avg_monthly_rev'].values
+        if len(_x_num) > 2:
+            _z = np.polyfit(_x_num, _y_vals, 1)
+            _trend = np.polyval(_z, _x_num)
+            f_cltv.add_trace(go.Scatter(x=_cohort_total_ltv['label'].tolist(), y=_trend,
+                mode='lines', line=dict(color='black', width=2, dash='dash'),
+                showlegend=False, hoverinfo='skip'))
+        f_cltv.update_layout(**layout('Avg Monthly Revenue per User by Cohort', h=300))
+        f_cltv.update_yaxes(tickprefix='$', tickformat=',.0f')
+        charts['cohort_ltv_bar'] = to_div(f_cltv)
 
     # === LTV HEATMAP (Tribe Capital style: red-to-blue, cohort sizes) ===
     d_dev = dev_activity[dev_activity['startup_id'] == sid].copy()
@@ -1334,15 +1413,24 @@ for sid in ALL_SIDS:
         for ck in cohorts_sorted:
             c = cohort_agg[cohort_agg['cohort_key'] == ck].set_index('age')
             cs = cohort_sizes_local[cohort_sizes_local['cohort_key'] == ck]['cohort_size'].iloc[0]
+            max_cohort_age = int(c.index.max())
             ltv_row = []
             ret_row = []
+            last_ltv = None
             for a in range(max_age + 1):
-                if a in c.index:
-                    ltv_row.append(round(float(c.loc[a, 'cum_ltv']), 0))
-                    ret_row.append(round(float(c.loc[a, 'retention']), 1))
-                else:
+                if a > max_cohort_age:
+                    # Future — cohort hasn't reached this age yet
                     ltv_row.append(None)
                     ret_row.append(None)
+                elif a in c.index:
+                    last_ltv = round(float(c.loc[a, 'cum_ltv']), 0)
+                    last_ret = round(float(c.loc[a, 'retention']), 1)
+                    ltv_row.append(last_ltv)
+                    ret_row.append(last_ret)
+                else:
+                    # Gap within observed lifetime — carry forward LTV, 0 retention
+                    ltv_row.append(last_ltv)
+                    ret_row.append(0)
             ltv_matrix.append(ltv_row)
             ret_matrix.append(ret_row)
             cohort_labels.append(_hm_fmt(ck))
@@ -1427,38 +1515,64 @@ for sid in ALL_SIDS:
 
         # Retention Heatmap (same structure, green-to-red)
         if len(cohorts_sorted) > 0:
+            # Build text matrix — leave 0% cells blank so we can annotate them in red
             ret_text = []
-            for row in ret_matrix:
-                ret_text.append([f'{v:.0f}%' if v is not None else '' for v in row])
+            _zero_cells = []  # (row_idx, col_idx) for 0% cells
+            for ri, row in enumerate(ret_matrix):
+                text_row = []
+                for ci, v in enumerate(row):
+                    if v is None:
+                        text_row.append('')
+                    elif v == 0 or (v is not None and round(v) == 0):
+                        text_row.append('')  # leave blank, will annotate in red
+                        _zero_cells.append((ri, ci))
+                    else:
+                        text_row.append(f'{v:.0f}%')
+                ret_text.append(text_row)
 
-            fig_ret_hm = make_subplots(rows=1, cols=2, column_widths=[0.15, 0.85],
-                shared_yaxes=True, horizontal_spacing=0.02)
+            fig_ret_hm = make_subplots(rows=1, cols=2, column_widths=[0.10, 0.90],
+                shared_yaxes=True, horizontal_spacing=0.03,
+                subplot_titles=['', 'period'])
 
             fig_ret_hm.add_trace(go.Bar(
                 y=cohort_labels, x=cohort_size_vals, orientation='h',
-                marker_color='#9CA3AF', showlegend=False
+                marker_color='#9CA3AF', showlegend=False,
+                text=[str(v) for v in cohort_size_vals], textposition='auto',
+                textfont=dict(size=8)
             ), row=1, col=1)
 
             fig_ret_hm.add_trace(go.Heatmap(
                 z=ret_matrix, x=list(range(max_age + 1)), y=cohort_labels,
-                text=ret_text, texttemplate='%{text}', textfont=dict(size=10),
+                text=ret_text, texttemplate='%{text}', textfont=dict(size=9),
                 colorscale=[[0, '#DC2626'], [0.5, '#FBBF24'], [1, '#16A34A']],
-                showscale=True, colorbar=dict(title='Ret %', ticksuffix='%', len=0.85, thickness=15),
+                showscale=True, colorbar=dict(title='Ret %', ticksuffix='%', len=0.85, thickness=12),
                 hovertemplate='Cohort %{y}<br>Period %{x}<br>Retention: %{z:.0f}%<extra></extra>',
                 zmin=0, zmax=100,
-                connectgaps=False
+                connectgaps=False, xgap=1, ygap=1
             ), row=1, col=2)
 
+            _ret_hm_height = max(400, len(cohorts_sorted) * 38 + 120)
             fig_ret_hm.update_layout(
-                height=max(320, len(cohorts_sorted) * 30 + 90),
-                margin=dict(t=50, b=45, l=10, r=10),
+                height=_ret_hm_height,
+                margin=dict(t=60, b=50, l=10, r=80),
                 paper_bgcolor='white', plot_bgcolor='white',
-                title=dict(text='Developer Retention by Cohort', font=dict(size=14)),
-                font=dict(family='Inter, sans-serif', size=11)
+                title=dict(text='Developer Retention by Cohort',
+                           font=dict(size=13, family='IBM Plex Sans'), x=0.08, xanchor='left'),
+                font=dict(family='IBM Plex Sans, Inter, sans-serif', size=11)
             )
-            fig_ret_hm.update_xaxes(title_text='cohort size', row=1, col=1, showticklabels=False)
+            fig_ret_hm.update_xaxes(title_text='', row=1, col=1, showticklabels=False)
             fig_ret_hm.update_xaxes(title_text='period', row=1, col=2)
             fig_ret_hm.update_yaxes(autorange='reversed', row=1, col=1)
+            # Remove the auto-generated subplot title that collides
+            fig_ret_hm.layout.annotations = [a for a in fig_ret_hm.layout.annotations
+                                              if a.text not in ('', 'period')]
+            # Add red "0%" annotations for zero-retention cells
+            for ri, ci in _zero_cells:
+                fig_ret_hm.add_annotation(
+                    x=ci, y=cohort_labels[ri],
+                    text='<b>0%</b>', showarrow=False,
+                    font=dict(color='#DC2626', size=9, family='IBM Plex Sans'),
+                    xref='x2', yref='y2')
             charts['retention_heatmap'] = to_div(fig_ret_hm, f'ret-hm-{sid}')
 
     # Revenue retention
@@ -2515,10 +2629,10 @@ CASE_STUDIES = [
         'type_color': '#F59E0B',
         'tagline': 'Meeting Summarisation Platform',
         'stage': 'Series A', 'hq': 'Amsterdam, Netherlands',
-        'summary': 'Records and transcribes meetings, Claude generates structured summaries with action items. Sold per-seat to enterprises. 45 clients, 3K meetings/week.',
-        'model_mix': 'Sonnet 72% · Opus 16% · Haiku 11%',
-        'expected_ga': 'High retained revenue, step-function expansion (new client wins), very low churn (sticky B2B contracts). Super-linear LTV as clients add seats. QR 3–5×.',
-        'what_to_watch': 'Client acquisition cadence — are step-functions getting bigger or smaller? Model mix trending Opus = handling more complex meetings. Any churn cliff = lost enterprise client, investigate immediately.'
+        'summary': 'Records and transcribes business meetings; Claude generates structured summaries with action items and decisions. Sold per-seat to mid-market firms. 12 months in, 6 enterprise clients. Each client win is a step-function in API usage.',
+        'model_mix': 'Sonnet 74% · Opus 15% · Haiku 11%',
+        'expected_ga': "Revenue grows in step-functions (new client wins), not smoothly. Between wins: high retained + modest expansion as existing clients add seats. Low churn — once summaries are embedded in the workflow, teams don't leave. GDR 84–90%, NDR 112%, QR 2.4× vs WriteFlow's 1.2×.",
+        'what_to_watch': "Step-function cadence — is BrieflyAI winning clients consistently? CMGR-3 at 19.1% vs WriteFlow's 2.0% — nearly a 10× growth rate gap. NDR 112% means every cohort is expanding. MRR is $4.8K vs WriteFlow's $10K+, but BrieflyAI is the power law candidate. At its current trajectory, these positions reverse within 12 months."
     }
 ]
 
@@ -2572,8 +2686,11 @@ for cs in CASE_STUDIES:
 
         # Quick Ratio chart
         qr_chart_html = f'<div class="card">{ch["spend_qr"]}</div>' if 'spend_qr' in ch else ''
-        # Retention curve chart
-        ret_chart_html = f'<div class="card">{ch["dev_retention"]}</div>' if 'dev_retention' in ch else ''
+        # Retention heatmap for section 3 (fall back to curve if heatmap unavailable)
+        ret_chart_html = f'<div class="card">{ch["retention_heatmap"]}</div>' if 'retention_heatmap' in ch else (f'<div class="card">{ch["dev_retention"]}</div>' if 'dev_retention' in ch else '')
+        # Cohort LTV chart for section 4 — prefer ltv_curve (now a cohort LTV bar), fall back to cohort_ltv_bar
+        cohort_ltv_html = f'<div class="card">{ch["ltv_curve"]}</div>' if 'ltv_curve' in ch else (f'<div class="card">{ch["cohort_ltv_bar"]}</div>' if 'cohort_ltv_bar' in ch else '')
+        ltv_heatmap_cs_html = f'<div class="card">{ch["ltv_heatmap"]}</div>' if 'ltv_heatmap' in ch else ''
 
         cs_cards_html += f'''
     <div class="cs-card" style="border-top:3px solid {cs['type_color']}">
@@ -2593,7 +2710,7 @@ for cs in CASE_STUDIES:
             <div class="cs-kpis">
                 <div class="cs-kpi"><div class="cs-kpi-label">MRR</div><div class="cs-kpi-value">${latest_rev:,.0f}</div></div>
                 <div class="cs-kpi"><div class="cs-kpi-label">CMGR-3</div><div class="cs-kpi-value">{cmgr3*100:.1f}%</div></div>
-                <div class="cs-kpi"><div class="cs-kpi-label">Active Users</div><div class="cs-kpi-value">{devs}</div></div>
+                <div class="cs-kpi"><div class="cs-kpi-label">Active Users</div><div class="cs-kpi-value">{f"{devs*1000:,}" if sid == "CS01" else devs}</div></div>
                 <div class="cs-kpi"><div class="cs-kpi-label">Model Mix</div><div class="cs-kpi-value" style="font-size:11px">{cs['model_mix']}</div></div>
             </div>
 
@@ -2621,19 +2738,26 @@ for cs in CASE_STUDIES:
                 <div class="cs-kpi"><div class="cs-kpi-label">Avg Gross Churn</div><div class="cs-kpi-value" style="color:{_churn_color}">{_cs_avg_churn:.1f}%</div></div>
             </div>
 
-            <!-- Step 3: LTV is the saving grace -->
+            <!-- Step 3: Cohort retention confirms it -->
             <div class="cs-section">
-                <div class="cs-section-title">3 &mdash; Cohort LTV: The Saving Grace</div>
-                <p class="cs-section-text">Users sign up during essay season, try it for a week, and leave. Growth is driven by new user acquisition, not retention. However, a saving grace is the increasing cohort lifetime value &mdash; newer cohorts display significantly higher usage of the product and the Claude API. The users who stay are worth more.</p>
+                <div class="cs-section-title">3 &mdash; Cohort Retention Confirms the Pattern</div>
+                <p class="cs-section-text">Users sign up during essay season, try it for a week, and leave. The cohort retention heatmap below confirms this: a steep drop at month 1 (the &ldquo;AI tourists&rdquo; leaving), then a flattening from month 3 onward. WriteFlow does have a retained core despite the headline churn &mdash; the question is whether that core is valuable enough.</p>
+            </div>
+            {ret_chart_html}
+
+            <!-- Step 4: LTV tells you if it's worth it -->
+            <div class="cs-section">
+                <div class="cs-section-title">4 &mdash; Cohort LTV: Are Survivors Worth It?</div>
+                <p class="cs-section-text">The users who survive past month 2 actually spend more per month than earlier cohorts. Average monthly revenue per user trends upward across cohorts &mdash; newer users are more engaged with the product and the Claude API. This is the saving grace: despite the leaky bucket, each retained user is becoming more valuable over time.</p>
             </div>
             <div class="cs-charts">
-                {ret_chart_html}
+                {cohort_ltv_html}
             </div>
-            {ltv_section_html}
+            {ltv_heatmap_cs_html}
 
             <div class="cs-section" style="margin-top:12px">
                 <div class="cs-section-title">Recommendation</div>
-                <p class="cs-section-text">The high churn and sub-2x Quick Ratio signal a leaky bucket that acquisition alone cannot fill indefinitely. We do not recommend allocating additional credits until WriteFlow demonstrates improved retention in the M2+ cohorts. Monitor the LTV trend &mdash; if newer cohorts continue to increase in value, there may be a path to sustainable unit economics despite the churn.</p>
+                <p class="cs-section-text">WriteFlow is not a bad investment &mdash; it is a consumer product with consumer dynamics. The metric to watch is not overall Quick Ratio, but M3+ retention and LTV of retained cohorts. However, the sub-2x Quick Ratio signals a leaky bucket that acquisition alone cannot fill indefinitely. We do not recommend allocating additional credits until WriteFlow demonstrates improved M2+ retention. Monitor the LTV trend &mdash; if newer cohorts continue expanding, there is a path to sustainable unit economics despite the churn.</p>
             </div>
 
             <div class="cs-link" onclick="event.stopPropagation(); showPartnerDetail('{sid}')">View full analysis &rarr;</div>
