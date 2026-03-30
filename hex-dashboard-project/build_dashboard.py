@@ -2892,10 +2892,10 @@ body {{ font-family:'IBM Plex Sans',-apple-system,sans-serif; background:{BG}; c
 .tab-detail {{ font-weight:600; }}
 .tab-detail .detail-back {{ color:{ACCENT}; margin-right:4px; }}
 .tab-detail:hover .detail-back {{ color:{TEXT}; }}
-.tab-group {{ display:flex; align-items:center; gap:0; position:relative; }}
-.tab-group-label {{ font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:{MUTED}; position:absolute; top:4px; left:20px; }}
-.tab-group .tab {{ padding-top:18px; }}
-.tab-divider {{ width:1px; height:20px; background:{GRID}; margin:0 4px; align-self:center; }}
+.tab-group {{ display:flex; align-items:flex-end; gap:0; position:relative; padding-top:6px; }}
+.tab-group-label {{ font-size:8px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:{MUTED}; position:absolute; top:2px; left:20px; pointer-events:none; }}
+.tab-group .tab {{ padding-top:14px; }}
+.tab-divider {{ width:1px; height:18px; background:{GRID}; margin:0 12px; align-self:center; }}
 .tab-cs {{ color:{ACCENT} !important; font-weight:700 !important; }}
 .tab-cs.active {{ color:{ACCENT} !important; border-bottom-color:{ACCENT} !important; }}
 .tab-linkedin {{ color:{MUTED}; padding:12px 12px !important; }}
