@@ -3305,8 +3305,7 @@ html {{ scroll-behavior:smooth; }}
     <div class="tab" data-tab="casestudies">Case Studies</div>
     <div class="tab tab-detail" data-tab="detail" style="display:none"><span class="detail-back">&larr;</span> <span class="detail-name"></span></div>
     <div style="flex:1"></div>
-    <div class="tab" data-tab="cv" style="color:{MUTED};border-left:1px solid {GRID};padding-left:20px">CV</div>
-    <div class="tab" data-tab="about" style="color:{MUTED}">About</div>
+    <div class="tab" data-tab="about" style="color:{MUTED};border-left:1px solid {GRID};padding-left:20px">About</div>
 </div>
 
 <div class="content">
@@ -3321,13 +3320,6 @@ html {{ scroll-behavior:smooth; }}
     </div>
     <div class="tab-panel" id="panel-detail">
         {''.join(f'<div class="detail-view" id="detail-{sid.lower()}" style="display:none">{startup_tab_html(sid)}</div>' for sid in ALL_SIDS)}
-    </div>
-    <div class="tab-panel" id="panel-cv">
-        <div class="section-header" style="margin-top:0">CURRICULUM VITAE</div>
-        <div style="background:{CARD};border:1px solid {GRID};border-radius:10px;overflow:hidden;margin-top:16px;">
-            <iframe src="analysis.pdf" style="width:100%;height:80vh;border:none;"></iframe>
-        </div>
-        <p style="font-size:11px;color:{MUTED};margin-top:8px;">If the PDF doesn't load, <a href="analysis.pdf" target="_blank" style="color:{ACCENT}">open it directly</a>.</p>
     </div>
     <div class="tab-panel" id="panel-about">
         <div class="section-header" style="margin-top:0">ABOUT</div>
