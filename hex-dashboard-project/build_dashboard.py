@@ -2103,7 +2103,7 @@ tier1_html = f'''
                     <button class="wf-pill" data-scope="churned">Churned</button>
                 </div>
             </div>
-            <div id="wf-content"></div>
+            <div id="wf-content"><div class="wf-loading"><div class="wf-loading-bar"></div><div class="wf-loading-bar" style="width:70%"></div><div class="wf-loading-bar" style="width:85%"></div><div class="wf-loading-bar" style="width:50%"></div><div class="wf-loading-bar" style="width:60%"></div><div class="wf-loading-bar" style="width:40%"></div><div class="wf-loading-bar" style="width:30%;margin-top:8px"></div></div></div>
             <script>window.__waterfall_data = {_wf_json_str};</script>
             {el1_html}
         </div>
@@ -3245,6 +3245,19 @@ html {{ scroll-behavior:smooth; }}
     .mode-tabs {{ flex-wrap:wrap; }}
 }}
 
+/* Loading skeleton */
+.wf-loading {{ padding:8px 0; }}
+.wf-loading-bar {{
+    height:28px; border-radius:6px; margin-bottom:6px;
+    background:linear-gradient(90deg, {GRID} 25%, {BORDER_SUBTLE} 50%, {GRID} 75%);
+    background-size:200% 100%;
+    animation:shimmer 1.5s ease-in-out infinite;
+}}
+@keyframes shimmer {{
+    0% {{ background-position:200% 0; }}
+    100% {{ background-position:-200% 0; }}
+}}
+
 /* Case studies split layout */
 .cs-split {{
     display:flex; gap:20px; align-items:flex-start;
@@ -3613,6 +3626,9 @@ document.querySelectorAll('.partner-list').forEach(wrap => {{
 (function() {{
     const WF = window.__waterfall_data;
     if (!WF) return;
+
+    // Defer render to after page paint
+    const _initWaterfall = () => {{
     const GAIN = '{GAIN}';
     const LOSS = '{LOSS}';
     const SUCCESS_C = '{SUCCESS}';
@@ -3827,6 +3843,14 @@ document.querySelectorAll('.partner-list').forEach(wrap => {{
     window.__wf_getCurPeriod = function() {{ return curPeriod; }};
     window.__wf_getCurView = function() {{ return curView; }};
     window.__wf_getCurScope = function() {{ return curScope; }};
+    }}; // end _initWaterfall
+
+    // Defer to after first paint
+    if (document.readyState === 'complete') {{
+        requestAnimationFrame(() => setTimeout(_initWaterfall, 50));
+    }} else {{
+        window.addEventListener('load', () => requestAnimationFrame(() => setTimeout(_initWaterfall, 50)));
+    }}
 }})();
 
 // ======== GA MONTHLY BREAKDOWN TABLE ========
