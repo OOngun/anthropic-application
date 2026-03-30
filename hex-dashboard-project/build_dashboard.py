@@ -2749,8 +2749,29 @@ for cs in CASE_STUDIES:
     </div>
     '''
 
-    # ── CS02, CS03 and others: standard layout ──────────────
+    # ── CS03 and others: full analysis layout ──────────────
     else:
+        # Compute QR, GDR, NDR for this company
+        _cs_ga2 = per_company_ga_df[sid]
+        _cs_latest_qr2 = _cs_ga2['quick_ratio'].iloc[-1] if len(_cs_ga2) > 0 else 0
+        _cs_prev_total2 = _cs_ga2['total_revenue'].shift(1)
+        _cs_churn_pct2 = (_cs_ga2['churned_revenue'] + _cs_ga2['contraction_revenue']) / _cs_prev_total2 * 100
+        _cs_churn_pct2 = _cs_churn_pct2.replace([np.inf, -np.inf], np.nan).dropna()
+        _cs_avg_churn2 = _cs_churn_pct2.iloc[-3:].mean() if len(_cs_churn_pct2) >= 3 else (_cs_churn_pct2.mean() if len(_cs_churn_pct2) > 0 else 0)
+        # GDR: retained / prior total
+        _cs_gdr_series = _cs_ga2['gross_retention_pct'].dropna()
+        _cs_gdr = _cs_gdr_series.iloc[-3:].mean() if len(_cs_gdr_series) >= 3 else (_cs_gdr_series.mean() if len(_cs_gdr_series) > 0 else 0)
+        # NDR: (retained + expansion + resurrected) / prior total
+        _cs_ndr_series = ((_cs_ga2['retained_revenue'] + _cs_ga2['expansion_revenue'] + _cs_ga2['resurrected_revenue']) / _cs_prev_total2 * 100).replace([np.inf, -np.inf], np.nan).dropna()
+        _cs_ndr = _cs_ndr_series.iloc[-3:].mean() if len(_cs_ndr_series) >= 3 else (_cs_ndr_series.mean() if len(_cs_ndr_series) > 0 else 0)
+
+        _qr_color2 = SUCCESS if _cs_latest_qr2 >= 4 else WARNING if _cs_latest_qr2 >= 2 else DANGER
+        _gdr_color = SUCCESS if _cs_gdr >= 80 else WARNING if _cs_gdr >= 60 else DANGER
+        _ndr_color = SUCCESS if _cs_ndr >= 100 else WARNING if _cs_ndr >= 80 else DANGER
+
+        qr_chart_html2 = f'<div class="card">{ch["spend_qr"]}</div>' if 'spend_qr' in ch else ''
+        gret_chart_html2 = f'<div class="card">{ch["gross_ret"]}</div>' if 'gross_ret' in ch else ''
+
         cs_cards_html += f'''
     <div class="cs-card" style="border-top:3px solid {cs['type_color']}">
         <div class="cs-header-clickable" onclick="toggleCaseStudy(this)">
@@ -2773,6 +2794,13 @@ for cs in CASE_STUDIES:
                 <div class="cs-kpi"><div class="cs-kpi-label">Model Mix</div><div class="cs-kpi-value" style="font-size:11px">{cs['model_mix']}</div></div>
             </div>
 
+            <div class="cs-kpis" style="margin-top:8px">
+                <div class="cs-kpi"><div class="cs-kpi-label">Quick Ratio</div><div class="cs-kpi-value" style="color:{_qr_color2}">{_cs_latest_qr2:.1f}x</div></div>
+                <div class="cs-kpi"><div class="cs-kpi-label">Avg Gross Churn</div><div class="cs-kpi-value" style="color:{DANGER}">{_cs_avg_churn2:.1f}%</div></div>
+                <div class="cs-kpi"><div class="cs-kpi-label">Net Dollar Retention</div><div class="cs-kpi-value" style="color:{_ndr_color}">{_cs_ndr:.0f}%</div></div>
+                <div class="cs-kpi"><div class="cs-kpi-label">Gross Retention</div><div class="cs-kpi-value" style="color:{_gdr_color}">{_cs_gdr:.0f}%</div></div>
+            </div>
+
             <div class="cs-section">
                 <div class="cs-section-title">Expected GA Profile</div>
                 <p class="cs-section-text">{cs['expected_ga']}</p>
@@ -2787,6 +2815,11 @@ for cs in CASE_STUDIES:
                 {mau_chart_html}
                 {ga_chart_html}
                 {rev_chart_html}
+            </div>
+
+            <div class="cs-charts">
+                {qr_chart_html2}
+                {gret_chart_html2}
             </div>
 
             {ltv_section_html}
