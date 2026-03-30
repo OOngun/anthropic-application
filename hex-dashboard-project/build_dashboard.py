@@ -1070,10 +1070,10 @@ def layout(title, h=380):
         title=dict(text=title, font=dict(size=13, color=TEXT, family='IBM Plex Sans'), x=0.01),
         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor=BG,
         font=dict(family='IBM Plex Sans', color=DIM, size=12),
-        height=h, margin=dict(l=55, r=20, t=40, b=40),
+        height=h, margin=dict(l=55, r=20, t=60, b=40),
         xaxis=dict(gridcolor=BORDER_SUBTLE, linecolor=GRID, showgrid=True, zeroline=False),
         yaxis=dict(gridcolor=BORDER_SUBTLE, linecolor=GRID, showgrid=True, zeroline=False),
-        legend=dict(bgcolor='rgba(0,0,0,0)', orientation='h', yanchor='bottom', y=1.02, xanchor='left', x=0, font=dict(size=11)),
+        legend=dict(bgcolor='rgba(0,0,0,0)', orientation='h', yanchor='bottom', y=1.08, xanchor='left', x=0.15, font=dict(size=10), traceorder='normal'),
         hovermode='x unified',
         hoverlabel=dict(bgcolor=TEXT, font_color=BG, font_size=12, font_family='IBM Plex Sans'),
     )
@@ -1305,26 +1305,26 @@ for sid in ALL_SIDS:
         _cltv_df = pd.DataFrame(_cohort_ltv_summary)
 
         if len(_cltv_df) > 0:
+            # --- Cohort LTV CURVES: cumulative LTV per dev over age (multi-line) ---
             f = go.Figure()
-            # Bar: LTV per user for each cohort
-            f.add_trace(go.Bar(
-                x=_cltv_df['label'], y=_cltv_df['ltv_per_user'],
-                marker_color=COLORS[sid], opacity=0.8, showlegend=False,
-                hovertemplate='%{x}<br>LTV/user: $%{y:,.0f}<br>Cohort: %{customdata[0]} users<br>Observed: %{customdata[1]} months<extra></extra>',
-                customdata=list(zip(_cltv_df['cohort_size'], _cltv_df['months_observed']))))
-            # Trend line
-            _x_num = np.arange(len(_cltv_df))
-            _y_vals = _cltv_df['ltv_per_user'].values
-            if len(_x_num) > 2:
-                _z = np.polyfit(_x_num, _y_vals, 1)
-                _trend = np.polyval(_z, _x_num)
-                f.add_trace(go.Scatter(x=_cltv_df['label'].tolist(), y=_trend,
-                    mode='lines', line=dict(color='black', width=2, dash='dash'),
-                    showlegend=False, hoverinfo='skip'))
-            f.update_layout(**layout('Cohort Lifetime Value', h=350))
-            f.update_layout(margin=dict(l=55, r=30, t=40, b=60))
-            f.update_yaxes(tickprefix='$', tickformat=',.0f')
-            f.update_xaxes(tickangle=-45)
+            for i, ck in enumerate(_ltv_cohorts):
+                coh = _cohort_agg_ltv[_cohort_agg_ltv['cohort_key'] == ck].sort_values('age')
+                if len(coh) < 2:
+                    continue
+                _clr = _coh_colors[i % len(_coh_colors)]
+                _label = _fmt_label(ck)
+                _cs = int(coh['cohort_size'].iloc[0])
+                f.add_trace(go.Scatter(
+                    x=coh['age'], y=coh['cum_ltv_per_dev'],
+                    mode='lines+markers', name=f'{_label} ({_cs})',
+                    line=dict(color=_clr, width=2.5),
+                    marker=dict(size=4, color=_clr),
+                    hovertemplate=f'{_label}<br>Month %{{x}}<br>LTV/dev: $%{{y:,.0f}}<extra></extra>'))
+            f.update_layout(**layout('Cumulative LTV per Developer by Cohort', h=380))
+            f.update_layout(margin=dict(l=55, r=30, t=60, b=50),
+                legend=dict(orientation='v', yanchor='top', y=0.98, xanchor='left', x=1.02, font=dict(size=10)))
+            f.update_yaxes(tickprefix='$', tickformat=',.0f', title='Cumulative LTV ($)')
+            f.update_xaxes(title='Months since onboarding', dtick=2)
             charts['ltv_curve'] = to_div(f)
 
         # --- Cohort LTV bar chart: avg monthly revenue per user by cohort ---
@@ -2615,16 +2615,6 @@ CASE_STUDIES = [
         'what_to_watch': 'Churn rate vs new acquisition rate. If churn exceeds new for 2+ months, the product is losing PMF. Model mix shift toward Sonnet signals premium feature adoption.'
     },
     {
-        'sid': 'CS02', 'name': 'FinLedger', 'type': 'Developer Tooling',
-        'type_color': '#0EA5E9',
-        'tagline': 'Internal Engineering Use (Fintech)',
-        'stage': 'Seed', 'hq': 'Berlin, Germany',
-        'summary': 'Accounting automation startup. Their product isn\'t AI — but their 4 engineers use Claude daily for code review, test generation, and docs. API keys = engineers.',
-        'model_mix': 'Sonnet 64% · Haiku 21% · Opus 15%',
-        'expected_ga': 'Very high retention (95%+), minimal churn (only if an engineer leaves). Near-zero new (only on hire). Expansion from adding use cases, not users. QR > 3× but slow-moving.',
-        'what_to_watch': 'Step-function jumps = new use case adopted. Flat line = stable but no deepening. Any churn at all is a signal (small team, losing 1 of 4 devs is 25% churn).'
-    },
-    {
         'sid': 'CS03', 'name': 'BrieflyAI', 'type': 'B2B Embedded',
         'type_color': '#F59E0B',
         'tagline': 'Meeting Summarisation Platform',
@@ -2651,16 +2641,10 @@ for cs in CASE_STUDIES:
     # MAU chart
     mau_chart_html = f'<div class="card">{ch["mau"]}</div>' if 'mau' in ch else ''
 
-    # LTV charts — CS02 gets a text note instead of charts
-    if sid == 'CS02':
-        ltv_section_html = '''<div class="cs-section">
-    <div class="cs-section-title">Lifetime Value</div>
-    <p class="cs-section-text">With only 4\u20135 developers and near-zero churn, cohort analysis is not meaningful for FinLedger. Their value story is better read through the growth accounting section \u2014 specifically the step-function expansions when they adopt new Claude use cases (CI pipeline at month 9, documentation at month 16).</p>
-</div>'''
-    else:
-        ltv_curve_html = f'<div class="card">{ch["ltv_curve"]}</div>' if 'ltv_curve' in ch else ''
-        ltv_heatmap_html = f'<div class="card">{ch["ltv_heatmap"]}</div>' if 'ltv_heatmap' in ch else ''
-        ltv_section_html = f'''<div class="cs-section">
+    # LTV charts
+    ltv_curve_html = f'<div class="card">{ch["ltv_curve"]}</div>' if 'ltv_curve' in ch else ''
+    ltv_heatmap_html = f'<div class="card">{ch["ltv_heatmap"]}</div>' if 'ltv_heatmap' in ch else ''
+    ltv_section_html = f'''<div class="cs-section">
                 <div class="cs-section-title">LTV Cohort Analysis</div>
             </div>
             <div class="cs-charts">
@@ -2800,6 +2784,7 @@ for cs in CASE_STUDIES:
             </div>
 
             <div class="cs-charts">
+                {mau_chart_html}
                 {ga_chart_html}
                 {rev_chart_html}
             </div>
@@ -2813,7 +2798,7 @@ for cs in CASE_STUDIES:
 
 casestudies_content = f'''
 <div class="section-header" style="margin-top:0">CASE STUDIES</div>
-<p class="pl-subtitle" style="margin-bottom:20px">Three partner archetypes demonstrating how growth accounting profiles differ by use case. Based on the <a href="https://tribecap.co/essays/a-quantitative-approach-to-product-market-fit" style="color:{MUTED};text-decoration:underline" target="_blank">Tribe Capital PMF framework</a>.</p>
+<p class="pl-subtitle" style="margin-bottom:20px">Two partner archetypes demonstrating how growth accounting profiles differ by use case. Based on the <a href="https://tribecap.co/essays/a-quantitative-approach-to-product-market-fit" style="color:{MUTED};text-decoration:underline" target="_blank">Tribe Capital PMF framework</a>.</p>
 {cs_cards_html}
 '''
 
