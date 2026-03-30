@@ -3331,8 +3331,13 @@ html {{ scroll-behavior:smooth; }}
     <div class="tab-panel" id="panel-about">
         <div class="section-header" style="margin-top:0">ABOUT</div>
         <div style="background:{CARD};border:1px solid {GRID};border-radius:10px;padding:24px;margin-top:16px;max-width:600px;">
-            <h3 style="font-size:18px;font-weight:700;margin-bottom:12px;">Ongun Ozdemir</h3>
-            <p style="font-size:13px;color:{DIM};margin-bottom:16px;">Strategic Investments &amp; BizOps Manager at RootstockLabs, the leading Bitcoin Layer 2 deep tech lab. Based in London.</p>
+            <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;">
+                <img src="headshot.jpg" style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid {GRID};" alt="Ongun Ozdemir">
+                <div>
+                    <h3 style="font-size:18px;font-weight:700;margin-bottom:2px;">Ongun Ozdemir</h3>
+                    <p style="font-size:13px;color:{DIM};margin:0;">Strategic Investments &amp; BizOps Manager at RootstockLabs. London.</p>
+                </div>
+            </div>
             <div style="font-size:12px;color:{DIM};margin-bottom:16px;">
                 <div style="font-weight:600;color:{TEXT};margin-bottom:8px;">Experience</div>
                 <div style="margin-bottom:10px;">
