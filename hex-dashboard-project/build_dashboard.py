@@ -2837,14 +2837,9 @@ for cs in CASE_STUDIES:
 
 casestudies_content = f'''
 <div class="section-header" style="margin-top:0">CASE STUDIES</div>
-<p class="pl-subtitle" style="margin-bottom:20px">Two partner archetypes demonstrating how growth accounting profiles differ by use case. Based on the <a href="https://tribecap.co/essays/a-quantitative-approach-to-product-market-fit" style="color:{MUTED};text-decoration:underline" target="_blank">Tribe Capital PMF framework</a>.</p>
-
-<div style="background:{CARD};border:1px solid {GRID};border-radius:10px;overflow:hidden;margin-bottom:24px;">
-    <div style="padding:12px 16px;border-bottom:1px solid {GRID};display:flex;justify-content:space-between;align-items:center;">
-        <span style="font-size:12px;font-weight:600;color:{DIM};">Case Study Analysis Document</span>
-        <a href="analysis.pdf" target="_blank" style="font-size:11px;color:{ACCENT};text-decoration:none;">Open in new tab &rarr;</a>
-    </div>
-    <iframe src="analysis.pdf" style="width:100%;height:75vh;border:none;"></iframe>
+<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
+    <p class="pl-subtitle" style="margin-bottom:0">Two partner archetypes demonstrating how growth accounting profiles differ by use case. Based on the <a href="https://tribecap.co/essays/a-quantitative-approach-to-product-market-fit" style="color:{MUTED};text-decoration:underline" target="_blank">Tribe Capital PMF framework</a>.</p>
+    <button onclick="toggleDocPanel()" class="doc-panel-btn" id="doc-panel-btn">&#128196; Analysis Document</button>
 </div>
 
 {cs_cards_html}
@@ -3241,6 +3236,51 @@ html {{ scroll-behavior:smooth; }}
     .analysis-header {{ flex-direction:column; align-items:flex-start; gap:6px; }}
     .mode-tabs {{ flex-wrap:wrap; }}
 }}
+
+/* Document slide-out panel */
+.doc-panel-btn {{
+    flex-shrink:0;
+    display:inline-flex; align-items:center; gap:6px;
+    padding:8px 16px;
+    background:{ACCENT}; color:#fff;
+    border:none; border-radius:8px;
+    font-size:12px; font-weight:600; font-family:inherit;
+    cursor:pointer; transition:opacity 0.15s;
+    white-space:nowrap;
+}}
+.doc-panel-btn:hover {{ opacity:0.85; }}
+.doc-panel-btn.active {{ background:{TEXT}; }}
+
+.doc-overlay {{
+    display:none; position:fixed; inset:0;
+    background:rgba(0,0,0,0.3); z-index:999;
+    transition:opacity 0.3s;
+}}
+.doc-overlay.open {{ display:block; }}
+
+.doc-panel {{
+    position:fixed; top:0; right:-42%;
+    width:40%; height:100vh;
+    background:{CARD}; border-left:1px solid {GRID};
+    box-shadow:-4px 0 24px rgba(0,0,0,0.08);
+    z-index:1000;
+    transition:right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}}
+.doc-panel.open {{ right:0; }}
+
+.doc-panel-header {{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:12px 16px;
+    border-bottom:1px solid {GRID};
+    background:{BG};
+}}
+.doc-panel-title {{
+    font-size:13px; font-weight:600; color:{TEXT};
+}}
+
+@media (max-width: 900px) {{
+    .doc-panel {{ width:85%; right:-87%; }}
+}}
 </style>
 </head>
 <body>
@@ -3311,6 +3351,26 @@ html {{ scroll-behavior:smooth; }}
 </div>
 
 <script>
+// ======== DOCUMENT PANEL ========
+function toggleDocPanel() {{
+    const panel = document.getElementById('doc-panel');
+    const overlay = document.getElementById('doc-overlay');
+    const btn = document.getElementById('doc-panel-btn');
+    const iframe = document.getElementById('doc-panel-iframe');
+    const isOpen = panel.classList.contains('open');
+    if (!isOpen) {{
+        // Lazy-load the PDF only on first open
+        if (!iframe.src || iframe.src === 'about:blank') iframe.src = 'analysis.pdf';
+        panel.classList.add('open');
+        overlay.classList.add('open');
+        if (btn) btn.classList.add('active');
+    }} else {{
+        panel.classList.remove('open');
+        overlay.classList.remove('open');
+        if (btn) btn.classList.remove('active');
+    }}
+}}
+
 // ======== TOOLTIP ENGINE (rich HTML) ========
 (function() {{
     const tip = document.createElement('div');
@@ -4197,6 +4257,19 @@ document.querySelectorAll('.partner-list').forEach(wrap => {{
     <div class="tip-body">Projected monthly revenue in 6 months. Factors in model mix since Opus generates more revenue per token than Haiku.</div>
 </div>
 
+</div>
+
+<!-- Slide-out document panel -->
+<div class="doc-overlay" id="doc-overlay" onclick="toggleDocPanel()"></div>
+<div class="doc-panel" id="doc-panel">
+    <div class="doc-panel-header">
+        <span class="doc-panel-title">Case Study Analysis</span>
+        <div style="display:flex;gap:12px;align-items:center;">
+            <a href="analysis.pdf" target="_blank" style="font-size:11px;color:{ACCENT};text-decoration:none;">Open in new tab &rarr;</a>
+            <button onclick="toggleDocPanel()" style="background:none;border:none;font-size:18px;color:{MUTED};cursor:pointer;padding:0 4px;">&times;</button>
+        </div>
+    </div>
+    <iframe id="doc-panel-iframe" style="width:100%;height:calc(100% - 48px);border:none;"></iframe>
 </div>
 
 </body>
