@@ -10,6 +10,7 @@ transcripts/
 networking-research/
 cv/
 *.pdf
+!docs/*.pdf
 interview-questions.md
 job-tracker.md
 ongun-profile.md
