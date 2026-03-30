@@ -3324,8 +3324,40 @@ html {{ scroll-behavior:smooth; }}
     <div class="tab-panel" id="panel-about">
         <div class="section-header" style="margin-top:0">ABOUT</div>
         <div style="background:{CARD};border:1px solid {GRID};border-radius:10px;padding:24px;margin-top:16px;max-width:600px;">
-            <h3 style="font-size:18px;font-weight:700;margin-bottom:8px;">Ongun Ozdemir</h3>
-            <p style="font-size:13px;color:{DIM};margin-bottom:16px;">Investments &amp; Business Operations Manager based in London. Background spanning venture capital (Ada Ventures scout, VC Lab with Adeo Resi, SMOK Ventures), programme building ($5.5M&rarr;$15.5M grants programme built from zero at RootstockLabs), and strategic operations.</p>
+            <h3 style="font-size:18px;font-weight:700;margin-bottom:12px;">Ongun Ozdemir</h3>
+            <p style="font-size:13px;color:{DIM};margin-bottom:16px;">Strategic Investments &amp; BizOps Manager at RootstockLabs, the leading Bitcoin Layer 2 deep tech lab. Based in London.</p>
+            <div style="font-size:12px;color:{DIM};margin-bottom:16px;">
+                <div style="font-weight:600;color:{TEXT};margin-bottom:8px;">Experience</div>
+                <div style="margin-bottom:10px;">
+                    <div style="font-weight:600;color:{TEXT};">RootstockLabs</div>
+                    <div style="color:{MUTED};font-size:11px;">3 yrs 8 mos &middot; London</div>
+                    <div style="margin-top:4px;">Strategic Investments &amp; BizOps Manager (2025&ndash;present)</div>
+                    <div>Senior VC Associate (2023&ndash;2026)</div>
+                    <div>Venture Associate (2022&ndash;2023)</div>
+                    <div style="color:{MUTED};margin-top:4px;font-size:11px;">Built $5.5M&rarr;$15.5M grants programme from zero. Led ecosystem programmes, hackathons, developer events, and all investments.</div>
+                </div>
+                <div style="margin-bottom:10px;">
+                    <div style="font-weight:600;color:{TEXT};">Ada Ventures &middot; Venture Scout</div>
+                    <div style="color:{MUTED};font-size:11px;">1 yr 8 mos &middot; London &middot; &pound;65M fund</div>
+                </div>
+                <div style="margin-bottom:10px;">
+                    <div style="font-weight:600;color:{TEXT};">VC Lab &middot; Analyst</div>
+                    <div style="color:{MUTED};font-size:11px;">1 yr &middot; Palo Alto (remote) &middot; Employee #10</div>
+                    <div style="color:{MUTED};margin-top:4px;font-size:11px;">Premier VC accelerator. Launched 500+ VC funds &mdash; 50% of new VC funds worldwide.</div>
+                </div>
+                <div style="margin-bottom:10px;">
+                    <div style="font-weight:600;color:{TEXT};">Portfolio Ventures &middot; Analyst</div>
+                    <div style="color:{MUTED};font-size:11px;">2 yrs 6 mos &middot; London &middot; UK Angel Fund (Fintech, SaaS, Enterprise)</div>
+                </div>
+                <div style="margin-bottom:10px;">
+                    <div style="font-weight:600;color:{TEXT};">Diversity VC &middot; Volunteer</div>
+                    <div style="color:{MUTED};font-size:11px;">1 yr &middot; London &middot; Downing Street 2022</div>
+                </div>
+            </div>
+            <div style="font-size:12px;color:{DIM};margin-bottom:16px;">
+                <div style="font-weight:600;color:{TEXT};margin-bottom:6px;">Education</div>
+                <div>University of Kent &middot; Economics (2013&ndash;2016)</div>
+            </div>
             <div style="display:flex;gap:16px;">
                 <a href="https://www.linkedin.com/in/ongunozdemir/" target="_blank" style="display:inline-flex;align-items:center;gap:6px;color:{ACCENT};text-decoration:none;font-size:13px;font-weight:500;">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
