@@ -2838,6 +2838,7 @@ for cs in CASE_STUDIES:
 casestudies_content = f'''
 <div class="section-header" style="margin-top:0">CASE STUDIES</div>
 <p class="pl-subtitle" style="margin-bottom:20px">Two partner archetypes demonstrating how growth accounting profiles differ by use case. Based on the <a href="https://tribecap.co/essays/a-quantitative-approach-to-product-market-fit" style="color:{MUTED};text-decoration:underline" target="_blank">Tribe Capital PMF framework</a>.</p>
+<a href="analysis.pdf" target="_blank" style="display:inline-flex;align-items:center;gap:8px;padding:10px 20px;background:{ACCENT};color:#fff;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600;margin-bottom:20px;transition:opacity 0.15s;" onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">&#128196; View Case Study Document</a>
 {cs_cards_html}
 '''
 
