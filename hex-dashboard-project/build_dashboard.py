@@ -1629,17 +1629,20 @@ for sid in ALL_SIDS:
     f.update_layout(**ll)
     charts['latency'] = to_div(f)
 
-    # Spend Quick Ratio (per-company) — log scale like Tribe Capital presentation
+    # Spend Quick Ratio (per-company)
     f = go.Figure()
     if len(d_ga) > 0 and 'quick_ratio' in d_ga.columns:
         _qr_data = d_ga[d_ga['quick_ratio'].notna() & (d_ga['quick_ratio'] > 0)]
-        _qr_vals = _qr_data['quick_ratio'].clip(upper=50)
+        _qr_vals = _qr_data['quick_ratio'].clip(upper=15)
         f.add_trace(go.Scatter(x=_qr_data['month'], y=_qr_vals,
             mode='lines+markers', line=dict(color=COLORS[sid], width=2.5), marker=dict(size=5), showlegend=False,
             hovertemplate='%{y:.1f}x<extra></extra>'))
-        f.add_hline(y=4, line_dash="dash", line_color=SUCCESS, annotation_text="4.0x Strong", annotation_position="top right", annotation_font_color=SUCCESS)
-        f.add_hline(y=1, line_dash="dash", line_color=DANGER, annotation_text="1.0x Flat", annotation_position="bottom right", annotation_font_color=DANGER)
-        f.update_yaxes(type='log', dtick=1, range=[np.log10(0.3), np.log10(60)])
+        f.add_hline(y=4, line_dash="dash", line_color=SUCCESS, annotation_text="4.0x Strong",
+            annotation=dict(yanchor='bottom'), annotation_font_color=SUCCESS)
+        f.add_hline(y=1, line_dash="dash", line_color=DANGER, annotation_text="1.0x Flat",
+            annotation=dict(yanchor='top'), annotation_font_color=DANGER)
+        _qr_max = min(float(_qr_vals.max()) * 1.3, 15)
+        f.update_yaxes(range=[0, _qr_max], ticksuffix='x')
     else:
         f.add_annotation(text="Insufficient data", xref="paper", yref="paper",
             x=0.5, y=0.5, showarrow=False, font=dict(size=13, color=MUTED))
